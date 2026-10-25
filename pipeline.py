@@ -129,9 +129,9 @@ def render(root):
     image.save(root/'cover.png')
     image.resize((1280, 720)).save(root/'thumbnail.jpg', quality=90)
     subprocess.run(['ffmpeg', '-y', '-loop', '1', '-i', str(root/'cover.png'), '-i', str(root/'song.wav'),
-        '-filter_complex', '[1:a]asplit=2[a][v];[v]showwaves=s=1600x180:mode=line:colors=0xf9b4cc:rate=25,format=rgba[w];[0:v][w]overlay=160:750,format=yuv420p[out]',
+        '-filter_complex', '[1:a]asplit=2[a][v];[v]showwaves=s=1600x180:mode=line:colors=0xf9b4cc:rate=25,format=rgba[w];[0:v][w]overlay=160:750:shortest=1,format=yuv420p[out]',
         '-map', '[out]', '-map', '[a]', '-c:v', 'libx264', '-preset', 'fast', '-crf', '20',
-        '-c:a', 'aac', '-b:a', '320k', '-shortest', '-movflags', '+faststart', str(root/'video.mp4')],
+        '-c:a', 'aac', '-b:a', '320k', '-t', str(duration(root/'song.wav')), '-shortest', '-movflags', '+faststart', str(root/'video.mp4')],
         check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     validate_duration(duration(root/'video.mp4'))
 
