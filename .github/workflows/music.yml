@@ -19,14 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       ACESTEP_API_URL: ${{ secrets.ACESTEP_API_URL }}
       ACESTEP_API_KEY: ${{ secrets.ACESTEP_API_KEY }}
       YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
       EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID }}
       DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
       DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-      LYRICS_MODEL: ${{ vars.LYRICS_MODEL || 'llama-3.3-70b-versatile' }}
+      LYRICS_MODEL: Qwen/Qwen3-4B-Instruct-2507
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
       REQUESTED_RUN_ID: ${{ inputs.run_id }}
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +36,19 @@ jobs:
           python-version: '3.11'
           cache: pip
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt -r requirements-lyrics.txt
       - run: python -m unittest -v
+      - name: Prepare original Hindi lyrics, music and video
+        shell: bash
+        run: |
+          RUN_ID="${REQUESTED_RUN_ID:-daily-$(TZ=Asia/Dhaka date +%F)}"
+          python -u prepare_music.py --run-id "$RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: generated-music-${{ github.run_id }}
+          path: output/
+          retention-days: 7
       - name: Generate and publish
         shell: bash
         run: |

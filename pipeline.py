@@ -37,16 +37,22 @@ def make_song(day, history):
     prompt (English musical style, instruments and vocal direction), duration
     (integer seconds 180-360, aim 240), description (Hindi/English, <=4000 chars).
     Lyrics should support a complete 3-6 minute vocal song. No spoken CTA.'''
-    response = requests.post('https://api.groq.com/openai/v1/chat/completions',
-        headers={'Authorization': 'Bearer ' + required('GROQ_API_KEY')},
-        json={'model': os.getenv('LYRICS_MODEL', 'llama-3.3-70b-versatile'),
-              'messages': [{'role': 'user', 'content': prompt}],
-              'response_format': {'type': 'json_object'}, 'max_tokens': 3500}, timeout=120)
-    response.raise_for_status()
-    choice = response.json()['choices'][0]
-    if choice.get('finish_reason') == 'length':
-        raise RuntimeError('Lyrics truncated')
-    return validate_song(json.loads(choice['message']['content']))
+    from lyrics_cpu import MODEL_ID, request_story
+    schema = {'type': 'object', 'additionalProperties': False,
+        'required': ['title', 'lyrics', 'prompt', 'duration', 'description'],
+        'properties': {
+            'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+            'lyrics': {'type': 'string', 'minLength': 500},
+            'prompt': {'type': 'string', 'minLength': 20},
+            'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360},
+            'description': {'type': 'string', 'minLength': 20, 'maxLength': 4000}}}
+    result = request_story('chat/completions', {'model': MODEL_ID,
+        'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter. Write natural Hindi in Devanagari.'},
+                     {'role': 'user', 'content': prompt}],
+        'response_format': {'type': 'json_schema', 'json_schema': {'schema': schema}},
+        'max_completion_tokens': 5000})
+    return validate_song(json.loads(result['choices'][0]['message']['content']))
+
 
 
 class AceStep:
@@ -215,7 +221,8 @@ def run(run_id):
         return
     if not state.get('song'):
         day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
-        song = make_song(day, [h['title'] for h in history[-30:]])
+        song = (validate_song(json.loads((root/'song.json').read_text()))
+                if (root/'song.json').exists() else make_song(day, [h['title'] for h in history[-30:]]))
         digest = hashlib.sha256(song['lyrics'].encode()).hexdigest()
         if any(h.get('hash') == digest or h['title'] == song['title'] for h in history):
             raise RuntimeError('Duplicate song rejected')

@@ -8,3 +8,5 @@ google-auth-oauthlib>=1.2,<2
 
 cryptography>=44,<47
 jsonschema>=4.23,<5
+
+gradio-client>=2,<3
