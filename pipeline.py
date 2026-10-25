@@ -30,6 +30,9 @@ def validate_song(song):
 def make_song(day, history):
     prompt = f'''Write an ORIGINAL Hindi song for Heart and Mind on {day}.
     Themes: love, longing, healing, hope. Natural poetic Hindi in Devanagari.
+    पूरा गीत हिंदी की देवनागरी लिपि में लिखो। रोमन लिपि में हिंदी मत लिखो।
+    Example of the required script: तेरी यादों में मेरा दिल खो गया।
+    Every sung line must use Hindi characters, never English transliteration.
     Never copy existing lyrics, melodies, titles, or imitate a named singer.
     Avoid these previous titles: {json.dumps(history, ensure_ascii=False)}.
     Return JSON only: title (Hindi plus short English, <=100 chars), lyrics
@@ -42,7 +45,7 @@ def make_song(day, history):
         'required': ['title', 'lyrics', 'prompt', 'duration', 'description'],
         'properties': {
             'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
-            'lyrics': {'type': 'string', 'minLength': 500},
+            'lyrics': {'type': 'string', 'minLength': 500, 'pattern': '[ऀ-ॿ]'},
             'prompt': {'type': 'string', 'minLength': 20},
             'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360},
             'description': {'type': 'string', 'minLength': 20, 'maxLength': 4000}}}

@@ -82,6 +82,7 @@ def request_story(endpoint, payload):
         if isinstance(node, dict):
             node.pop('minLength', None)
             node.pop('maxLength', None)
+            node.pop('pattern', None)
             for value in node.values():
                 remove_string_bounds(value)
         elif isinstance(node, list):
@@ -113,6 +114,10 @@ def request_story(endpoint, payload):
             print(json.dumps({'check': 'Qwen JSON validation retry', 'attempt': attempt + 1}), flush=True)
             if attempt == 2:
                 raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts') from None
+            messages.append({'role': 'user', 'content':
+                'The previous response did not match the required schema. Regenerate the complete JSON. '
+                'Write every sung lyric line in actual Hindi Devanagari characters (जैसे तेरी यादों में मेरा दिल). '
+                'Romanized Hindi using English letters is invalid. Keep all required fields and duration 180-360.'})
             continue
         print(json.dumps({'check': 'Qwen lyrics JSON', 'passed': True,
             'seconds': round(time.monotonic() - started, 1),
