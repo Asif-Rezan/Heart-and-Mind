@@ -10,6 +10,11 @@ on:
         description: Optional previous GitHub run ID whose saved song/video should be resumed
         required: false
         type: string
+      retry_rejected_submission:
+        description: Confirm logs show the saved request was rejected before music generation
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: '0 19 * * *' # 01:00 Asia/Dhaka
 permissions:
@@ -34,6 +39,7 @@ jobs:
       OMP_NUM_THREADS: '4'
       HF_HUB_DISABLE_XET: '1'
       REQUESTED_RUN_ID: ${{ inputs.run_id }}
+      RETRY_REJECTED_SUBMISSION: ${{ inputs.retry_rejected_submission }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -55,7 +61,11 @@ jobs:
         shell: bash
         run: |
           RUN_ID="${REQUESTED_RUN_ID:-daily-$(TZ=Asia/Dhaka date +%F)}"
-          python -u prepare_music.py --run-id "$RUN_ID"
+          OPTIONS=()
+          if [[ "$RETRY_REJECTED_SUBMISSION" == 'true' ]]; then
+            OPTIONS+=(--retry-rejected-submission)
+          fi
+          python -u prepare_music.py --run-id "$RUN_ID" "${OPTIONS[@]}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

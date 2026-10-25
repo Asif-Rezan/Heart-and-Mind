@@ -1,6 +1,6 @@
 """Generate through the requested official ACE-Step 1.5 Hugging Face Space."""
 import json
-import shutil
+import subprocess
 from pathlib import Path
 from gradio_client import Client
 
@@ -18,14 +18,17 @@ def generate(song, target, state, save):
     wanted = {'models': 'acestep-v15-xl-turbo', 'Song Description': '',
         'Prompt': song['prompt'], 'Lyrics': song['lyrics'], 'Vocal Language': 'hi',
         'Vocal Language (optional)': 'hi', 'Audio Duration (seconds)': song['duration'],
-        'batch size': 1, 'Audio Format': 'wav', 'Thinking': True}
+        'batch size': 1, 'Audio Format': 'flac', 'Thinking': True}
     found = set()
     for p in parameters:
         label = p.get('label')
         if label in wanted:
+            choices = p.get('type', {}).get('enum')
+            if choices and wanted[label] not in choices:
+                raise RuntimeError('Official Space does not support requested ' + label)
             values[p['parameter_name']] = wanted[label]
             found.add(label)
-    if not {'Prompt', 'Lyrics', 'Audio Duration (seconds)', 'Vocal Language'} <= found:
+    if not {'Prompt', 'Lyrics', 'Audio Duration (seconds)', 'Vocal Language', 'Audio Format'} <= found:
         raise RuntimeError('Official Space endpoint changed; review its API before generation')
     values['generation_mode'] = 'custom'
     state['generation_started'] = True
@@ -38,6 +41,11 @@ def generate(song, target, state, save):
         raise RuntimeError('Official Space returned no generated audio')
     from pipeline import duration, validate_duration
     validate_duration(duration(Path(audio)))
-    shutil.copyfile(audio, target)
+    temporary = target.with_name(target.stem + '.converting.wav')
+    subprocess.run(['ffmpeg', '-y', '-i', audio, '-map', '0:a:0', '-vn',
+        '-c:a', 'pcm_s16le', str(temporary)], check=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    validate_duration(duration(temporary))
+    temporary.replace(target)
     state['audio_ready'] = True
     save()
