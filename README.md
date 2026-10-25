@@ -75,3 +75,7 @@ Reference inspected: `Rezan-After-Dark` main, including `workflow.py`, `daily_pu
 ## Dedicated Google Cloud project
 
 Selected an unused project in organization `931428574736`, renamed **Heart and Mind**. Project ID: `project-5a0943f4-af8e-49e0-8e4`, project number `563533070055`. Before reuse its credential lists were empty, API traffic had no data over 30 days, and inventory contained only the default service registrations, log buckets/sinks, and project record.
+
+Account setup completed: external OAuth app is **In production**, YouTube Data API v3 and Drive API enabled, fresh offline credentials verified against Heart & Mind (`UCDTjTh7ORO2J_5OrR0dESTQ`) and its private Drive folder. All four Google account settings are stored as encrypted repository Actions secrets. No Groq key is configured or read.
+
+If a run prepared media before credentials became available, launch the workflow using the same `run_id` and its numeric GitHub run ID in `prepared_run`. This restores the original saved audio/video rather than generating another song. Inspect incomplete generation checkpoints before retrying an ambiguous music service submission.

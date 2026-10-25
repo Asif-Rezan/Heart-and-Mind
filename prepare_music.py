@@ -36,7 +36,9 @@ def prepare(run_id):
         else:
             generate(song, root/'song.wav', state, save)
     validate_duration(duration(root/'song.wav'))
-    render(root)
+    if not (root/'video.mp4').exists():
+        render(root)
+    validate_duration(duration(root/'video.mp4'))
     print(json.dumps({'run_id': run_id, 'phase': 'prepared', 'title': song['title'],
         'duration': duration(root/'video.mp4')}), flush=True)
 

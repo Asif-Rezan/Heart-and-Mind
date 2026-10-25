@@ -6,10 +6,15 @@ on:
         description: Stable run ID; reuse it to resume an interrupted song
         required: true
         type: string
+      prepared_run:
+        description: Optional previous GitHub run ID whose saved song/video should be resumed
+        required: false
+        type: string
   schedule:
     - cron: '0 19 * * *' # 01:00 Asia/Dhaka
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: heart-and-mind-publish
   cancel-in-progress: false
@@ -38,6 +43,14 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - run: pip install -r requirements.txt -r requirements-lyrics.txt
       - run: python -m unittest -v
+      - name: Restore original generated music when resuming
+        if: inputs.prepared_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-music-${{ inputs.prepared_run }}
+          run-id: ${{ inputs.prepared_run }}
+          github-token: ${{ github.token }}
+          path: output/
       - name: Prepare original Hindi lyrics, music and video
         shell: bash
         run: |
