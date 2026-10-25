@@ -83,3 +83,25 @@ class SpaceTests(unittest.TestCase):
                 with self.assertRaises((RuntimeError, TimeoutError)):
                     music_space.generate({'prompt':'pop', 'lyrics':'हिंदी', 'duration':240}, Path('song.wav'), state, Mock())
             self.assertEqual(state['generation_started'], expected_started)
+
+    def test_hugging_face_token_is_passed_to_music_client(self):
+        client = Mock()
+        client.view_api.return_value = api_info()
+        client.predict.return_value = [None]
+        with patch.dict('os.environ', {'HF_TOKEN': 'test-only-token'}), patch.object(music_space, 'Client', return_value=client) as factory:
+            with self.assertRaisesRegex(RuntimeError, 'no generated audio'):
+                music_space.generate({'prompt':'pop', 'lyrics':'हिंदी', 'duration':240}, Path('song.wav'), {}, Mock())
+        self.assertEqual(factory.call_args.kwargs['token'], 'test-only-token')
+
+    def test_confirmed_quota_rejection_is_saved_without_blind_retries(self):
+        from gradio_client.exceptions import AppError
+        client = Mock()
+        client.view_api.return_value = api_info()
+        client.predict.side_effect = AppError('You have exceeded your ZeroGPU runs limit. Authenticate with a Hugging Face token for more quota')
+        state = {}
+        with patch.object(music_space, 'Client', return_value=client):
+            with self.assertRaisesRegex(RuntimeError, 'configure HF_TOKEN'):
+                music_space.generate({'prompt':'pop', 'lyrics':'हिंदी', 'duration':240}, Path('song.wav'), state, Mock())
+        self.assertFalse(state['generation_started'])
+        self.assertIn('quota', state['generation_failed'])
+        self.assertEqual(client.predict.call_count, 1)

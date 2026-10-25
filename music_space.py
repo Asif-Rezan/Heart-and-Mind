@@ -1,5 +1,5 @@
 """Generate through the requested official ACE-Step 1.5 Hugging Face Space."""
-import json
+import os
 import subprocess
 from pathlib import Path
 from gradio_client import Client
@@ -9,7 +9,7 @@ SPACE = 'ACE-Step/Ace-Step-v1.5'
 def generate(song, target, state, save):
     if state.get('generation_started'):
         raise RuntimeError('Ambiguous Space generation; reconcile before resubmission')
-    client = Client(SPACE, download_files=str(target.parent/'space-downloads'), verbose=False)
+    client = Client(SPACE, token=os.getenv('HF_TOKEN') or None, download_files=str(target.parent/'space-downloads'), verbose=False)
     info = client.view_api(return_format='dict', print_info=False)
     endpoint = info['named_endpoints']['/generation_wrapper']
     parameters = endpoint['parameters']
@@ -47,6 +47,11 @@ def generate(song, target, state, save):
         from gradio_client.exceptions import AppError
         # This exact terminal service response confirms the task stopped.
         # Transport failures and timeouts stay ambiguous and cannot resubmit.
+        if isinstance(error, AppError) and str(error).strip().startswith('You have exceeded your ZeroGPU runs limit.'):
+            state['generation_started'] = False
+            state['generation_failed'] = 'ZeroGPU quota exhausted before generation'
+            save()
+            raise RuntimeError('ACE-Step ZeroGPU quota exhausted; configure HF_TOKEN with available quota or a private ACESTEP_API_URL') from None
         if isinstance(error, AppError) and str(error).strip() == 'GPU task aborted':
             state['generation_started'] = False
             state['generation_failed'] = 'GPU task aborted'
