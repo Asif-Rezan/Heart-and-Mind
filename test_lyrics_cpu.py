@@ -112,3 +112,19 @@ class QwenTests(unittest.TestCase):
         self.assertEqual(download.call_count, 3)
         llama.assert_not_called()
 
+
+    def test_long_string_bounds_validated_without_native_grammar_expansion(self):
+        payload = self.payload()
+        schema = {'type': 'object', 'properties': {'text': {'type': 'string', 'minLength': 500, 'maxLength': 4000}}, 'required': ['text']}
+        payload['response_format']['json_schema']['schema'] = schema
+        result = self.result(json.dumps({'text': 'a' * 600}))
+        model = self.model(create_chat_completion=Mock(return_value=result))
+        with patch.object(s, 'load_model', return_value=model):
+            s.request_story('chat/completions', payload)
+        grammar = model.create_chat_completion.call_args.kwargs['response_format']['schema']
+        self.assertEqual(grammar['properties']['text'], {'type': 'string'})
+        self.assertEqual(schema['properties']['text']['maxLength'], 4000)
+        model.create_chat_completion.return_value = self.result(json.dumps({'text': 'short'}))
+        with patch.object(s, 'load_model', return_value=model):
+            with self.assertRaises(s.StoryGenerationError):
+                s.request_story('chat/completions', payload)

@@ -75,6 +75,19 @@ def request_story(endpoint, payload):
     limit = int(payload.get('max_completion_tokens', 4200))
     if not 1 <= limit <= 6000:
         raise StoryGenerationError('Lyrics output token budget must be between 1 and 6000')
+    # Bounds remain enforced by jsonschema. Expanding thousands of optional
+    # characters in llama.cpp's grammar can overflow its native parser stack.
+    grammar_schema = copy.deepcopy(schema)
+    def remove_string_bounds(node):
+        if isinstance(node, dict):
+            node.pop('minLength', None)
+            node.pop('maxLength', None)
+            for value in node.values():
+                remove_string_bounds(value)
+        elif isinstance(node, list):
+            for value in node:
+                remove_string_bounds(value)
+    remove_string_bounds(grammar_schema)
     model = load_model()
     # Include chat markers and the BOS token in the conservative context allowance.
     prompt_tokens = sum(len(model.tokenize(message['content'].encode(), add_bos=False)) + 16
@@ -85,7 +98,7 @@ def request_story(endpoint, payload):
         started = time.monotonic()
         try:
             result = model.create_chat_completion(messages=messages,
-                response_format={'type': 'json_object', 'schema': schema},
+                response_format={'type': 'json_object', 'schema': grammar_schema},
                 max_tokens=limit, temperature=max(.2, float(payload.get('temperature', .7)) - .15 * attempt),
                 top_p=.8, top_k=20, repeat_penalty=1.05, seed=1700 + attempt)
         except Exception:

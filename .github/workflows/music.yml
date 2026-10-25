@@ -16,7 +16,7 @@ concurrency:
 jobs:
   publish:
     if: github.event_name == 'workflow_dispatch' || vars.AUTOMATION_ENABLED == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       ACESTEP_API_URL: ${{ secrets.ACESTEP_API_URL }}
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: pip
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - run: pip install -r requirements.txt -r requirements-lyrics.txt

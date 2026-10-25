@@ -2,18 +2,30 @@
 import argparse
 import json
 import subprocess
+import shutil
+import os
 from pathlib import Path
 
 REPO = 'Asif-Rezan/Heart-and-Mind'
 SCOPES = {
-    'youtube': ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.force-ssl'],
+    'youtube': ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly'],
     'drive': ['https://www.googleapis.com/auth/drive.file'],
 }
 
 
 def secret(name, value):
-    subprocess.run(['gh', 'secret', 'set', name, '--repo', REPO], input=value,
-                   text=True, check=True, capture_output=True)
+    if shutil.which('gh'):
+        subprocess.run(['gh', 'secret', 'set', name, '--repo', REPO], input=value,
+                       text=True, check=True, capture_output=True)
+    else:
+        directory = Path('.credentials')
+        directory.mkdir(mode=0o700, exist_ok=True)
+        os.chmod(directory, 0o700)
+        path = directory/name
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, 'w') as stream:
+            stream.write(value)
+        print('Prepared encrypted-repository-secret input locally: ' + name)
 
 
 def main():
@@ -32,7 +44,7 @@ def main():
     email = 'asifrezan@gmail.com' if args.account == 'youtube' else 'asifrezanit@gmail.com'
     flow = InstalledAppFlow.from_client_config(config, SCOPES[args.account], autogenerate_code_verifier=True)
     credentials = flow.run_local_server(host='127.0.0.1', port=0, prompt='consent',
-        access_type='offline', login_hint=email, timeout_seconds=600)
+        access_type='offline', login_hint=email, timeout_seconds=1800, open_browser=False)
     if not credentials.refresh_token:
         raise RuntimeError('Offline refresh token missing')
     if not set(SCOPES[args.account]).issubset(set(credentials.granted_scopes or credentials.scopes or [])):
@@ -59,7 +71,7 @@ def main():
         secret('DRIVE_TOKEN_JSON', credentials.to_json())
         secret('DRIVE_FOLDER_ID', folder['id'])
         print('Dedicated Drive folder configured for ' + email)
-    print('Credentials saved securely as repository secrets; no tokens printed.')
+    print('Credentials prepared securely; no tokens printed. If GitHub CLI is unavailable, save .credentials inputs as repository Actions secrets.')
 
 
 if __name__ == '__main__':
