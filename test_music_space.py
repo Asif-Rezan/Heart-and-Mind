@@ -7,13 +7,16 @@ import music_space
 
 
 def api_info(formats=('mp3', 'flac')):
-    fields = [('models', 'selected_model', ['acestep-v15-xl-turbo']),
+    fields = [('models', 'selected_model', ['acestep-v15-turbo']),
         ('Prompt', 'prompt', None), ('Lyrics', 'lyrics', None),
         ('Vocal Language', 'language', ['hi']), ('Audio Duration (seconds)', 'seconds', None),
-        ('Audio Format', 'format', list(formats))]
-    return {'named_endpoints': {'/generation_wrapper': {'parameters': [
+        ('Audio Format', 'format', list(formats)), ('Thinking', 'thinking', None)]
+    parameters = [
         {'label': label, 'parameter_name': name, 'type': {'enum': choices} if choices else {}}
-        for label, name, choices in fields]}}}
+        for label, name, choices in fields]
+    parameters += [{'label':'planning', 'parameter_name':name, 'type':{'type':'boolean'}, 'parameter_default':True}
+        for name in ('param_37', 'param_38', 'param_39')]
+    return {'named_endpoints': {'/generation_wrapper': {'parameters': parameters}}}
 
 
 class SpaceTests(unittest.TestCase):
@@ -56,3 +59,27 @@ class SpaceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Ambiguous'):
                 music_space.generate({}, Path('song.wav'), {'generation_started':True}, Mock())
         client.assert_not_called()
+
+    def test_smaller_turbo_and_all_planning_passes_disabled(self):
+        client = Mock()
+        client.view_api.return_value = api_info()
+        client.predict.return_value = [None]
+        with patch.object(music_space, 'Client', return_value=client):
+            with self.assertRaisesRegex(RuntimeError, 'no generated audio'):
+                music_space.generate({'prompt':'pop', 'lyrics':'हिंदी', 'duration':240}, Path('song.wav'), {}, Mock())
+        values = client.predict.call_args.kwargs
+        self.assertEqual(values['selected_model'], 'acestep-v15-turbo')
+        for name in ('thinking', 'param_37', 'param_38', 'param_39'):
+            self.assertIs(values[name], False)
+
+    def test_terminal_gpu_abort_is_resumable_but_timeout_remains_ambiguous(self):
+        from gradio_client.exceptions import AppError
+        for error, expected_started in ((AppError('GPU task aborted'), False), (TimeoutError('network timeout'), True)):
+            client = Mock()
+            client.view_api.return_value = api_info()
+            client.predict.side_effect = error
+            state = {}
+            with patch.object(music_space, 'Client', return_value=client):
+                with self.assertRaises((RuntimeError, TimeoutError)):
+                    music_space.generate({'prompt':'pop', 'lyrics':'हिंदी', 'duration':240}, Path('song.wav'), state, Mock())
+            self.assertEqual(state['generation_started'], expected_started)

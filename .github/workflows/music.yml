@@ -11,7 +11,7 @@ on:
         required: false
         type: string
       retry_rejected_submission:
-        description: Confirm logs show the saved request was rejected before music generation
+        description: Confirm logs show service rejection or a terminal GPU abort with no audio
         required: false
         type: boolean
         default: false

@@ -26,9 +26,9 @@ def prepare(run_id, retry_rejected_submission=False):
         if state.get('task_id') or state.get('audio_ready') or (root/'song.wav').exists():
             raise RuntimeError('Cannot reset a submission with an existing task or audio')
         if not state.get('generation_started') or not (root/'song.json').exists():
-            raise RuntimeError('Rejected-submission recovery requires a saved song and submission checkpoint')
+            raise RuntimeError('Failed-submission recovery requires a saved song and submission checkpoint')
         state['generation_started'] = False
-        state['reconciled_rejection'] = 'Operator confirmed request rejected before music inference'
+        state['reconciled_failure'] = 'Operator confirmed service rejection or terminal GPU abort; no audio returned'
         save()
     if (root/'song.json').exists():
         song = validate_song(json.loads((root/'song.json').read_text()))
@@ -54,6 +54,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--retry-rejected-submission', action='store_true',
-        help='Only after logs confirm the previous request was rejected before music generation')
+        help='Only after logs confirm service rejection or a terminal GPU abort with no audio')
     args = parser.parse_args()
     prepare(args.run_id, args.retry_rejected_submission)
