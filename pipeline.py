@@ -319,6 +319,8 @@ def run(run_id, defer_drive_cleanup=False):
         for name in ('song.json', 'video.mp4', 'thumbnail.jpg', 'background-source.png', 'thumbnail-source.png', 'image-manifest.json', 'storyboard.json', 'alignment.json'):
             if (root/name).exists():
                 store.upload(root/name, f'runs/{run_id}/{name}')
+        for manifest in sorted(root.glob('image-shard-*.json')):
+            store.upload(manifest, f'runs/{run_id}/{manifest.name}')
         for scene in sorted(root.glob('scene-[0-9][0-9][0-9].png')):
             store.upload(scene, f'runs/{run_id}/{scene.name}')
     elif not (root/'thumbnail.jpg').exists():
