@@ -36,29 +36,24 @@ def prepare(run_id, stage='all'):
         lyrics_cpu._model = None
     gc.collect()
     if stage == 'images':
-        from lyric_video import generate_shard
-        generate_shard(root, song, int(os.getenv('IMAGE_SHARD', '0')))
+        from song_images import generate_song_images
+        generate_song_images(root, song)
         print(json.dumps({'phase': 'images ready', 'run_id': run_id}), flush=True)
         return
+    if stage == 'all':
+        from song_images import generate_song_images
+        generate_song_images(root, song)
+        import image_cpu
+        image_cpu._pipeline = None
+        gc.collect()
     if not (root/'song.wav').exists():
-        if stage in ('render', 'storyboard'):
-            raise RuntimeError('Completed song audio required')
+        if stage == 'render':
+            raise RuntimeError('Music artifact missing; publishing cannot generate through a remote service')
         generate(song, root/'song.wav', state, save)
     validate_duration(duration(root/'song.wav'))
     if stage == 'music':
         print(json.dumps({'phase':'music ready', 'run_id':run_id}), flush=True)
         return
-    if stage in ('storyboard', 'all'):
-        from lyric_video import prepare_storyboard
-        prepare_storyboard(root, song)
-        if stage == 'storyboard':
-            return
-        if lyrics_cpu._model is not None:
-            lyrics_cpu._model.close()
-            lyrics_cpu._model = None
-        gc.collect()
-        from lyric_video import generate_shard
-        generate_shard(root, song, 0, 1)
     if not (root/'video.mp4').exists():
         render(root)
     validate_duration(duration(root/'video.mp4'))
@@ -68,6 +63,6 @@ def prepare(run_id, stage='all'):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id', required=True)
-    parser.add_argument('--stage', choices=['all', 'lyrics', 'music', 'images', 'storyboard', 'render'], default='all')
+    parser.add_argument('--stage', choices=['all', 'lyrics', 'music', 'images', 'render'], default='all')
     args = parser.parse_args()
     prepare(args.run_id, args.stage)

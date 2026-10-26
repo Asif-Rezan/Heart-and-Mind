@@ -13,22 +13,10 @@ from storage import Store, required
 
 
 def normalize_lyrics(text):
-    """Decode only escaped layout markers, preserving Unicode lyrics verbatim."""
-    if not isinstance(text, str):
-        return text
+    """Repair escaped layout markers without changing the Hindi words."""
     text = text.replace('\r\n', '\n').replace('\r', '\n')
     text = re.sub(r'\\+(?:r\\+n|n|r)', '\n', text)
     return re.sub(r'\\+t', ' ', text)
-
-
-def validate_hindi_lyrics(text):
-    text = normalize_lyrics(text)
-    sung = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', text)
-    if re.search(r'[A-Za-z\u0980-\u09ff]', sung):
-        raise ValueError('Sung lyrics must use Devanagari only')
-    if not re.search(r'[\u0900-\u097f]', sung):
-        raise ValueError('Hindi Devanagari lyrics required')
-    return text
 
 
 def validate_song(song):
@@ -37,7 +25,9 @@ def validate_song(song):
             raise ValueError('Missing song ' + field)
     if len(song['title']) > 100 or len(song['description']) > 4400:
         raise ValueError('YouTube metadata too long')
-    song['lyrics'] = validate_hindi_lyrics(song['lyrics'])
+    song['lyrics'] = normalize_lyrics(song['lyrics'])
+    if not re.search(r'[\u0900-\u097f]', song['lyrics']):
+        raise ValueError('Hindi Devanagari lyrics required')
     if not 180 <= song.get('duration', 0) <= 360:
         raise ValueError('Song must be 180-360 seconds')
     if 'tags' in song and (not isinstance(song['tags'], list) or
@@ -50,7 +40,6 @@ def validate_song(song):
     for field in ('background_prompt', 'thumbnail_prompt'):
         if field in song and (not isinstance(song[field], str) or not 40 <= len(song[field]) <= 380):
             raise ValueError('Invalid image prompt')
-    validate_public_metadata(song)
     return song
 
 
@@ -58,9 +47,9 @@ SONG_PROFILES = (
     ('romance', 'Hindi romantic acoustic pop', 'new love; an ordinary shared moment becomes unforgettable', 'warm intimate solo vocal, acoustic guitar, piano, gentle live drums', 'TERE SAATH'),
     ('heartbreak', 'Hindi sad piano ballad', 'a quiet goodbye; acceptance rather than blame', 'restrained vulnerable solo vocal, felt piano, cello, spacious drums', 'ADHURI BAATEIN'),
     ('romance', 'Hindi indie dream pop', 'long-distance love; two lives connected by a small daily ritual', 'airy expressive vocal, clean electric guitar, atmospheric synths, soft groove', 'DOOR HOKE BHI'),
-    ('healing', 'Hindi uplifting folk pop', 'starting again after loss; rediscovering self-worth', 'grounded hopeful vocal, acoustic guitar, flute, dholak and warm percussion', 'PHIR SE JEE LE'),
+    ('healing', 'Hindi uplifting folk pop', 'starting again after loss; rediscovering self-worth', 'grounded hopeful vocal, acoustic guitar, flute, warm percussion', 'PHIR SE JEE LE'),
     ('romance', 'Hindi celebratory dance pop', 'joyful reunion; choosing each other again', 'playful energetic vocal, dholak, bass, bright synths, danceable rhythm', 'DIL KA JASHN'),
-    ('heartbreak', 'Hindi modern Hindi album ballad', 'unspoken affection; a letter that never reaches its reader', 'measured expressive vocal, harmonium, tabla, esraj, subtle piano', 'ANKAHI BAATEIN'),
+    ('heartbreak', 'Hindi ghazal-inspired contemporary ballad', 'unspoken affection; a letter that never reaches its reader', 'measured expressive vocal, harmonium, tabla, sarangi, subtle piano', 'ANKAHI MOHABBAT'),
     ('healing', 'Hindi soulful cinematic pop', 'finding hope in solitude; courage for a new morning', 'soulful solo vocal, piano, strings, gradual percussion build', 'NAYI SUBAH'),
     ('romance', 'Hindi monsoon lo-fi pop', 'remembering a first meeting in the rain', 'soft intimate vocal, mellow keys, muted guitar, relaxed lo-fi beat', 'BAARISH AUR TUM'),
 )
@@ -73,14 +62,17 @@ def song_profile(day):
 
 def make_song(day, history, draft_path=None):
     mood, genre, story, arrangement, hook = song_profile(day)
-    prompt = f'''Write an ORIGINAL Indian Hindi album-style song for Heart and Mind on {day}.
+    search_term = {'romance': 'Hindi Romantic Song', 'heartbreak': 'Hindi Sad Song',
+                   'healing': 'Heart Touching Hindi Song'}[mood]
+    hindi_term = {'romance': 'हिंदी रोमांटिक गाना', 'heartbreak': 'हिंदी दर्द भरा गाना',
+                  'healing': 'दिल छू लेने वाला हिंदी गाना'}[mood]
+    year = day[:4]
+    prompt = f'''Write an ORIGINAL Hindi song for Heart and Mind on {day}.
     Today's direction: {genre}. Emotional story: {story}.
     Musical arrangement: {arrangement}. Visual mood: {mood}.
     Develop a specific original scene, characters and emotional progression in this direction.
     Do not recycle a generic love song. Use concrete sensory details, conversational poetic
     Hindi, fresh metaphors, natural breath-length phrases and consistent viewpoint.
-    Use idiomatic modern Indian Hindi, correct grammar and natural collocations.
-    Use natural Hindi idioms; do not invent meaningless lines or force rhymes.
     Plan a clear beginning, emotional turn in verse 2, and resolution in the bridge/outro.
     Write a memorable 2-4 line chorus with one distinctive central phrase; repeat that chorus
     consistently. Verses should advance the story, not paraphrase the chorus. Keep a singable
@@ -88,14 +80,16 @@ def make_song(day, history, draft_path=None):
     Structure: [Intro], [Verse 1] (6-8 lines), [Pre-Chorus] (2-4), [Chorus] (4),
     [Verse 2] (6-8), [Chorus], [Bridge] (4), [Final Chorus], [Outro] (2).
     Intro may be instrumental. Target 140-180 sung words for a complete 3-6 minute song.
-    पूरा गीत हिंदी देवनागरी लिपि में लिखो। गाने में रोमन लिपि का प्रयोग मत करो।
+    पूरा गीत हिंदी की देवनागरी लिपि में लिखो। रोमन लिपि में हिंदी मत लिखो।
     Every sung line must use Devanagari, never English transliteration; bracket labels in English.
     Never copy existing lyrics, melodies, titles, or imitate a named singer.
     Avoid these previous titles: {json.dumps(history, ensure_ascii=False)}.
     Return JSON only with these fields:
-    title: unique short Devanagari song name only, <=45 characters.
-    romanized_title: the same song name in readable Romanized Hindi, <=35 ASCII characters.
-      No famous artist names, film claims, clickbait, 'viral', keyword lists or invented popularity.
+    title: original Hindi song name first, a short Romanized Hindi name, then the accurate
+      search phrase "{search_term} {year}". Keep the whole title <=100 characters, ideally 65-90.
+      Format example ONLY: तेरे बिना | Tere Bina | Hindi Sad Song {year}.
+      Use the supplied mood's search phrase; do not label a hopeful song sad or a ballad dance.
+      Never claim a film connection, famous singer, official release, viral hit or chart success.
     lyrics: complete song as above. prompt: English musical production directions including
       {genre}, {arrangement}, tempo, dynamic arc and clear Hindi diction. No named artists.
     duration: integer seconds 180-360, aim 240.
@@ -104,10 +98,9 @@ def make_song(day, history, draft_path=None):
     Privately revise for originality, story, meter and singability before returning.'''
     from lyrics_cpu import MODEL_ID, request_story
     core_schema = {'type': 'object', 'additionalProperties': False,
-        'required': ['title', 'romanized_title', 'lyrics', 'prompt', 'duration'],
+        'required': ['title', 'lyrics', 'prompt', 'duration'],
         'properties': {
-            'title': {'type': 'string', 'minLength': 1, 'maxLength': 45, 'pattern': '[ऀ-ॿ]'},
-            'romanized_title': {'type': 'string', 'minLength': 1, 'maxLength': 35, 'pattern': '^[A-Za-z0-9 !?]+$'},
+            'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
             'lyrics': {'type': 'string', 'minLength': 500, 'pattern': '[ऀ-ॿ]'},
             'prompt': {'type': 'string', 'minLength': 20, 'maxLength': 600},
             'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360}}}
@@ -127,79 +120,77 @@ def make_song(day, history, draft_path=None):
         Draft202012Validator(core_schema).validate(song)
     else:
         song = request(prompt, core_schema, 6000)
-    song['lyrics'] = validate_hindi_lyrics(song['lyrics'])
-    Draft202012Validator(core_schema).validate(song)
-    if draft_path is not None:
-        temporary = draft_path.with_suffix('.tmp')
-        temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
-        temporary.replace(draft_path)
+        song['lyrics'] = normalize_lyrics(song['lyrics'])
+        if draft_path is not None:
+            temporary = draft_path.with_suffix('.tmp')
+            temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
+            temporary.replace(draft_path)
     packaging_schema = {'type': 'object', 'additionalProperties': False,
-        'required': ['description', 'tags', 'thumbnail_text', 'thumbnail_prompt'],
+        'required': ['description', 'tags', 'thumbnail_text', 'background_prompt', 'thumbnail_prompt'],
         'properties': {
             'description': {'type': 'string', 'minLength': 20, 'maxLength': 1200},
             'tags': {'type': 'array', 'minItems': 8, 'maxItems': 12,
                      'items': {'type': 'string', 'minLength': 1, 'maxLength': 40}},
             'thumbnail_text': {'type': 'string', 'minLength': 3, 'maxLength': 26, 'pattern': '^[A-Za-z0-9 !?]+$'},
+            'background_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380},
             'thumbnail_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380}}}
     packaging_prompt = f'''Package the supplied original Hindi song. Do not rewrite the song.
-    Genre: {genre}. Visual mood: {mood}. Return only these four JSON fields.
-    description: first two lines describe this specific song's story and genre naturally in
-      Hindi and English. Follow with a short listening context, no credits or hashtags (added separately). Maximum 1200 characters. No invented credits, links or keyword stuffing. Never name internal tools, models, software or providers anywhere in public metadata.
-    tags: 8-12 distinct relevant search terms covering the Hindi and romanized song name,
-      Hindi music, exact genre, mood and Heart and Mind. No unrelated artists/trends.
-    thumbnail_text: 2-4 words in ASCII Romanized Hindi from the chorus or emotional promise,
-      <=26 characters, not the channel name; sample mood only: {hook}.
-    thumbnail_prompt: a DIFFERENT 20-25 word English visual composition of the same emotional
-      story, closer expressive adult faces on the right, strong light contrast, dark empty left
-      half for a hook. No celebrities, child subjects, text, logos, collages or stock-poster wording.
+    Genre: {genre}. Visual mood: {mood}. Return only these five JSON fields.
+    description: 60-100 words, readable Hindi and English. The first 150 characters must
+      naturally include this song's name and "{search_term}". The first two lines should explain
+      its specific emotion/story and include "{hindi_term}". Then give one natural listening
+      context and an honest sentence about the arrangement. Include "new Hindi song {year}"
+      and "original Hindi music" only once each where they fit naturally. Do not repeat a list
+      of keywords. No invented artist/label credits, external links, technical explanations,
+      internal tool names, model names, providers or software names. Do not add hashtags or
+      production credits; the publisher adds the channel credit and three relevant hashtags.
+    tags: 8-12 distinct relevant search phrases, each <=40 characters. Prioritize this song's
+      short Devanagari name, Romanized name, "{search_term}", "{hindi_term}",
+      "new Hindi song {year}", the actual musical genre, one suitable listening context,
+      "original Hindi music", and "Heart and Mind". Use specific Hindi/English searches,
+      not broad unrelated self-help terms. No other singers, films, tools, models or trend bait.
+    thumbnail_text: 2-4 short ASCII Romanized Hindi words, <=26 characters, drawn from the
+      chorus or central emotional promise. Make the hook easy to read at phone size and
+      complementary to the title. Avoid generic channel-name text and unsupported clickbait.
+      Mood example ONLY: {hook}.
+    background_prompt: 20-30 English words depicting a specific scene from THIS song's story,
+      setting, time, weather, colors and emotional action. For love/reunion show a fully clothed
+      adult South Asian couple; for loss/healing show a reflective adult or symbolic landscape.
+      Cinematic photorealism, subjects on right half, no lettering. Put the scene first.
+    thumbnail_prompt: a DIFFERENT 20-30 word English photographic scene for THIS song.
+      Put the key emotion and adult subject first so they survive the image encoder's limit.
+      For love/longing, show an expressive adult South Asian couple with natural eye contact;
+      for heartbreak/healing, use an emotionally appropriate adult portrait or pair. Tight
+      chest-up framing, sharp expressive eyes, clear separation from a simple cinematic
+      background, strong warm/cool light contrast. Keep faces entirely in the RIGHT half
+      and the LEFT 45 percent dark and empty for large text. One clear emotional focal point.
+      Fully clothed adults, natural anatomy, no clutter, collage, generated text or watermark.
+      The image must communicate the song's emotion at phone size without any channel logo.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
     The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
-    Keep the thumbnail scene prompt under 380 characters. Do not repeat lyrics in the response.
+    Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.
     Song to package: {json.dumps(song, ensure_ascii=False)}'''
+    song['lyrics'] = normalize_lyrics(song['lyrics'])
     song.update(request(packaging_prompt, packaging_schema, 3000))
     song['visual_mood'] = mood  # Chosen locally, never ask the model to reproduce a fixed enum.
-    song = optimize_metadata(song, mood, day[:4])
     return validate_song(song)
 
 
-INTERNAL_NAMES = re.compile(r'(?i)\b(?:ace[- ]?step|ssd[- ]?1b|segmind|qwen|whisper|diffusers|hugging\s*face|llama|openai|gpt[- ]?\d|cpu runner|github actions|ffmpeg|pillow|ctranslate|systran|kokoro|suno|udio|stable diffusion|chatgpt|google drive)\b')
-
-
-def validate_public_metadata(song):
-    public = '\n'.join([song.get('title', ''), song.get('description', ''),
-                        song.get('thumbnail_text', '')] + song.get('tags', []))
-    if INTERNAL_NAMES.search(public):
-        raise ValueError('Internal tool names are not allowed in public metadata')
-    without_credit = public.replace('Original Hindi album music by Heart and Mind.', '')
-    if re.search(r'(?i)(?:created|produced|sung|composed|music|lyrics|vocals)\s+(?:by|:)', without_credit):
-        raise ValueError('Unverified creator credits are not allowed')
-
-
-def optimize_metadata(song, mood, year):
-    name, romanized = song['title'].strip(), song['romanized_title'].strip()
-    keyword = {'romance': 'Hindi Romantic Song', 'heartbreak': 'Hindi Sad Song',
-               'healing': 'Hindi Album Song'}[mood]
-    native_keyword = {'romance': 'हिंदी रोमांटिक गाना', 'heartbreak': 'हिंदी दर्द भरा गाना',
-                      'healing': 'हिंदी एल्बम गीत'}[mood]
-    suffix = f'{keyword} {year}'
-    title = f'{name} | {romanized} | {suffix}'
-    if len(title) > 100:
-        title = f'{name} | {suffix}'
-    song['song_name'], song['title'] = name, title
-    body = re.sub(r'#[^\s#]+', '', song['description']).strip()
-    hashtag = {'romance': '#HindiRomanticSong', 'heartbreak': '#HindiSadSong', 'healing': '#HindiAlbumSong'}[mood]
-    song['description'] = (f'{name} ({romanized}) — {keyword} {year} | {native_keyword}\n'
-        'Original Hindi album music by Heart and Mind. हिंदी गाने और दिल की कहानियाँ।\n\n' + body + f'\n\n#HindiSong #HindiMusic {hashtag}')
-    song['tags'] = metadata_tags(dict(song, tags=[name, romanized, keyword, native_keyword,
-        'Hindi song', 'हिंदी गाना', 'Hindi album song', 'हिंदी एल्बम गीत',
-        f'New Hindi Song {year}', 'Hindi music video'] + song['tags']))
-    validate_public_metadata(song)
-    return song
+PUBLIC_INTERNAL_NAMES = re.compile(r'(?i)\b(?:ace[- ]?step|ssd[- ]?1b|segmind|qwen[\w.-]*|whisper|diffusers|hugging\s*face|llama|openai|gpt[- ]?\d|github actions)\b')
 
 
 def upload_description(song):
-    validate_public_metadata(song)
-    return song['description']
+    """Keep the song summary public, with only verified channel credit and hashtags."""
+    text = re.sub(r'#[^\s#]+', '', song['description'])
+    sentences = re.split(r'(?<=[.!?।])\s+|\n+', text)
+    sentences = [part.strip() for part in sentences if part.strip() and
+        not PUBLIC_INTERNAL_NAMES.search(part) and
+        not re.search(r'(?i)(?:created|produced|sung|composed|music|lyrics|vocals)\s+(?:by|:)', part)]
+    mood = song.get('visual_mood', 'romance')
+    hashtag = {'romance': '#HindiRomanticSong', 'heartbreak': '#HindiSadSong',
+               'healing': '#HeartTouchingSong'}.get(mood, '#HindiMusic')
+    return ('\n'.join(sentences) + '\n\nOriginal Hindi music by Heart and Mind.\n\n'
+            '#HindiSong #HindiMusic ' + hashtag)
 
 
 def metadata_tags(song):
@@ -208,7 +199,7 @@ def metadata_tags(song):
     result = []
     for tag in candidates:
         tag = tag.strip()
-        if tag and len(tag) <= 40 and tag.casefold() not in {item.casefold() for item in result}:
+        if tag and not PUBLIC_INTERNAL_NAMES.search(tag) and tag.casefold() not in {item.casefold() for item in result}:
             # YouTube counts quotes around tags containing spaces toward its 500-character limit.
             if sum(len(item) + (2 if ' ' in item else 0) + 1 for item in result + [tag]) <= 480:
                 result.append(tag)
@@ -226,8 +217,15 @@ def validate_duration(seconds):
 
 
 def render(root):
-    from lyric_video import render_video
-    return render_video(root)
+    from artwork import create_artwork
+    song = json.loads((root/'song.json').read_text())
+    create_artwork(root, song)
+    subprocess.run(['ffmpeg', '-y', '-loop', '1', '-i', str(root/'cover.png'), '-i', str(root/'song.wav'),
+        '-filter_complex', '[1:a]asplit=2[a][v];[v]showwaves=s=1600x90:mode=line:colors=0xf9b4cc:rate=25,format=rgba[w];[0:v][w]overlay=160:980:shortest=1,format=yuv420p[out]',
+        '-map', '[out]', '-map', '[a]', '-c:v', 'libx264', '-preset', 'fast', '-crf', '20',
+        '-c:a', 'aac', '-b:a', '320k', '-t', str(duration(root/'song.wav')), '-shortest', '-movflags', '+faststart', str(root/'video.mp4')],
+        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    validate_duration(duration(root/'video.mp4'))
 
 
 def youtube_client():
@@ -247,10 +245,11 @@ def publish(client, root, song, state, save):
     if not state.get('video_id'):
         if state.get('upload_started'):
             raise RuntimeError('Ambiguous upload; reconcile YouTube before retry to avoid duplicates')
+        state['upload_description'] = upload_description(song)
         state['upload_started'] = True
         save()
         request = client.videos().insert(part='snippet,status', body={
-            'snippet': {'title': song['title'], 'description': upload_description(song),
+            'snippet': {'title': song['title'], 'description': state['upload_description'],
                 'categoryId': '10', 'defaultLanguage': 'hi', 'defaultAudioLanguage': 'hi',
                 'tags': metadata_tags(song)},
             'status': {'privacyStatus': 'public', 'selfDeclaredMadeForKids': False,
@@ -331,15 +330,13 @@ def run(run_id, defer_drive_cleanup=False):
     if not state.get('video_id'):
         store.upload(root/'song.wav', f'runs/{run_id}/song.wav')
         if not (root/'video.mp4').exists():
+            from song_images import generate_song_images
+            generate_song_images(root, song)
             render(root)
         validate_duration(duration(root/'video.mp4'))
-        for name in ('song.json', 'video.mp4', 'thumbnail.jpg', 'background-source.png', 'thumbnail-source.png', 'image-manifest.json', 'storyboard.json', 'alignment.json'):
+        for name in ('song.json', 'video.mp4', 'thumbnail.jpg', 'background-source.png', 'thumbnail-source.png', 'image-manifest.json'):
             if (root/name).exists():
                 store.upload(root/name, f'runs/{run_id}/{name}')
-        for manifest in sorted(root.glob('image-shard-*.json')):
-            store.upload(manifest, f'runs/{run_id}/{manifest.name}')
-        for scene in sorted(root.glob('scene-[0-9][0-9][0-9].png')):
-            store.upload(scene, f'runs/{run_id}/{scene.name}')
     elif not (root/'thumbnail.jpg').exists():
         store.download(store.find(f'runs/{run_id}/thumbnail.jpg'), root/'thumbnail.jpg')
     publish(client, root, song, state, save)

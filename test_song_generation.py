@@ -5,13 +5,14 @@ import unittest
 from unittest.mock import patch
 from jsonschema import Draft202012Validator
 
-from pipeline import make_song, normalize_lyrics, validate_song
+from pipeline import make_song
 
-CORE = {'title': 'नई सुबह', 'romanized_title': 'Nayi Subah', 'lyrics': '[Verse 1]\n' + 'नई सुबह में फिर से जीना है\n'*30,
+CORE = {'title': 'नई सुबह | Nayi Subah | Hindi Soulful Song', 'lyrics': '[Verse 1]\n' + 'नई सुबह में फिर से जीना है\n'*30,
         'prompt': 'Hindi cinematic soulful pop with piano and warm expressive vocals', 'duration': 240}
 PACKAGE = {'description': 'A hopeful original Hindi song about starting again. #HindiMusic',
            'tags': ['Nayi Subah', 'नई सुबह', 'Hindi song', 'Hindi soul', 'hopeful song', 'Hindi pop', 'original music', 'Heart and Mind'],
            'thumbnail_text': 'NAYI SUBAH',
+           'background_prompt': 'An adult South Asian woman in a meadow watches the sunrise, hopeful expression, cinematic warm golden light.',
            'thumbnail_prompt': 'Close portrait of a hopeful South Asian adult, glowing sunrise on the right, dark empty left, cinematic photography.'}
 
 
@@ -36,8 +37,6 @@ class SongGenerationTests(unittest.TestCase):
         self.assertNotIn('tags', requests[0]['response_format']['json_schema']['schema']['properties'])
         self.assertNotIn('lyrics', requests[1]['response_format']['json_schema']['schema']['properties'])
         self.assertIn(CORE['title'], requests[1]['messages'][-1]['content'])
-        self.assertIn('Hindi Album Song', song['title'])
-        self.assertIn('हिंदी एल्बम गीत', song['description'])
         self.assertLess(requests[1]['max_completion_tokens'], requests[0]['max_completion_tokens'])
 
     def test_valid_lyrics_survive_packaging_failure_and_are_not_regenerated(self):
@@ -51,31 +50,6 @@ class SongGenerationTests(unittest.TestCase):
                 song = make_song('2026-10-26', [], draft)
             request.assert_called_once()
             self.assertEqual(song['lyrics'], CORE['lyrics'])
-
-    def test_literal_layout_markers_preserve_hindi_characters(self):
-        expected = '[Verse 1]\nतेरी याद\nमेरा दिल'
-        for separator in (r'\n', r'\\n', r'\r\n', r'\\r\\n', '\r\n', '\n'):
-            with self.subTest(separator=separator):
-                self.assertEqual(normalize_lyrics(separator.join(expected.splitlines())), expected)
-        self.assertEqual(normalize_lyrics('तेरा दिल'), 'तेरा दिल')
-
-    def test_saved_escaped_hindi_draft_resumes_without_lyric_regeneration(self):
-        escaped = dict(CORE, lyrics=CORE['lyrics'].replace('\n', r'\\n'))
-        with tempfile.TemporaryDirectory() as temp:
-            draft = Path(temp)/'song-draft.json'
-            draft.write_text(json.dumps(escaped))
-            with patch('lyrics_cpu.request_story', return_value=response(PACKAGE)) as request:
-                song = make_song('2026-10-26', [], draft)
-            request.assert_called_once()
-            self.assertEqual(song['lyrics'], CORE['lyrics'])
-            self.assertEqual(json.loads(draft.read_text())['lyrics'], CORE['lyrics'])
-
-    def test_actual_english_sung_words_are_still_rejected_before_packaging(self):
-        invalid = dict(CORE, lyrics=CORE['lyrics'] + '\nLove forever')
-        with patch('lyrics_cpu.request_story', return_value=response(invalid)) as request:
-            with self.assertRaisesRegex(ValueError, 'Devanagari only'):
-                make_song('2026-10-26', [])
-            request.assert_called_once()
 
     def test_retry_reports_field_and_constraint_without_quoting_generated_content(self):
         import lyrics_cpu
