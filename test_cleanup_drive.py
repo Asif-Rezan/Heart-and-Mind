@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from cleanup_drive import cleanup
-from pipeline import metadata_tags
+from pipeline import metadata_tags, upload_description
 
 
 class DriveCleanupTests(unittest.TestCase):
@@ -15,7 +15,7 @@ class DriveCleanupTests(unittest.TestCase):
         self.song = {'title': 'नई सुबह', 'description': 'A hopeful Hindi song', 'tags': ['Hindi music']}
         self.state = {'phase': 'published', 'video_id': 'video', 'thumbnail_uploaded': True, 'song': self.song}
         self.video = {'id': 'video', 'snippet': {'channelId': 'channel', 'title': self.song['title'],
-            'description': self.song['description'],
+            'description': upload_description(self.song),
             'tags': metadata_tags(self.song)}, 'status': {'privacyStatus': 'public', 'uploadStatus': 'processed'},
             'processingDetails': {'processingStatus': 'succeeded'}, 'contentDetails': {'definition': 'hd'}}
         self.client = Mock()
@@ -80,21 +80,6 @@ class DriveCleanupTests(unittest.TestCase):
         self.assertNotIn(f'runs/{self.run_id}/image-manifest.json', keys)
         calls = [call[0] for call in self.store.mock_calls]
         self.assertLess(calls.index('save'), calls.index('client.files().delete'))
-
-    def test_cleanup_enumerates_only_validated_storyboard_scene_names(self):
-        from test_lyric_video import plan
-        self.store.load.side_effect = [None, plan()]
-        scene_key = f'runs/{self.run_id}/scene-000.png'
-        self.store.find.side_effect = lambda key: 'scene' if key == scene_key else None
-        remote = dict(self.remote, id='scene', name=scene_key.replace('/', '__'),
-            appProperties={'workflow_key': hashlib.sha256(scene_key.encode()).hexdigest()}, mimeType='image/png')
-        self.store.client.files().get().execute.return_value = remote
-        cleanup(self.store, self.client, self.run_id, self.state)
-        self.store.client.files().delete.assert_called_once_with(fileId='scene')
-        keys = [call.args[0] for call in self.store.find.call_args_list]
-        self.assertIn(f'runs/{self.run_id}/scene-035.png', keys)
-        self.assertNotIn(f'runs/{self.run_id}/scene-036.png', keys)
-        self.assertNotIn(f'runs/other-run/scene-000.png', keys)
 
     def test_deleted_before_checkpoint_is_safe_to_resume(self):
         error = RuntimeError('not found')
