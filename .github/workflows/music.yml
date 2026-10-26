@@ -72,7 +72,7 @@ jobs:
     env:
       SONG_RUN_ID: ${{ needs.lyrics.outputs.run_id }}
       ACESTEP_SOURCE_DIR: ${{ github.workspace }}/.vendor/ace-step
-      ACESTEP_CHECKPOINTS_DIR: ${{ runner.temp }}/acestep-models
+      ACESTEP_CHECKPOINTS_DIR: .models/acestep
       ACESTEP_INIT_LLM: 'false'
       CUDA_VISIBLE_DEVICES: ''
       OMP_NUM_THREADS: '4'
