@@ -52,7 +52,7 @@ def song_profile(day):
     return SONG_PROFILES[dt.date.fromisoformat(day).toordinal() % len(SONG_PROFILES)]
 
 
-def make_song(day, history):
+def make_song(day, history, draft_path=None):
     mood, genre, story, arrangement, hook = song_profile(day)
     prompt = f'''Write an ORIGINAL Hindi song for Heart and Mind on {day}.
     Today's direction: {genre}. Emotional story: {story}.
@@ -66,7 +66,7 @@ def make_song(day, history):
     syllable pattern within each section; avoid forced rhyme, filler and unrelated imagery.
     Structure: [Intro], [Verse 1] (6-8 lines), [Pre-Chorus] (2-4), [Chorus] (4),
     [Verse 2] (6-8), [Chorus], [Bridge] (4), [Final Chorus], [Outro] (2).
-    Intro may be instrumental. Target 180-240 sung words for a complete 3-6 minute song.
+    Intro may be instrumental. Target 140-180 sung words for a complete 3-6 minute song.
     पूरा गीत हिंदी की देवनागरी लिपि में लिखो। रोमन लिपि में हिंदी मत लिखो।
     Every sung line must use Devanagari, never English transliteration; bracket labels in English.
     Never copy existing lyrics, melodies, titles, or imitate a named singer.
@@ -78,14 +78,55 @@ def make_song(day, history):
     lyrics: complete song as above. prompt: English musical production directions including
       {genre}, {arrangement}, tempo, dynamic arc and clear Hindi diction. No named artists.
     duration: integer seconds 180-360, aim 240.
+    No spoken CTA. Keep the song concise: 140-180 sung words, including repeated choruses.
+    Do not add metadata, descriptions, tags or image prompts to this response.
+    Privately revise for originality, story, meter and singability before returning.'''
+    from lyrics_cpu import MODEL_ID, request_story
+    core_schema = {'type': 'object', 'additionalProperties': False,
+        'required': ['title', 'lyrics', 'prompt', 'duration'],
+        'properties': {
+            'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+            'lyrics': {'type': 'string', 'minLength': 500, 'pattern': '[ऀ-ॿ]'},
+            'prompt': {'type': 'string', 'minLength': 20, 'maxLength': 600},
+            'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360}}}
+    def request(instructions, schema, tokens):
+        result = request_story('chat/completions', {'model': MODEL_ID,
+            'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter and truthful music editor. Write natural, singable Hindi in Devanagari.'},
+                         {'role': 'user', 'content': instructions}],
+            'response_format': {'type': 'json_schema', 'json_schema': {'schema': schema}},
+            'max_completion_tokens': tokens})
+        return json.loads(result['choices'][0]['message']['content'])
+
+    # Keep the full song and packaging out of the same completion. Small CPU models
+    # otherwise have to satisfy many tight text bounds while writing long Hindi lyrics.
+    from jsonschema import Draft202012Validator
+    if draft_path is not None and draft_path.exists():
+        song = json.loads(draft_path.read_text())
+        Draft202012Validator(core_schema).validate(song)
+    else:
+        song = request(prompt, core_schema, 6000)
+        if draft_path is not None:
+            temporary = draft_path.with_suffix('.tmp')
+            temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
+            temporary.replace(draft_path)
+    packaging_schema = {'type': 'object', 'additionalProperties': False,
+        'required': ['description', 'tags', 'thumbnail_text', 'background_prompt', 'thumbnail_prompt'],
+        'properties': {
+            'description': {'type': 'string', 'minLength': 20, 'maxLength': 1200},
+            'tags': {'type': 'array', 'minItems': 8, 'maxItems': 12,
+                     'items': {'type': 'string', 'minLength': 1, 'maxLength': 40}},
+            'thumbnail_text': {'type': 'string', 'minLength': 3, 'maxLength': 26, 'pattern': '^[A-Za-z0-9 !?]+$'},
+            'background_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380},
+            'thumbnail_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380}}}
+    packaging_prompt = f'''Package the supplied original Hindi song. Do not rewrite the song.
+    Genre: {genre}. Visual mood: {mood}. Return only these five JSON fields.
     description: first two lines describe this specific song's story and genre naturally in
       Hindi and English. Follow with a short listening context, an accurate original AI music
-      credit and at most 3 relevant hashtags. No invented credits, links or keyword stuffing.
+      credit and at most 3 relevant hashtags. Maximum 1200 characters. No invented credits, links or keyword stuffing.
     tags: 8-12 distinct relevant search terms covering the Hindi and romanized song name,
       Hindi music, exact genre, mood and Heart and Mind. No unrelated artists/trends.
     thumbnail_text: 2-4 words in ASCII Romanized Hindi from the chorus or emotional promise,
       <=26 characters, not the channel name; sample mood only: {hook}.
-    visual_mood: exactly {mood}.
     background_prompt: 20-30 English words depicting a specific scene from THIS song's story,
       setting, time, weather, colors and emotional action. For love/reunion show a fully clothed
       adult South Asian couple; for loss/healing show a reflective adult or symbolic landscape.
@@ -93,28 +134,13 @@ def make_song(day, history):
     thumbnail_prompt: a DIFFERENT 20-25 word English visual composition of the same emotional
       story, closer expressive adult faces on the right, strong light contrast, dark empty left
       half for a hook. No celebrities, child subjects, text, logos, collages or stock-poster wording.
-    No spoken CTA. Privately revise for originality, story, meter and singability before returning.'''
-    from lyrics_cpu import MODEL_ID, request_story
-    schema = {'type': 'object', 'additionalProperties': False,
-        'required': ['title', 'lyrics', 'prompt', 'duration', 'description', 'tags', 'thumbnail_text', 'visual_mood', 'background_prompt', 'thumbnail_prompt'],
-        'properties': {
-            'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
-            'lyrics': {'type': 'string', 'minLength': 500, 'pattern': '[ऀ-ॿ]'},
-            'prompt': {'type': 'string', 'minLength': 20},
-            'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360},
-            'description': {'type': 'string', 'minLength': 20, 'maxLength': 4000},
-            'tags': {'type': 'array', 'minItems': 8, 'maxItems': 12,
-                     'items': {'type': 'string', 'minLength': 1, 'maxLength': 40}},
-            'thumbnail_text': {'type': 'string', 'minLength': 3, 'maxLength': 26, 'pattern': '^[A-Za-z0-9 !?]+$'},
-            'visual_mood': {'type': 'string', 'enum': [mood]},
-            'background_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380},
-            'thumbnail_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380}}}
-    result = request_story('chat/completions', {'model': MODEL_ID,
-        'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter and truthful music editor. Write natural, singable Hindi in Devanagari.'},
-                     {'role': 'user', 'content': prompt}],
-        'response_format': {'type': 'json_schema', 'json_schema': {'schema': schema}},
-        'max_completion_tokens': 6000})
-    return validate_song(json.loads(result['choices'][0]['message']['content']))
+    Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
+    The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
+    Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.
+    Song to package: {json.dumps(song, ensure_ascii=False)}'''
+    song.update(request(packaging_prompt, packaging_schema, 3000))
+    song['visual_mood'] = mood  # Chosen locally, never ask the model to reproduce a fixed enum.
+    return validate_song(song)
 
 
 def metadata_tags(song):
@@ -235,7 +261,7 @@ def run(run_id, defer_drive_cleanup=False):
     if not state.get('song'):
         day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
         song = (validate_song(json.loads((root/'song.json').read_text()))
-                if (root/'song.json').exists() else make_song(day, [h['title'] for h in history[-30:]]))
+                if (root/'song.json').exists() else make_song(day, [h['title'] for h in history[-30:]], root/'song-draft.json'))
         digest = hashlib.sha256(song['lyrics'].encode()).hexdigest()
         if any(h.get('hash') == digest or h['title'] == song['title'] for h in history):
             raise RuntimeError('Duplicate song rejected')

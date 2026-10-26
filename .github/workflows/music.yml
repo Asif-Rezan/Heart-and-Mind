@@ -48,10 +48,20 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-lyrics.txt
       - run: python -m unittest -v
       - name: Restore saved original lyrics or music
+        id: restore_music
+        continue-on-error: true
         if: inputs.prepared_run != ''
         uses: actions/download-artifact@v4
         with:
           name: generated-music-${{ inputs.prepared_run }}
+          run-id: ${{ inputs.prepared_run }}
+          github-token: ${{ github.token }}
+          path: output/
+      - name: Restore validated lyrics draft from a failed lyrics job
+        if: inputs.prepared_run != '' && steps.restore_music.outcome == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: music-input-${{ inputs.prepared_run }}
           run-id: ${{ inputs.prepared_run }}
           github-token: ${{ github.token }}
           path: output/

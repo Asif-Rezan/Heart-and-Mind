@@ -105,19 +105,38 @@ def request_story(endpoint, payload):
         except Exception:
             # Runtime/configuration errors are not content errors; don't spin on them.
             raise StoryGenerationError('Qwen CPU generation failed; inspect runner memory and runtime compatibility') from None
+        issue, field, bound = None, '$', None
         try:
             choice = result['choices'][0]
             if choice.get('finish_reason') != 'stop':
+                issue = 'incomplete_output'
                 raise ValueError('Incomplete output')
             validator.validate(json.loads(choice['message']['content']))
-        except (ValueError, TypeError, KeyError, IndexError, ValidationError):
-            print(json.dumps({'check': 'Qwen JSON validation retry', 'attempt': attempt + 1}), flush=True)
+        except ValidationError as error:
+            issue = error.validator
+            path = list(error.absolute_path)
+            if path and path[0] in schema.get('properties', {}):
+                field = path[0]
+            if isinstance(error.validator_value, int):
+                bound = error.validator_value
+        except (ValueError, TypeError, KeyError, IndexError):
+            issue = issue or 'invalid_json_or_response'
+        if issue:
+            # Report schema constraints and counters, never generated content or raw errors.
+            print(json.dumps({'check': 'Qwen JSON validation retry', 'attempt': attempt + 1,
+                'constraint': issue, 'field': field, 'bound': bound,
+                'completion_tokens': result.get('usage', {}).get('completion_tokens')}), flush=True)
             if attempt == 2:
                 raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts') from None
-            messages.append({'role': 'user', 'content':
-                'The previous response did not match the required schema. Regenerate the complete JSON. '
-                'Write every sung lyric line in actual Hindi Devanagari characters (जैसे तेरी यादों में मेरा दिल). '
-                'Romanized Hindi using English letters is invalid. Keep all required fields and duration 180-360.'})
+            correction = f'The previous response failed {issue} for field {field}.'
+            if bound is not None:
+                correction += f' The required {issue} is {bound}.'
+            if issue == 'incomplete_output':
+                correction += ' Shorten prose and lyric lines so the entire JSON fits the output budget.'
+            messages.append({'role': 'user', 'content': correction +
+                ' Regenerate the complete JSON matching the supplied schema. Follow every field length limit. '
+                'Only sung lyrics must be Hindi Devanagari; thumbnail_text and image prompts must follow '
+                'their own ASCII/English rules. Do not add fields or commentary.'})
             continue
         print(json.dumps({'check': 'Qwen lyrics JSON', 'passed': True,
             'seconds': round(time.monotonic() - started, 1),
