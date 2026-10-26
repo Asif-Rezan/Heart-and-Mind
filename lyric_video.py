@@ -68,7 +68,12 @@ def timed_shots(lyrics, words, seconds):
         start, end = index*INTERVAL, min((index+1)*INTERVAL, seconds)
         active = [word for word in matched if word['start'] < end and word['end'] > start]
         anchor = (active[0] if active else min(matched, key=lambda word: abs(word['start']-(start+end)/2)))['index']
-        context = ' '.join(original[max(0, anchor-5):min(len(original), anchor+15)])
+        if active:
+            first = min(word['index'] for word in active)
+            last = max(word['index'] for word in active)+1
+            context = ' '.join(original[max(0, first-2):min(len(original), last+3)])
+        else:
+            context = ' '.join(original[max(0, anchor-3):min(len(original), anchor+8)])
         shots.append(dict(index=index, start=start, duration=end-start, lyrics=context,
                           instrumental=not bool(active)))
     return shots
