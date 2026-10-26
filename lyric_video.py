@@ -11,7 +11,7 @@ import re
 import subprocess
 
 INTERVAL = 5
-SHARDS = 8
+SHARDS = 16
 ASR_REPO = 'Systran/faster-whisper-small'
 ASR_REVISION = '536b0662742c02347bc0e980a01041f333bce120'
 
@@ -173,7 +173,7 @@ def generate_shard(root, song, shard=0, shards=SHARDS):
     root = Path(root)
     plan = json.loads((root/'storyboard.json').read_text())
     shots = validate_plan(plan)
-    if not plan.get('complete') or not 0 <= shard < shards <= 8:
+    if not plan.get('complete') or not 0 <= shard < shards <= 16:
         raise RuntimeError('Completed lyric storyboard and valid shard required')
     tasks = [(f"scene-{shot['index']:03}.png", shot['prompt'], str(shot['index']))
              for shot in shots if shot['index'] % shards == shard]
@@ -181,6 +181,12 @@ def generate_shard(root, song, shard=0, shards=SHARDS):
         tasks.append(('thumbnail-source.png', song['thumbnail_prompt'] + ', expressive adults on right, dark empty left, no text', 'thumbnail'))
     manifest_path = root/f'image-shard-{shard}.json'
     old = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+    # A resumed production may have used a different shard count. Remove only
+    # restored files listed in this shard's own manifest and now owned elsewhere.
+    assigned = {name for name, _, _ in tasks}
+    for name in old:
+        if re.fullmatch(r'scene-\d{3}\.png', name) and name not in assigned:
+            (root/name).unlink(missing_ok=True)
     saved = {}
     for name, prompt, purpose in tasks:
         seed = int(hashlib.sha256((plan['identity']+purpose).encode()).hexdigest()[:8], 16)

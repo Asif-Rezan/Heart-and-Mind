@@ -208,9 +208,9 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 16
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     env:
       SONG_RUN_ID: ${{ needs.lyrics.outputs.run_id }}
       IMAGE_SHARD: ${{ matrix.shard }}

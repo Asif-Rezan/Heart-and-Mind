@@ -63,13 +63,13 @@ class LyricVideoTests(unittest.TestCase):
             root = Path(temp)
             (root/'storyboard.json').write_text(json.dumps(plan()))
             records = []
-            for shard in range(8):
+            for shard in range(16):
                 records.extend(generate_shard(root, SONG, shard).items())
             self.assertEqual(worker.call_count, 37)
             self.assertEqual(len(list(root.glob('scene-*.png'))), 36)
             self.assertTrue((root/'thumbnail-source.png').exists())
             self.assertEqual(len({spec['seed'] for _, spec in records}), 37)
-            for shard in range(8):
+            for shard in range(16):
                 generate_shard(root, SONG, shard)
             self.assertEqual(worker.call_count, 37)
             changed = plan()
