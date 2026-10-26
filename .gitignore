@@ -6,3 +6,6 @@ client_secrets*.json
 .venv/
 
 .credentials/
+
+.vendor/
+.models/

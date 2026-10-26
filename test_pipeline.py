@@ -16,14 +16,6 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pipeline.validate_song(dict(title='Song', lyrics='English only', prompt='pop', description='Music', duration=240))
 
-    def test_ambiguous_generation_not_resubmitted(self):
-        with patch.dict('os.environ', {'ACESTEP_API_URL':'https://music.example', 'ACESTEP_API_KEY':'test'}):
-            ace = pipeline.AceStep()
-            ace.call = Mock()
-            with self.assertRaises(RuntimeError):
-                ace.generate({}, {'generation_started':True}, Mock(), Path('unused'))
-            ace.call.assert_not_called()
-
     def test_ambiguous_upload_not_repeated(self):
         client = Mock()
         with self.assertRaises(RuntimeError):

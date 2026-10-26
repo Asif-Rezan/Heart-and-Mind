@@ -8,9 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
-from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
-import requests
 from storage import Store, required
 
 
@@ -56,62 +54,6 @@ def make_song(day, history):
         'max_completion_tokens': 5000})
     return validate_song(json.loads(result['choices'][0]['message']['content']))
 
-
-
-class AceStep:
-    def __init__(self):
-        self.base = required('ACESTEP_API_URL').rstrip('/') + '/'
-        if urlsplit(self.base).scheme != 'https' and urlsplit(self.base).hostname not in ('localhost', '127.0.0.1'):
-            raise ValueError('Use HTTPS for remote ACE-Step')
-        self.session = requests.Session()
-        self.session.headers['Authorization'] = 'Bearer ' + required('ACESTEP_API_KEY')
-
-    def call(self, path, data=None):
-        result = self.session.request('GET' if data is None else 'POST',
-            urljoin(self.base, path), json=data, timeout=120)
-        result.raise_for_status()
-        body = result.json()
-        if body.get('code', 200) != 200 or body.get('error'):
-            raise RuntimeError('ACE-Step API rejected request')
-        return body['data']
-
-    def generate(self, song, state, save, target):
-        if not state.get('task_id'):
-            if state.get('generation_started'):
-                raise RuntimeError('Ambiguous generation submission; reconcile before retry')
-            state['generation_started'] = True
-            save()
-            task = self.call('release_task', {'model': 'acestep-v15-turbo',
-                'prompt': song['prompt'], 'lyrics': song['lyrics'], 'vocal_language': 'hi',
-                'audio_duration': song['duration'], 'audio_format': 'wav',
-                'batch_size': 1, 'thinking': True, 'inference_steps': 8})
-            state['task_id'] = task['task_id']
-            save()
-        deadline = time.monotonic() + 3600
-        while time.monotonic() < deadline:
-            rows = self.call('query_result', {'task_id_list': [state['task_id']]})
-            row = next((r for r in rows if r['task_id'] == state['task_id']), {})
-            if row.get('status') == 2:
-                raise RuntimeError('ACE-Step music generation failed')
-            if row.get('status') == 1:
-                results = row['result']
-                results = json.loads(results) if isinstance(results, str) else results
-                url = urljoin(self.base, results[0]['file'])
-                if urlsplit(url).netloc != urlsplit(self.base).netloc:
-                    raise RuntimeError('Unexpected audio download origin')
-                with self.session.get(url, stream=True, timeout=180, allow_redirects=False) as response:
-                    response.raise_for_status()
-                    if response.status_code != 200:
-                        raise RuntimeError('Audio download redirected')
-                    temporary = target.with_suffix('.part')
-                    with temporary.open('wb') as stream:
-                        for chunk in response.iter_content(1024 * 1024):
-                            stream.write(chunk)
-                    validate_duration(duration(temporary))
-                    temporary.replace(target)
-                return
-            time.sleep(10)
-        raise TimeoutError('ACE-Step still running; rerun with same run ID')
 
 
 def duration(path):
@@ -238,11 +180,14 @@ def run(run_id):
         if fid:
             store.download(fid, root/'song.wav')
         else:
-            AceStep().generate(song, state, save, root/'song.wav')
+            from music_cpu import generate
+            generate(song, root/'song.wav', state, save)
     validate_duration(duration(root/'song.wav'))
     if not state.get('video_id'):
         store.upload(root/'song.wav', f'runs/{run_id}/song.wav')
-        render(root)
+        if not (root/'video.mp4').exists():
+            render(root)
+        validate_duration(duration(root/'video.mp4'))
         for name in ('song.json', 'video.mp4', 'thumbnail.jpg'):
             store.upload(root/name, f'runs/{run_id}/{name}')
     elif not (root/'thumbnail.jpg').exists():

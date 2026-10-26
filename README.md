@@ -1,87 +1,58 @@
 # Heart and Mind — Hindi Music Automation
 
-Adapted from [Rezan After Dark](https://github.com/Asif-Rezan/Rezan-After-Dark): staged generation, separate Google authorizations, private Drive checkpoints, resumable processing and guarded uploads. Horror narration/TTS is replaced with original Hindi vocal music. This is a new music implementation, not a copy of the horror repository.
+All AI inference and video rendering run on standard **GitHub Actions CPU runners**. There is no hosted Hugging Face Space, ZeroGPU call, Groq key, remote music API, GPU rental, or self-hosted runner requirement. Public model weights are downloaded anonymously; downloads do not perform remote inference.
 
-## What it does
+## Workflow
 
-1. Generate original Hindi Devanagari lyrics and Hindi/English video metadata locally with Qwen/Qwen3-4B-Instruct-2507, matching the reference project; no text API key is used.
-2. Generate a complete vocal song using ACE-Step 1.5 (`acestep-v15-turbo`, Hindi language), aiming at 4 minutes.
-3. Measure audio and final video with ffprobe; reject anything outside 180–360 seconds. Never pad or loop short songs to meet the limit.
-4. Render a 1920×1080 animated audio visualizer and branded thumbnail.
-5. Save song, audio, video and checkpoint records to the dedicated private Drive folder.
-6. Upload with `privacyStatus=public`, music category, Hindi audio language and AI disclosure. Verify channel, actual public visibility, processing and HD before marking published.
+1. **Lyrics job:** original Hindi Devanagari lyrics and metadata using the same pinned Qwen3-4B CPU model as [Rezan After Dark](https://github.com/Asif-Rezan/Rezan-After-Dark).
+2. **Music job:** ACE-Step 1.5 `acestep-v15-turbo` runs directly on the GitHub CPU. Hindi vocals, one complete 180–360 second song, eight diffusion steps. Optional ACE-Step planning LM is disabled because lyrics and the musical prompt are already supplied.
+3. **Publish job:** measure the real audio duration, render a 1920×1080 branded waveform video and thumbnail, back up privately to Drive, upload publicly to the exact Heart & Mind channel, and verify actual public visibility and HD processing.
 
-An interrupted upload with no saved video ID requires manual reconciliation to avoid duplicate videos. Rerun with the SAME run ID. No media is automatically deleted. Account or API restrictions never count as successful publication.
+Songs are never looped or padded to meet the duration requirement. Images are a locally drawn branded background and thumbnail; AI scene-image generation is not implemented.
 
-## Accounts
+The three jobs run sequentially on separate workers to release memory between models. Only the publishing job receives Google credentials. Music inference has a 350-minute deadline, a CPU-only PyTorch installation, and 16 GB of additional swap. CPU generation can be slow; successful completion still depends on the runner's memory, disk and time limits. A failed run is not reported as published.
+
+## Start or resume
+
+Open GitHub Actions → **Hindi music generation and public publishing** → **Run workflow**.
+
+- `run_id`: stable song identifier, e.g. `first-hindi-song-20261025`.
+- `prepared_run`: optional numeric previous GitHub run ID with a `generated-music-<ID>` artifact. Reuse the same `run_id` to restore its lyrics and any completed audio.
+
+Old checkpoints from the removed hosted backend can supply the lyrics. The CPU worker does not resubmit their remote tasks. A failed local music process can restart with the saved lyrics. Completed audio is reused. An interrupted YouTube upload without a saved video ID still requires reconciliation to prevent duplicate publishing.
+
+The scheduled workflow is daily at **01:00 Asia/Dhaka**, gated by repository variable `AUTOMATION_ENABLED=true`. Scheduling stays off until a full generation and publishing run succeeds. Manual runs request public publishing.
+
+## Google accounts and secrets
 
 | Purpose | Account |
 | --- | --- |
-| YouTube Heart and Mind | asifrezan@gmail.com |
-| Google Cloud project owner | asifrezan.office@gmail.com |
-| Private Drive media folder | asifrezanit@gmail.com |
+| Heart & Mind YouTube | asifrezan@gmail.com |
+| Google Cloud owner | asifrezan.office@gmail.com |
+| Private Drive media | asifrezanit@gmail.com |
 
-YouTube is checked by exact channel ID, because an email can contain several channels. The setup helper requires that ID; get it from Heart and Mind's YouTube Studio. Drive owner email and the folder's project marker are checked at runtime. No reference project credentials or channel IDs are reused.
+The previously unused project in organization `931428574736` is named **Heart and Mind**, project ID `project-5a0943f4-af8e-49e0-8e4`, number `563533070055`. Before reuse, credentials were empty, API traffic had no data for 30 days, and asset inventory contained only default project/services/logging resources.
 
-## Google Cloud / OAuth setup
+The OAuth app is **In production**, with YouTube Data API v3 and Drive API enabled. Fresh offline credentials were verified for channel `UCDTjTh7ORO2J_5OrR0dESTQ` and its private project-marked Drive folder. Required encrypted repository Actions secrets:
 
-This repository does not imply Cloud has already been configured. In Google Cloud under `asifrezan.office@gmail.com`, inspect projects and select an unused dedicated project. Confirm it has no active integrations before reusing it. Enable YouTube Data API v3 and Google Drive API. Configure Google Auth Platform branding, audience and requested scopes. Set publishing status to **In production**, then create a Desktop OAuth client and download its JSON as `client_secrets.json` locally.
+- `YOUTUBE_TOKEN_JSON`
+- `EXPECTED_CHANNEL_ID`
+- `DRIVE_TOKEN_JSON`
+- `DRIVE_FOLDER_ID`
 
-Production status must be set BEFORE fresh offline consent. Reauthorize after changing out of Testing; an existing Testing token should not be relied on. Testing grants for these scopes have a seven-day refresh-token limit. Production removes that Testing-specific limit, but tokens can still be revoked or expire for other reasons. OAuth Production status is not a guarantee of YouTube public publishing eligibility; inspect the actual returned video status.
+No Hugging Face or Groq token is needed. Production removes the Testing-specific seven-day refresh-token limit; revocation and other expiry conditions can still require reauthorization.
 
-Install Python 3.11+, GitHub CLI, FFmpeg, and dependencies:
+For future account setup, download the dedicated Desktop client JSON as ignored `client_secrets.json`, install `requirements.txt`, then run `python setup_accounts.py youtube --channel-id UCDTjTh7ORO2J_5OrR0dESTQ` and `python setup_accounts.py drive`. The helper uses GitHub CLI if available; otherwise it prepares inputs under ignored owner-only `.credentials/` for encrypted Actions secrets. Never commit or print credentials.
 
-```bash
-python -m pip install -r requirements.txt
-gh auth login
-python setup_accounts.py youtube --channel-id YOUR_HEART_AND_MIND_CHANNEL_ID
-python setup_accounts.py drive
-```
+## Pinned music runtime
 
-Select Heart and Mind under `asifrezan@gmail.com` for YouTube. Select `asifrezanit@gmail.com` for Drive. The helper creates/reuses a project-marked folder and saves tokens, folder ID and channel ID directly to repository secrets using GitHub CLI stdin. It never writes tokens to repository files or prints them. Google login/consent remains interactive on your computer. Keep client JSON private.
+- Official source: `ace-step/ACE-Step-1.5`, commit `ca1e85fe9430179831e6bc6be790c332190a3866`.
+- Public weights: `ACE-Step/Ace-Step1.5`, revision `19671f406d603126926c1b7e2adc169acbcade22`.
+- Downloaded components: turbo DiT, official VAE, Qwen3 embedding encoder. No optional 5Hz planning LM is downloaded or loaded.
+- `requirements-music-cpu.txt` contains the inference dependencies. PyTorch and torchaudio CPU wheels are installed from PyTorch's official CPU index.
 
-## ACE-Step 1.5
+The wrapper checks the source commit before importing it and initializes with `device='cpu'`, no FlashAttention, no GPU backend, no compilation and no hosted fallback. It follows the official [CPU-only installation](https://github.com/ace-step/ACE-Step-1.5/blob/ca1e85fe9430179831e6bc6be790c332190a3866/docs/en/INSTALL.md#cpu-only-mode) and [inference API](https://github.com/ace-step/ACE-Step-1.5/blob/ca1e85fe9430179831e6bc6be790c332190a3866/docs/en/INFERENCE.md).
 
-Requested source: [ACE-Step/Ace-Step-v1.5](https://huggingface.co/spaces/ACE-Step/Ace-Step-v1.5). The pipeline integrates the official ACE-Step 1.5 REST API; it does not assume the public Gradio demo is a reliable unattended REST server. By default, generation uses the official Space’s published Gradio API and ACE-Step 1.5 turbo checkpoint. Availability and ZeroGPU quotas may interrupt a run. Configure an optional private ACE-Step 1.5 server to use the REST backend instead.
+## Checks
 
-Install the official [ACE-Step-1.5](https://github.com/ace-step/ACE-Step-1.5) project on your own suitable machine, follow its installation instructions, then launch its documented `acestep-api` entry point. Configure server `ACESTEP_API_KEY`; protect remote transport with HTTPS. Configure the API URL/key as GitHub secrets below. No GPU service is purchased or provisioned by this repository. Hosted Ubuntu Actions orchestrates the API and renders video; it does not install/run the music model itself. CPU inference is available upstream, but generation time depends on your machine. Use a self-hosted runner/local server if you want generation on your own hardware.
-
-API contract: `POST /release_task`, `POST /query_result`, then same-origin `/v1/audio` download. Task IDs are checkpointed before polling, with a one-hour deadline. API submissions are not blindly retried.
-
-## Required GitHub secrets
-
-| Secret | Source |
-| --- | --- |
-| ACESTEP_API_URL | Optional HTTPS URL of your ACE-Step 1.5 REST server |
-| ACESTEP_API_KEY | Required only with the private REST server |
-| YOUTUBE_TOKEN_JSON | YouTube setup helper |
-| EXPECTED_CHANNEL_ID | YouTube setup helper |
-| DRIVE_TOKEN_JSON | Drive setup helper |
-| DRIVE_FOLDER_ID | Drive setup helper |
-
-Lyrics use the reference project’s pinned Qwen3-4B Q4_K_M CPU model, downloaded anonymously and verified by SHA-256. Install `requirements-lyrics.txt` alongside `requirements.txt` for generation. No Groq credentials or hosted text service are used. Scheduled runs require repository variable `AUTOMATION_ENABLED=true`. Default cadence follows the reference: daily at 01:00 Asia/Dhaka. It is disabled until configuration is complete; manually run **Hindi music generation and public publishing** with a stable ID such as `first-song-001` to validate the full path. A manual run publishes publicly as requested. Enable the daily variable after that succeeds.
-
-```bash
-python -m unittest -v
-python pipeline.py --run-id first-song-001
-```
-
-## Current verification limits
-
-Unit tests cover duration boundaries, Hindi validation, interrupted submission safeguards and rejection of private-only uploads. Live music quality, account authorization, Drive access and public uploading require configured secrets and a working ACE-Step server. Hindi output is prompted and structurally checked; native listening review remains useful. The initial visual style is a branded audio visualizer rather than generated cinematic scenes or synchronized lyric captions.
-
-Reference inspected: `Rezan-After-Dark` main, including `workflow.py`, `daily_publish.py`, authorization helpers and requirements. Relevant upstream docs: https://ace-step.github.io/ACE-Step-1.5/en/API and https://developers.google.com/identity/protocols/oauth2 .
-
-## Dedicated Google Cloud project
-
-Selected an unused project in organization `931428574736`, renamed **Heart and Mind**. Project ID: `project-5a0943f4-af8e-49e0-8e4`, project number `563533070055`. Before reuse its credential lists were empty, API traffic had no data over 30 days, and inventory contained only the default service registrations, log buckets/sinks, and project record.
-
-Account setup completed: external OAuth app is **In production**, YouTube Data API v3 and Drive API enabled, fresh offline credentials verified against Heart & Mind (`UCDTjTh7ORO2J_5OrR0dESTQ`) and its private Drive folder. All four Google account settings are stored as encrypted repository Actions secrets. No Groq key is configured or read.
-
-If a run prepared media before credentials became available, launch the workflow using the same `run_id` and its numeric GitHub run ID in `prepared_run`. This restores the original saved audio/video rather than generating another song. Inspect incomplete generation checkpoints before retrying an ambiguous music service submission.
-
-The official Space accepts FLAC/MP3, so this workflow requests lossless FLAC and decodes it to PCM WAV before rendering. It checks the live API choices before submission. For a saved run whose logs explicitly confirm a pre-generation rejection (such as the old unsupported WAV request), use `prepared_run` plus `retry_rejected_submission=true`. This preserves the lyrics and records the reconciled rejection. It may also be used after the exact terminal service error `GPU task aborted` with no returned audio. Never use it for an unknown timeout or a still-running generation task.
-
-The public Space backend uses the smaller `acestep-v15-turbo` with one song per request and disables Thinking plus all three optional metadata/caption/language planning passes. Qwen supplies the original Hindi lyrics and musical prompt; the Space uses its GPU for music synthesis. This reduces hosted GPU work but cannot guarantee public Space availability. Exact terminal GPU aborts are checkpointed as failed/resumable; network timeouts remain ambiguous and blocked from silent resubmission.
-
-For public Space generation, set repository Actions secret `HF_TOKEN` to a Hugging Face user token whose account has available ZeroGPU quota. The workflow supplies it only to the music client. A token increases access to the account quota but does not guarantee capacity or unlimited runs. Confirmed quota rejections remain resumable without regenerating lyrics; the workflow does not repeatedly submit against exhausted quota. A private ACE-Step REST backend remains an alternative.
+`python -m unittest -v` exercises duration and Hindi validation, the pinned anonymous downloads, CPU-only generation parameters, safe local retries, and rejection of private-only upload results. A live Actions run additionally imports the real pinned ACE-Step runtime before downloading its model weights and generating audio. Unit tests alone do not establish actual song quality or completed publication.
