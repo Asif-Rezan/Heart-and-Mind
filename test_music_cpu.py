@@ -74,3 +74,20 @@ class CpuMusicTests(unittest.TestCase):
                     music.generate(SONG, target, state, Mock())
             self.assertEqual(json.loads((target.parent/'cpu-song-input.json').read_text()), SONG)
             self.assertFalse(state['generation_started'])
+
+    def test_cpu_timeout_replaces_gpu_default_before_runtime_import(self):
+        with patch.dict('os.environ', {'ACESTEP_GENERATION_TIMEOUT':'600'}):
+            with patch.object(music.subprocess, 'check_output', return_value='different-ref'):
+                with self.assertRaises(RuntimeError):
+                    music.runtime(Path('source'))
+            self.assertEqual(music.os.environ['ACESTEP_GENERATION_TIMEOUT'], '18000')
+
+    def test_parent_worker_has_a_bounded_cpu_deadline_and_recovers_on_expiry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = {}
+            error = subprocess.TimeoutExpired('worker', music.WORKER_TIMEOUT)
+            with patch.object(music.subprocess, 'run', side_effect=error) as worker:
+                with self.assertRaisesRegex(RuntimeError, 'resume'):
+                    music.generate(SONG, Path(directory)/'song.wav', state, Mock())
+            self.assertEqual(worker.call_args.kwargs['timeout'], 18900)
+            self.assertFalse(state['generation_started'])

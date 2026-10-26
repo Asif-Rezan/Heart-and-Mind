@@ -1,5 +1,10 @@
 """Run pinned ACE-Step 1.5 music inference on a GitHub Actions CPU runner."""
 import argparse
+from contextlib import contextmanager
+import importlib
+import resource
+import threading
+import time
 import json
 import os
 from pathlib import Path
@@ -12,6 +17,8 @@ MODEL_REPO = 'ACE-Step/Ace-Step1.5'
 MODEL_REVISION = '19671f406d603126926c1b7e2adc169acbcade22'
 MODEL = 'acestep-v15-turbo'
 COMPONENTS = (MODEL, 'vae', 'Qwen3-Embedding-0.6B')
+CPU_GENERATION_TIMEOUT = 18000
+WORKER_TIMEOUT = CPU_GENERATION_TIMEOUT + 900
 
 
 def checkpoints(root):
@@ -24,7 +31,33 @@ def checkpoints(root):
             raise RuntimeError('Missing pinned ACE-Step component: ' + name)
 
 
+def configure_cpu_timeout():
+    # Upstream reads this once, at module import, with a GPU-oriented 600s default.
+    os.environ['ACESTEP_GENERATION_TIMEOUT'] = str(CPU_GENERATION_TIMEOUT)
+
+
+@contextmanager
+def generation_progress():
+    started = time.monotonic()
+    stop = threading.Event()
+    def report():
+        while not stop.wait(60):
+            usage = resource.getrusage(resource.RUSAGE_SELF)
+            print(json.dumps({'phase':'CPU synthesis running',
+                'elapsed_seconds':round(time.monotonic()-started),
+                'cpu_seconds':round(usage.ru_utime+usage.ru_stime),
+                'peak_memory_mb':round(usage.ru_maxrss/1024)}), flush=True)
+    reporter = threading.Thread(target=report, daemon=True)
+    reporter.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        reporter.join(timeout=1)
+
+
 def runtime(source):
+    configure_cpu_timeout()
     revision = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
     if revision != SOURCE_REVISION:
         raise RuntimeError('ACE-Step source revision differs from the reviewed version')
@@ -32,6 +65,12 @@ def runtime(source):
     import torch
     from acestep.handler import AceStepHandler
     from acestep.inference import GenerationParams, GenerationConfig, generate_music
+
+    execution = importlib.import_module('acestep.core.generation.handler.generate_music_execute')
+    if execution._DEFAULT_GENERATION_TIMEOUT != CPU_GENERATION_TIMEOUT:
+        raise RuntimeError('ACE-Step was imported before the CPU timeout was configured')
+    print(json.dumps({'check':'native CPU generation timeout',
+        'seconds':execution._DEFAULT_GENERATION_TIMEOUT}), flush=True)
 
     class CpuHandler(AceStepHandler):
         def _ensure_models_present(self, *, checkpoint_path, config_path, prefer_source, vae_variant=None):
@@ -74,7 +113,7 @@ def synthesize(song, target, source, model_root):
     config = Config(batch_size=1, audio_format='wav', allow_lm_batch=False)
     print(json.dumps({'phase':'synthesizing music', 'device':'cpu',
         'duration':song['duration'], 'steps':8}), flush=True)
-    with torch.inference_mode():
+    with torch.inference_mode(), generation_progress():
         result = infer(handler, None, params, config, save_dir=str(target.parent/'cpu-audio'))
     if not result.success or not result.audios:
         raise RuntimeError('ACE-Step CPU music synthesis failed')
@@ -102,8 +141,8 @@ def generate(song, target, state, save):
     try:
         subprocess.run([sys.executable, '-u', str(Path(__file__).resolve()),
             '--song', str(request.resolve()), '--target', str(target.resolve()),
-            '--source', str(source), '--models', str(model_root)], check=True)
-    except subprocess.CalledProcessError:
+            '--source', str(source), '--models', str(model_root)], check=True, timeout=WORKER_TIMEOUT)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         state.update(generation_started=False, generation_failed='Local CPU worker failed; saved lyrics retained')
         save()
         raise RuntimeError('Local ACE-Step CPU worker failed; resume the saved run') from None

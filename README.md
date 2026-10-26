@@ -56,3 +56,5 @@ The wrapper checks the source commit before importing it and initializes with `d
 ## Checks
 
 `python -m unittest -v` exercises duration and Hindi validation, the pinned anonymous downloads, CPU-only generation parameters, safe local retries, and rejection of private-only upload results. A live Actions run additionally imports the real pinned ACE-Step runtime before downloading its model weights and generating audio. Unit tests alone do not establish actual song quality or completed publication.
+
+CPU synthesis configures the native `ACESTEP_GENERATION_TIMEOUT` to 18,000 seconds before importing ACE-Step (its default is only 600 seconds). Startup verifies the actual imported native timeout. The child worker has a separate 18,900-second hard deadline, within the 350-minute music job. A one-minute heartbeat reports elapsed CPU time and peak memory while synthesis runs. These are limits, not completion-time promises.
