@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 40
     outputs:
       run_id: ${{ steps.identity.outputs.run_id }}
+      restore_artifacts: ${{ steps.recovery.outputs.artifact_names || '[]' }}
     env:
       LYRICS_MODEL: Qwen/Qwen3-4B-Instruct-2507
       OMP_NUM_THREADS: '4'
@@ -47,21 +48,37 @@ jobs:
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
       - run: pip install -r requirements.txt -r requirements-lyrics.txt
       - run: python -m unittest -v
-      - name: Restore saved original lyrics or music
-        id: restore_music
-        continue-on-error: true
+      - name: Find available recovery checkpoints
+        id: recovery
+        if: inputs.prepared_run != ''
+        uses: actions/github-script@v7
+        env:
+          PREPARED_RUN_ID: ${{ inputs.prepared_run }}
+        with:
+          script: |
+            const saved = process.env.PREPARED_RUN_ID;
+            if (!/^\d+$/.test(saved) || !Number.isSafeInteger(Number(saved))) {
+              throw new Error('prepared_run must be a numeric GitHub run ID');
+            }
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              owner: context.repo.owner, repo: context.repo.repo,
+              run_id: Number(saved), per_page: 100
+            });
+            const names = artifacts.filter(a => !a.expired).map(a => a.name);
+            const music = `generated-music-${saved}`;
+            const lyrics = `music-input-${saved}`;
+            const selected = names.includes(music) ? music : names.includes(lyrics) ? lyrics : null;
+            if (!selected) {
+              throw new Error('No unexpired lyrics or music checkpoint is available for prepared_run');
+            }
+            core.setOutput('artifact_name', selected);
+            core.setOutput('artifact_names', JSON.stringify(names));
+            core.info(selected === music ? 'Restoring saved music checkpoint.' : 'Restoring saved lyrics draft.');
+      - name: Restore available lyrics or music checkpoint
         if: inputs.prepared_run != ''
         uses: actions/download-artifact@v4
         with:
-          name: generated-music-${{ inputs.prepared_run }}
-          run-id: ${{ inputs.prepared_run }}
-          github-token: ${{ github.token }}
-          path: output/
-      - name: Restore validated lyrics draft from a failed lyrics job
-        if: inputs.prepared_run != '' && steps.restore_music.outcome == 'failure'
-        uses: actions/download-artifact@v4
-        with:
-          name: music-input-${{ inputs.prepared_run }}
+          name: ${{ steps.recovery.outputs.artifact_name }}
           run-id: ${{ inputs.prepared_run }}
           github-token: ${{ github.token }}
           path: output/
@@ -171,8 +188,7 @@ jobs:
           name: generated-music-${{ github.run_id }}
           path: output/
       - name: Restore saved lyric timeline when available
-        if: inputs.prepared_run != ''
-        continue-on-error: true
+        if: inputs.prepared_run != '' && contains(fromJSON(needs.lyrics.outputs.restore_artifacts || '[]'), format('song-storyboard-{0}', inputs.prepared_run))
         uses: actions/download-artifact@v4
         with:
           name: song-storyboard-${{ inputs.prepared_run }}
@@ -246,8 +262,7 @@ jobs:
           name: song-storyboard-${{ github.run_id }}
           path: output/
       - name: Restore matching image shard when available
-        if: inputs.prepared_run != ''
-        continue-on-error: true
+        if: inputs.prepared_run != '' && contains(fromJSON(needs.lyrics.outputs.restore_artifacts || '[]'), format('generated-artwork-{0}-{1}', inputs.prepared_run, matrix.shard))
         uses: actions/download-artifact@v4
         with:
           name: generated-artwork-${{ inputs.prepared_run }}-${{ matrix.shard }}
