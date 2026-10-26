@@ -38,7 +38,7 @@ Open GitHub Actions â†’ **Hindi album music generation and public publishing** â
 
 Old checkpoints from the removed hosted backend can supply the lyrics. The CPU worker does not resubmit their remote tasks. A failed local music process can restart with the saved lyrics. Completed audio is reused. An interrupted YouTube upload without a saved video ID still requires reconciliation to prevent duplicate publishing.
 
-The scheduled workflow is daily at **01:00 Asia/Dhaka**, gated by repository variable `AUTOMATION_ENABLED=true`. Scheduling stays off until a full generation and publishing run succeeds. Manual runs request public publishing.
+The scheduled workflow is daily at **20:00 Asia/Dhaka (8:00 PM Bangladesh time)**, gated by repository variable `AUTOMATION_ENABLED=true`. Set the variable to `false` to pause daily generation. Manual runs request public publishing.
 
 ## Google accounts and secrets
 
