@@ -35,6 +35,17 @@ def prepare(run_id, stage='all'):
         lyrics_cpu._model.close()
         lyrics_cpu._model = None
     gc.collect()
+    if stage == 'images':
+        from song_images import generate_song_images
+        generate_song_images(root, song)
+        print(json.dumps({'phase': 'images ready', 'run_id': run_id}), flush=True)
+        return
+    if stage == 'all':
+        from song_images import generate_song_images
+        generate_song_images(root, song)
+        import image_cpu
+        image_cpu._pipeline = None
+        gc.collect()
     if not (root/'song.wav').exists():
         if stage == 'render':
             raise RuntimeError('Music artifact missing; publishing cannot generate through a remote service')
@@ -52,6 +63,6 @@ def prepare(run_id, stage='all'):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id', required=True)
-    parser.add_argument('--stage', choices=['all', 'lyrics', 'music', 'render'], default='all')
+    parser.add_argument('--stage', choices=['all', 'lyrics', 'music', 'images', 'render'], default='all')
     args = parser.parse_args()
     prepare(args.run_id, args.stage)
