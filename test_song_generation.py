@@ -7,11 +7,11 @@ from jsonschema import Draft202012Validator
 
 from pipeline import make_song
 
-CORE = {'title': 'নতুন ভোর', 'romanized_title': 'Notun Bhor', 'lyrics': '[Verse 1]\n' + 'নতুন ভোরে আবার বাঁচতে চাই\n'*30,
-        'prompt': 'Bangla cinematic soulful pop with piano and warm expressive vocals', 'duration': 240}
-PACKAGE = {'description': 'A hopeful original Bangla song about starting again. #BanglaMusic',
-           'tags': ['Notun Bhor', 'নতুন ভোর', 'Bangla song', 'Bangla soul', 'hopeful song', 'Bangla pop', 'original music', 'Heart and Mind'],
-           'thumbnail_text': 'NOTUN BHOR',
+CORE = {'title': 'नई सुबह', 'romanized_title': 'Nayi Subah', 'lyrics': '[Verse 1]\n' + 'नई सुबह में फिर से जीना है\n'*30,
+        'prompt': 'Hindi cinematic soulful pop with piano and warm expressive vocals', 'duration': 240}
+PACKAGE = {'description': 'A hopeful original Hindi song about starting again. #HindiMusic',
+           'tags': ['Nayi Subah', 'नई सुबह', 'Hindi song', 'Hindi soul', 'hopeful song', 'Hindi pop', 'original music', 'Heart and Mind'],
+           'thumbnail_text': 'NAYI SUBAH',
            'thumbnail_prompt': 'Close portrait of a hopeful South Asian adult, glowing sunrise on the right, dark empty left, cinematic photography.'}
 
 
@@ -36,8 +36,8 @@ class SongGenerationTests(unittest.TestCase):
         self.assertNotIn('tags', requests[0]['response_format']['json_schema']['schema']['properties'])
         self.assertNotIn('lyrics', requests[1]['response_format']['json_schema']['schema']['properties'])
         self.assertIn(CORE['title'], requests[1]['messages'][-1]['content'])
-        self.assertIn('Bangla Album Song', song['title'])
-        self.assertIn('বাংলা অ্যালবাম গান', song['description'])
+        self.assertIn('Hindi Album Song', song['title'])
+        self.assertIn('हिंदी एल्बम गीत', song['description'])
         self.assertLess(requests[1]['max_completion_tokens'], requests[0]['max_completion_tokens'])
 
     def test_valid_lyrics_survive_packaging_failure_and_are_not_regenerated(self):

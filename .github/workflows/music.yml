@@ -1,4 +1,4 @@
-name: Bangla album music generation and public publishing
+name: Hindi album music generation and public publishing
 on:
   workflow_dispatch:
     inputs:
@@ -65,7 +65,7 @@ jobs:
           run-id: ${{ inputs.prepared_run }}
           github-token: ${{ github.token }}
           path: output/
-      - name: Generate original Bangla lyrics on GitHub CPU
+      - name: Generate original Hindi lyrics on GitHub CPU
         env:
           SONG_RUN_ID: ${{ steps.identity.outputs.run_id }}
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage lyrics
@@ -133,7 +133,7 @@ jobs:
         with:
           name: music-input-${{ github.run_id }}
           path: output/
-      - name: Generate full Bangla song with ACE-Step on GitHub CPU
+      - name: Generate full Hindi song with ACE-Step on GitHub CPU
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage music
       - uses: actions/upload-artifact@v4
         if: always()
@@ -145,7 +145,7 @@ jobs:
             output/*/generation-state.json
           retention-days: 7
   storyboard:
-    name: Time Bangla lyrics and plan five-second scenes
+    name: Time Hindi lyrics and plan five-second scenes
     needs: [lyrics, music]
     runs-on: ubuntu-24.04
     timeout-minutes: 60

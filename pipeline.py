@@ -1,4 +1,4 @@
-"""Bangla song -> ACE-Step 1.5 -> HD visualizer -> verified public YouTube video."""
+"""Hindi song -> ACE-Step 1.5 -> HD visualizer -> verified public YouTube video."""
 import argparse
 import datetime as dt
 import hashlib
@@ -19,10 +19,10 @@ def validate_song(song):
     if len(song['title']) > 100 or len(song['description']) > 4400:
         raise ValueError('YouTube metadata too long')
     sung = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', song['lyrics'])
-    if re.search(r'[A-Za-z\u0900-\u097f]', sung):
-        raise ValueError('Sung lyrics must use Bengali script only')
-    if not re.search(r'[\u0980-\u09ff]', sung):
-        raise ValueError('Bangla Bengali script lyrics required')
+    if re.search(r'[A-Za-z\u0980-\u09ff]', sung):
+        raise ValueError('Sung lyrics must use Devanagari only')
+    if not re.search(r'[\u0900-\u097f]', sung):
+        raise ValueError('Hindi Devanagari lyrics required')
     if not 180 <= song.get('duration', 0) <= 360:
         raise ValueError('Song must be 180-360 seconds')
     if 'tags' in song and (not isinstance(song['tags'], list) or
@@ -40,14 +40,14 @@ def validate_song(song):
 
 
 SONG_PROFILES = (
-    ('romance', 'Bangla romantic acoustic pop', 'new love; an ordinary shared moment becomes unforgettable', 'warm intimate solo vocal, acoustic guitar, piano, gentle live drums', 'TOMAR SATHE'),
-    ('heartbreak', 'Bangla sad piano ballad', 'a quiet goodbye; acceptance rather than blame', 'restrained vulnerable solo vocal, felt piano, cello, spacious drums', 'OSOMAPTO KOTHA'),
-    ('romance', 'Bangla indie dream pop', 'long-distance love; two lives connected by a small daily ritual', 'airy expressive vocal, clean electric guitar, atmospheric synths, soft groove', 'DURE THEKEO'),
-    ('healing', 'Bangla uplifting folk pop', 'starting again after loss; rediscovering self-worth', 'grounded hopeful vocal, dotara, acoustic guitar, flute, khol and warm percussion', 'ABAR BANCHI'),
-    ('romance', 'Bangla celebratory dance pop', 'joyful reunion; choosing each other again', 'playful energetic vocal, dholak, bass, bright synths, danceable rhythm', 'MONER UTSOB'),
-    ('heartbreak', 'Bangla modern Bangla album ballad', 'unspoken affection; a letter that never reaches its reader', 'measured expressive vocal, harmonium, tabla, esraj, subtle piano', 'NA BOLA KOTHA'),
-    ('healing', 'Bangla soulful cinematic pop', 'finding hope in solitude; courage for a new morning', 'soulful solo vocal, piano, strings, gradual percussion build', 'NOTUN BHOR'),
-    ('romance', 'Bangla monsoon lo-fi pop', 'remembering a first meeting in the rain', 'soft intimate vocal, mellow keys, muted guitar, relaxed lo-fi beat', 'BRISHTI AR TUMI'),
+    ('romance', 'Hindi romantic acoustic pop', 'new love; an ordinary shared moment becomes unforgettable', 'warm intimate solo vocal, acoustic guitar, piano, gentle live drums', 'TERE SAATH'),
+    ('heartbreak', 'Hindi sad piano ballad', 'a quiet goodbye; acceptance rather than blame', 'restrained vulnerable solo vocal, felt piano, cello, spacious drums', 'ADHURI BAATEIN'),
+    ('romance', 'Hindi indie dream pop', 'long-distance love; two lives connected by a small daily ritual', 'airy expressive vocal, clean electric guitar, atmospheric synths, soft groove', 'DOOR HOKE BHI'),
+    ('healing', 'Hindi uplifting folk pop', 'starting again after loss; rediscovering self-worth', 'grounded hopeful vocal, acoustic guitar, flute, dholak and warm percussion', 'PHIR SE JEE LE'),
+    ('romance', 'Hindi celebratory dance pop', 'joyful reunion; choosing each other again', 'playful energetic vocal, dholak, bass, bright synths, danceable rhythm', 'DIL KA JASHN'),
+    ('heartbreak', 'Hindi modern Hindi album ballad', 'unspoken affection; a letter that never reaches its reader', 'measured expressive vocal, harmonium, tabla, esraj, subtle piano', 'ANKAHI BAATEIN'),
+    ('healing', 'Hindi soulful cinematic pop', 'finding hope in solitude; courage for a new morning', 'soulful solo vocal, piano, strings, gradual percussion build', 'NAYI SUBAH'),
+    ('romance', 'Hindi monsoon lo-fi pop', 'remembering a first meeting in the rain', 'soft intimate vocal, mellow keys, muted guitar, relaxed lo-fi beat', 'BAARISH AUR TUM'),
 )
 
 
@@ -58,14 +58,14 @@ def song_profile(day):
 
 def make_song(day, history, draft_path=None):
     mood, genre, story, arrangement, hook = song_profile(day)
-    prompt = f'''Write an ORIGINAL Bangladeshi Bangla album-style song for Heart and Mind on {day}.
+    prompt = f'''Write an ORIGINAL Indian Hindi album-style song for Heart and Mind on {day}.
     Today's direction: {genre}. Emotional story: {story}.
     Musical arrangement: {arrangement}. Visual mood: {mood}.
     Develop a specific original scene, characters and emotional progression in this direction.
     Do not recycle a generic love song. Use concrete sensory details, conversational poetic
-    Bangla, fresh metaphors, natural breath-length phrases and consistent viewpoint.
-    Use idiomatic modern Bangladeshi Bengali, correct grammar and natural collocations.
-    Do not translate Hindi phrases literally or invent meaningless lines.
+    Hindi, fresh metaphors, natural breath-length phrases and consistent viewpoint.
+    Use idiomatic modern Indian Hindi, correct grammar and natural collocations.
+    Use natural Hindi idioms; do not invent meaningless lines or force rhymes.
     Plan a clear beginning, emotional turn in verse 2, and resolution in the bridge/outro.
     Write a memorable 2-4 line chorus with one distinctive central phrase; repeat that chorus
     consistently. Verses should advance the story, not paraphrase the chorus. Keep a singable
@@ -73,16 +73,16 @@ def make_song(day, history, draft_path=None):
     Structure: [Intro], [Verse 1] (6-8 lines), [Pre-Chorus] (2-4), [Chorus] (4),
     [Verse 2] (6-8), [Chorus], [Bridge] (4), [Final Chorus], [Outro] (2).
     Intro may be instrumental. Target 140-180 sung words for a complete 3-6 minute song.
-    পুরো গান বাংলা লিপিতে লেখো। গানের কথায় রোমান হরফ ব্যবহার করবে না।
-    Every sung line must use Bengali script, never English transliteration; bracket labels in English.
+    पूरा गीत हिंदी देवनागरी लिपि में लिखो। गाने में रोमन लिपि का प्रयोग मत करो।
+    Every sung line must use Devanagari, never English transliteration; bracket labels in English.
     Never copy existing lyrics, melodies, titles, or imitate a named singer.
     Avoid these previous titles: {json.dumps(history, ensure_ascii=False)}.
     Return JSON only with these fields:
-    title: unique short Bengali-script song name only, <=45 characters.
-    romanized_title: the same song name in readable Romanized Bangla, <=35 ASCII characters.
+    title: unique short Devanagari song name only, <=45 characters.
+    romanized_title: the same song name in readable Romanized Hindi, <=35 ASCII characters.
       No famous artist names, film claims, clickbait, 'viral', keyword lists or invented popularity.
     lyrics: complete song as above. prompt: English musical production directions including
-      {genre}, {arrangement}, tempo, dynamic arc and clear Bangla diction. No named artists.
+      {genre}, {arrangement}, tempo, dynamic arc and clear Hindi diction. No named artists.
     duration: integer seconds 180-360, aim 240.
     No spoken CTA. Keep the song concise: 140-180 sung words, including repeated choruses.
     Do not add metadata, descriptions, tags or image prompts to this response.
@@ -91,21 +91,21 @@ def make_song(day, history, draft_path=None):
     core_schema = {'type': 'object', 'additionalProperties': False,
         'required': ['title', 'romanized_title', 'lyrics', 'prompt', 'duration'],
         'properties': {
-            'title': {'type': 'string', 'minLength': 1, 'maxLength': 45, 'pattern': '[ঀ-৿]'},
+            'title': {'type': 'string', 'minLength': 1, 'maxLength': 45, 'pattern': '[ऀ-ॿ]'},
             'romanized_title': {'type': 'string', 'minLength': 1, 'maxLength': 35, 'pattern': '^[A-Za-z0-9 !?]+$'},
-            'lyrics': {'type': 'string', 'minLength': 500, 'pattern': '[ঀ-৿]'},
+            'lyrics': {'type': 'string', 'minLength': 500, 'pattern': '[ऀ-ॿ]'},
             'prompt': {'type': 'string', 'minLength': 20, 'maxLength': 600},
             'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360}}}
     def request(instructions, schema, tokens):
         result = request_story('chat/completions', {'model': MODEL_ID,
-            'messages': [{'role': 'system', 'content': 'You are an original Bangla songwriter and truthful music editor. Write natural, singable Bangla in Bengali script.'},
+            'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter and truthful music editor. Write natural, singable Hindi in Devanagari.'},
                          {'role': 'user', 'content': instructions}],
             'response_format': {'type': 'json_schema', 'json_schema': {'schema': schema}},
             'max_completion_tokens': tokens})
         return json.loads(result['choices'][0]['message']['content'])
 
     # Keep the full song and packaging out of the same completion. Small CPU models
-    # otherwise have to satisfy many tight text bounds while writing long Bangla lyrics.
+    # otherwise have to satisfy many tight text bounds while writing long Hindi lyrics.
     from jsonschema import Draft202012Validator
     if draft_path is not None and draft_path.exists():
         song = json.loads(draft_path.read_text())
@@ -124,19 +124,19 @@ def make_song(day, history, draft_path=None):
                      'items': {'type': 'string', 'minLength': 1, 'maxLength': 40}},
             'thumbnail_text': {'type': 'string', 'minLength': 3, 'maxLength': 26, 'pattern': '^[A-Za-z0-9 !?]+$'},
             'thumbnail_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380}}}
-    packaging_prompt = f'''Package the supplied original Bangla song. Do not rewrite the song.
+    packaging_prompt = f'''Package the supplied original Hindi song. Do not rewrite the song.
     Genre: {genre}. Visual mood: {mood}. Return only these four JSON fields.
     description: first two lines describe this specific song's story and genre naturally in
-      Bangla and English. Follow with a short listening context, no credits or hashtags (added separately). Maximum 1200 characters. No invented credits, links or keyword stuffing. Never name internal tools, models, software or providers anywhere in public metadata.
-    tags: 8-12 distinct relevant search terms covering the Bangla and romanized song name,
-      Bangla music, exact genre, mood and Heart and Mind. No unrelated artists/trends.
-    thumbnail_text: 2-4 words in ASCII Romanized Bangla from the chorus or emotional promise,
+      Hindi and English. Follow with a short listening context, no credits or hashtags (added separately). Maximum 1200 characters. No invented credits, links or keyword stuffing. Never name internal tools, models, software or providers anywhere in public metadata.
+    tags: 8-12 distinct relevant search terms covering the Hindi and romanized song name,
+      Hindi music, exact genre, mood and Heart and Mind. No unrelated artists/trends.
+    thumbnail_text: 2-4 words in ASCII Romanized Hindi from the chorus or emotional promise,
       <=26 characters, not the channel name; sample mood only: {hook}.
     thumbnail_prompt: a DIFFERENT 20-25 word English visual composition of the same emotional
       story, closer expressive adult faces on the right, strong light contrast, dark empty left
       half for a hook. No celebrities, child subjects, text, logos, collages or stock-poster wording.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
-    The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Bengali script.
+    The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
     Keep the thumbnail scene prompt under 380 characters. Do not repeat lyrics in the response.
     Song to package: {json.dumps(song, ensure_ascii=False)}'''
     song.update(request(packaging_prompt, packaging_schema, 3000))
@@ -153,29 +153,29 @@ def validate_public_metadata(song):
                         song.get('thumbnail_text', '')] + song.get('tags', []))
     if INTERNAL_NAMES.search(public):
         raise ValueError('Internal tool names are not allowed in public metadata')
-    without_credit = public.replace('Original Bangla album music by Heart and Mind.', '')
+    without_credit = public.replace('Original Hindi album music by Heart and Mind.', '')
     if re.search(r'(?i)(?:created|produced|sung|composed|music|lyrics|vocals)\s+(?:by|:)', without_credit):
         raise ValueError('Unverified creator credits are not allowed')
 
 
 def optimize_metadata(song, mood, year):
     name, romanized = song['title'].strip(), song['romanized_title'].strip()
-    keyword = {'romance': 'Bangla Romantic Song', 'heartbreak': 'Bangla Sad Song',
-               'healing': 'Bangla Album Song'}[mood]
-    native_keyword = {'romance': 'বাংলা ভালোবাসার গান', 'heartbreak': 'বাংলা কষ্টের গান',
-                      'healing': 'বাংলা অ্যালবাম গান'}[mood]
+    keyword = {'romance': 'Hindi Romantic Song', 'heartbreak': 'Hindi Sad Song',
+               'healing': 'Hindi Album Song'}[mood]
+    native_keyword = {'romance': 'हिंदी रोमांटिक गाना', 'heartbreak': 'हिंदी दर्द भरा गाना',
+                      'healing': 'हिंदी एल्बम गीत'}[mood]
     suffix = f'{keyword} {year}'
     title = f'{name} | {romanized} | {suffix}'
     if len(title) > 100:
         title = f'{name} | {suffix}'
     song['song_name'], song['title'] = name, title
     body = re.sub(r'#[^\s#]+', '', song['description']).strip()
-    hashtag = {'romance': '#BanglaRomanticSong', 'heartbreak': '#BanglaSadSong', 'healing': '#BanglaAlbumSong'}[mood]
+    hashtag = {'romance': '#HindiRomanticSong', 'heartbreak': '#HindiSadSong', 'healing': '#HindiAlbumSong'}[mood]
     song['description'] = (f'{name} ({romanized}) — {keyword} {year} | {native_keyword}\n'
-        'Original Bangla album music by Heart and Mind. বাংলা গান ও মনের গল্প।\n\n' + body + f'\n\n#BanglaSong #BanglaMusic {hashtag}')
+        'Original Hindi album music by Heart and Mind. हिंदी गाने और दिल की कहानियाँ।\n\n' + body + f'\n\n#HindiSong #HindiMusic {hashtag}')
     song['tags'] = metadata_tags(dict(song, tags=[name, romanized, keyword, native_keyword,
-        'Bangla song', 'বাংলা গান', 'Bangla album song', 'বাংলা অ্যালবাম গান',
-        f'New Bangla Song {year}', 'Bangla music video'] + song['tags']))
+        'Hindi song', 'हिंदी गाना', 'Hindi album song', 'हिंदी एल्बम गीत',
+        f'New Hindi Song {year}', 'Hindi music video'] + song['tags']))
     validate_public_metadata(song)
     return song
 
@@ -187,7 +187,7 @@ def upload_description(song):
 
 def metadata_tags(song):
     # Old saved songs remain publishable; new songs carry their own search terms.
-    candidates = song.get('tags', []) + ['Heart and Mind', 'Bangla song', 'original Bangla music']
+    candidates = song.get('tags', []) + ['Heart and Mind', 'Hindi song', 'original Hindi music']
     result = []
     for tag in candidates:
         tag = tag.strip()
@@ -234,7 +234,7 @@ def publish(client, root, song, state, save):
         save()
         request = client.videos().insert(part='snippet,status', body={
             'snippet': {'title': song['title'], 'description': upload_description(song),
-                'categoryId': '10', 'defaultLanguage': 'bn', 'defaultAudioLanguage': 'bn',
+                'categoryId': '10', 'defaultLanguage': 'hi', 'defaultAudioLanguage': 'hi',
                 'tags': metadata_tags(song)},
             'status': {'privacyStatus': 'public', 'selfDeclaredMadeForKids': False,
                        'containsSyntheticMedia': True}},

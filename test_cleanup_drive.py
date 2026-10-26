@@ -10,9 +10,9 @@ from pipeline import metadata_tags
 
 class DriveCleanupTests(unittest.TestCase):
     def setUp(self):
-        self.run_id = 'original-bangla-20261026-artwork-01'
+        self.run_id = 'original-hindi-20261026-artwork-01'
         self.key = f'runs/{self.run_id}/video.mp4'
-        self.song = {'title': 'নতুন ভোর', 'description': 'A hopeful Bangla song', 'tags': ['Bangla music']}
+        self.song = {'title': 'नई सुबह', 'description': 'A hopeful Hindi song', 'tags': ['Hindi music']}
         self.state = {'phase': 'published', 'video_id': 'video', 'thumbnail_uploaded': True, 'song': self.song}
         self.video = {'id': 'video', 'snippet': {'channelId': 'channel', 'title': self.song['title'],
             'description': self.song['description'],

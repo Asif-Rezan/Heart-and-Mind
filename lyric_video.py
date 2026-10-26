@@ -32,7 +32,8 @@ def save_json(path, value):
 
 def lyric_words(text):
     text = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', text)
-    return re.findall(r'[\u0980-\u09ff]+', text)
+    text = text.replace('।', ' ').replace('॥', ' ')
+    return re.findall(r'[\u0900-\u097f]+', text)
 
 
 def align_words(lyrics, words, seconds):
@@ -56,7 +57,7 @@ def align_words(lyrics, words, seconds):
     if (len(matched) < 25 or len(matched)/max(len(heard), 1) < .3 or
             len(matched)/max(len(original), 1) < .25 or
             matched[-1]['end']-matched[0]['start'] < seconds*.4):
-        raise RuntimeError('Sung Bangla lyrics could not be reliably timed; preserve song for review')
+        raise RuntimeError('Sung Hindi lyrics could not be reliably timed; preserve song for review')
     return original, matched
 
 
@@ -84,7 +85,7 @@ def transcribe(root, song, audio_hash, seconds):
     model_path = snapshot_download(ASR_REPO, revision=ASR_REVISION, token=False,
                                    allow_patterns=['*.json', '*.bin', '*.txt'])
     model = WhisperModel(model_path, device='cpu', compute_type='int8', cpu_threads=4, num_workers=1)
-    segments, _ = model.transcribe(str(root/'song.wav'), language='bn', word_timestamps=True,
+    segments, _ = model.transcribe(str(root/'song.wav'), language='hi', word_timestamps=True,
         beam_size=5, vad_filter=False, condition_on_previous_text=False)
     words = [dict(start=word.start, end=word.end, word=word.word)
              for segment in segments for word in (segment.words or [])]
@@ -143,10 +144,10 @@ def prepare_storyboard(root, song):
                 'type': 'object', 'additionalProperties': False, 'required': ['index', 'prompt'], 'properties': {
                     'index': {'type': 'integer', 'enum': ids},
                     'prompt': {'type': 'string', 'minLength': 30, 'maxLength': 320}}}}}}
-        prompt = ('Storyboard this Bangla album song. For each timed lyric excerpt, write a DIFFERENT '
+        prompt = ('Storyboard this Hindi album song. For each timed lyric excerpt, write a DIFFERENT '
             '20-35 word English photographic scene that literally reflects its action, objects and emotion. '
             'For metaphorical lines use a clear visual symbol. For instrumental gaps use a related establishing shot. '
-            'Consistent fictional Bangladeshi adult couple age 28: man with short black hair in navy shirt, '
+            'Consistent fictional Indian adult couple age 28: man with short black hair in navy shirt, '
             'woman with long black hair in a teal salwar kameez. Show them only where the lyrics fit; vary '
             'close-ups, river/city/rain/nature locations, props and camera angle. Fully clothed, cinematic light, '
             'no celebrities, text, logos or tool names. Do not repeat the same generic sunset scene. '

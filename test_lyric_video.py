@@ -12,19 +12,19 @@ import image_cpu
 from lyric_video import timed_shots, validate_plan, generate_shard
 from pipeline import metadata_tags, song_profile, SONG_PROFILES, validate_song, optimize_metadata, publish
 
-WORDS = ['তোমার', 'চোখে', 'আমার', 'স্বপ্ন', 'ভালোবাসার', 'নদী', 'বৃষ্টি', 'আকাশ', 'পথে', 'বাতাস']*12
+WORDS = ['तेरी', 'आँखों', 'मेरे', 'सपने', 'प्यार', 'नदी', 'बारिश', 'आसमान', 'राह', 'हवा']*12
 LYRICS = ' '.join(WORDS)
 TIMED = [dict(start=i*1.5, end=i*1.5+1, word=word) for i, word in enumerate(WORDS)]
-SONG = dict(title='নতুন ভোর', romanized_title='Notun Bhor', lyrics=LYRICS,
-            prompt='Bangla album song with warm vocals and acoustic guitar', description='A story of hope and love.',
-            duration=240, visual_mood='healing', tags=['Bangla album song', 'বাংলা গান'],
-            thumbnail_text='NOTUN BHOR', thumbnail_prompt='Hopeful adult Bangladeshi woman watching sunrise, cinematic close-up on right, empty dark left.')
+SONG = dict(title='नई सुबह', romanized_title='Nayi Subah', lyrics=LYRICS,
+            prompt='Hindi album song with warm vocals and acoustic guitar', description='A story of hope and love.',
+            duration=240, visual_mood='healing', tags=['Hindi album song', 'हिंदी गाना'],
+            thumbnail_text='NAYI SUBAH', thumbnail_prompt='Hopeful adult Indian woman watching sunrise, cinematic close-up on right, empty dark left.')
 
 
 def plan(seconds=180):
     shots = timed_shots(LYRICS, TIMED, seconds)
     for shot in shots:
-        shot['prompt'] = 'An adult Bangladeshi couple walking by a river in warm cinematic light, a different angle.'
+        shot['prompt'] = 'An adult Indian couple walking by a river in warm cinematic light, a different angle.'
     return dict(identity='identity', audio_hash='audio', duration=seconds, complete=True, shots=shots)
 
 
@@ -35,12 +35,12 @@ class LyricVideoTests(unittest.TestCase):
         self.assertEqual([s['start'] for s in shots], list(range(0, 185, 5)))
         self.assertAlmostEqual(shots[-1]['duration'], 1.7)
         self.assertAlmostEqual(sum(s['duration'] for s in shots), 181.7)
-        self.assertIn('চোখে', shots[0]['lyrics'])
+        self.assertIn('आँखों', shots[0]['lyrics'])
         self.assertNotEqual(shots[0]['lyrics'], shots[1]['lyrics'])
 
     def test_no_guessed_alignment_when_vocals_do_not_match_lyrics(self):
         with self.assertRaisesRegex(RuntimeError, 'reliably timed'):
-            timed_shots(LYRICS, [dict(start=0, end=1, word='অন্যকথা')], 180)
+            timed_shots(LYRICS, [dict(start=0, end=1, word='अलगबात')], 180)
 
     def test_invalid_or_incomplete_timeline_is_rejected(self):
         original = plan()
@@ -88,10 +88,10 @@ class LyricVideoTests(unittest.TestCase):
                 image_cpu.generate('Adult couple walking', target, seed=1)
             self.assertFalse(target.exists())
 
-    def test_bangla_seo_metadata_has_no_internal_names_and_has_bounded_tags(self):
+    def test_hindi_seo_metadata_has_no_internal_names_and_has_bounded_tags(self):
         song = optimize_metadata(copy.deepcopy(SONG), 'healing', '2026')
-        self.assertIn('Bangla Album Song 2026', song['title'])
-        self.assertIn('বাংলা গান', song['description'])
+        self.assertIn('Hindi Album Song 2026', song['title'])
+        self.assertIn('हिंदी एल्बम गीत', song['description'])
         self.assertLessEqual(len(song['title']), 100)
         self.assertEqual(song['description'].count('#'), 3)
         validate_song(song)
@@ -99,11 +99,11 @@ class LyricVideoTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Internal tool'):
                 validate_song(dict(song, **{field: 'Generated using Qwen'}))
         with self.assertRaises(ValueError):
-            validate_song(dict(song, lyrics='तेरी यादों में मेरा दिल खो गया'))
+            validate_song(dict(song, lyrics='তোমার স্মৃতিতে আমার মন হারিয়ে যায়'))
         tags = metadata_tags(dict(song, tags=['a'*38+str(i) for i in range(30)]))
         self.assertLessEqual(sum(len(t)+(2 if ' ' in t else 0)+1 for t in tags), 480)
 
-    def test_upload_language_is_bengali_and_description_is_public_copy_only(self):
+    def test_upload_language_is_hindi_and_description_is_public_copy_only(self):
         song = optimize_metadata(copy.deepcopy(SONG), 'healing', '2026')
         client = Mock()
         client.videos().insert().next_chunk.return_value = (None, {'id': 'video'})
@@ -112,8 +112,8 @@ class LyricVideoTests(unittest.TestCase):
         with patch.dict('os.environ', {'EXPECTED_CHANNEL_ID': 'channel'}), patch('googleapiclient.http.MediaFileUpload'):
             publish(client, Path('.'), song, {'thumbnail_uploaded': True}, Mock())
         snippet = client.videos().insert.call_args.kwargs['body']['snippet']
-        self.assertEqual(snippet['defaultLanguage'], 'bn')
-        self.assertEqual(snippet['defaultAudioLanguage'], 'bn')
+        self.assertEqual(snippet['defaultLanguage'], 'hi')
+        self.assertEqual(snippet['defaultAudioLanguage'], 'hi')
         self.assertEqual(snippet['description'], song['description'])
         self.assertNotIn('ACE-Step', snippet['description'])
 
@@ -131,7 +131,7 @@ class LyricVideoTests(unittest.TestCase):
             self.assertEqual(download.call_args.kwargs['revision'], ASR_REVISION)
             self.assertIs(download.call_args.kwargs['token'], False)
             self.assertEqual(whisper.call_args.kwargs['device'], 'cpu')
-            self.assertEqual(model.transcribe.call_args.kwargs['language'], 'bn')
+            self.assertEqual(model.transcribe.call_args.kwargs['language'], 'hi')
             self.assertTrue(model.transcribe.call_args.kwargs['word_timestamps'])
             transcribe(root, SONG, 'audio-hash', 180)
             model.transcribe.assert_called_once()
@@ -141,7 +141,7 @@ class LyricVideoTests(unittest.TestCase):
         def request(endpoint, payload):
             schema = payload['response_format']['json_schema']['schema']
             ids = schema['properties']['scenes']['items']['properties']['index']['enum']
-            scenes = [dict(index=index, prompt=f'Adult Bangladeshi couple beside the river, cinematic angle {index}, thoughtful expressions and soft blue light.') for index in ids]
+            scenes = [dict(index=index, prompt=f'Adult Indian couple beside the river, cinematic angle {index}, thoughtful expressions and soft blue light.') for index in ids]
             return {'choices': [{'message': {'content': json.dumps({'scenes': scenes})}}]}
         with tempfile.TemporaryDirectory() as temp, patch('pipeline.duration', return_value=180), patch('lyric_video.transcribe', return_value=TIMED), patch('lyrics_cpu.request_story', side_effect=request) as writer:
             root=Path(temp)
@@ -154,11 +154,11 @@ class LyricVideoTests(unittest.TestCase):
             prepare_storyboard(root, SONG)
             self.assertEqual(writer.call_count,6)
 
-    def test_daily_rotation_preserves_varied_bangla_album_styles(self):
+    def test_daily_rotation_preserves_varied_hindi_album_styles(self):
         start = dt.date(2026, 10, 26)
         profiles = [song_profile((start+dt.timedelta(days=i)).isoformat()) for i in range(8)]
         self.assertEqual(set(profiles), set(SONG_PROFILES))
-        self.assertTrue(all('Bangla' in profile[1] for profile in profiles))
+        self.assertTrue(all('Hindi' in profile[1] for profile in profiles))
 
 
 if __name__ == '__main__':

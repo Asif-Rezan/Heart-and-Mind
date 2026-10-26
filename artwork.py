@@ -8,9 +8,9 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 ASSETS = Path(__file__).resolve().parent / 'assets' / 'artwork'
 MOODS = {
-    'romance': ('#ffdf96', 'BANGLA LOVE SONG', 'TOMAR SATHE'),
-    'heartbreak': ('#c4dcff', 'BANGLA SAD SONG', 'NA BOLA KOTHA'),
-    'healing': ('#ffe4a1', 'BANGLA SOULFUL SONG', 'NOTUN BHOR'),
+    'romance': ('#ffdf96', 'HINDI LOVE SONG', 'TERE SAATH'),
+    'heartbreak': ('#c4dcff', 'HINDI SAD SONG', 'ANKAHI BAATEIN'),
+    'healing': ('#ffe4a1', 'HINDI SOULFUL SONG', 'NAYI SUBAH'),
 }
 
 
