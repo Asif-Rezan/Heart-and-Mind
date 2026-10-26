@@ -48,6 +48,7 @@ class CpuMusicTests(unittest.TestCase):
             self.assertEqual(handler.initialize_service.call_args.kwargs['device'], 'cpu')
             self.assertEqual(params.call_args.kwargs['duration'], 240)
             self.assertEqual(params.call_args.kwargs['lyrics'], SONG['lyrics'])
+            self.assertEqual(params.call_args.kwargs['vocal_language'], 'hi')
             self.assertFalse(params.call_args.kwargs['thinking'])
             self.assertEqual(config.call_args.kwargs['batch_size'], 1)
             self.assertIsNone(infer.call_args.args[1])

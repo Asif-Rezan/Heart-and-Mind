@@ -1,7 +1,7 @@
 name: Clean published song media from Drive
 on:
   workflow_run:
-    workflows: [Hindi music generation and public publishing]
+    workflows: [Hindi music generation and public publishing, Hindi album music generation and public publishing]
     types: [completed]
   workflow_dispatch:
     inputs:

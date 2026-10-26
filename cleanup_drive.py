@@ -10,8 +10,12 @@ MEDIA = ('song.wav', 'video.mp4', 'thumbnail.jpg', 'background-source.png',
          'thumbnail-source.png', 'cover.png')
 
 
+def disposable(name):
+    return name in MEDIA or bool(re.fullmatch(r'scene-\d{3}\.png', name))
+
+
 def verify_public(client, state):
-    from pipeline import metadata_tags
+    from pipeline import metadata_tags, upload_description
     if state.get('phase') != 'published' or not state.get('video_id') or state.get('thumbnail_uploaded') is not True:
         raise RuntimeError('Published video and uploaded thumbnail required before cleanup')
     items = client.videos().list(part='snippet,status,processingDetails,contentDetails',
@@ -21,7 +25,7 @@ def verify_public(client, state):
     video = items[0]
     snippet, status = video.get('snippet', {}), video.get('status', {})
     song = state['song']
-    description = song['description'] + '\n\nOriginal AI-generated Hindi music by Heart and Mind. Created with ACE-Step 1.5.'
+    description = upload_description(song)
     if (video.get('id') != state['video_id'] or snippet.get('channelId') != required('EXPECTED_CHANNEL_ID')
             or snippet.get('title') != song['title'] or snippet.get('description') != description
             or set(snippet.get('tags', [])) != set(metadata_tags(song))
@@ -39,7 +43,12 @@ def cleanup(store, client, run_id, state):
     journal = store.load(key, None)
     if journal is None:
         files = []
-        for name in MEDIA:
+        plan = store.load(f'runs/{run_id}/storyboard.json', None)
+        scenes = []
+        if plan is not None:
+            from lyric_video import validate_plan
+            scenes = [f"scene-{shot['index']:03}.png" for shot in validate_plan(plan)]
+        for name in list(MEDIA) + scenes:
             media_key = f'runs/{run_id}/{name}'
             file_id = store.find(media_key)
             if file_id:
@@ -50,7 +59,7 @@ def cleanup(store, client, run_id, state):
         raise RuntimeError('Cleanup journal identity mismatch')
     for entry in journal['files']:
         file_id, name = entry['id'], entry['name']
-        if name not in MEDIA:
+        if not disposable(name):
             raise RuntimeError('Unsafe cleanup manifest entry')
         if file_id in journal['deleted']:
             continue
