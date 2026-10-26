@@ -211,7 +211,7 @@ def publish(client, root, song, state, save):
     raise TimeoutError('HD processing pending; rerun same run ID')
 
 
-def run(run_id):
+def run(run_id, defer_drive_cleanup=False):
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', run_id):
         raise ValueError('Invalid run ID')
     root = Path('output')/run_id
@@ -227,8 +227,9 @@ def run(run_id):
             history.append({'run': run_id, 'title': state['song']['title'],
                             'hash': state['hash'], 'video_id': state['video_id']})
             store.save('history.json', history)
-        from cleanup_drive import cleanup
-        cleanup(store, client, run_id, state)
+        if not defer_drive_cleanup:
+            from cleanup_drive import cleanup
+            cleanup(store, client, run_id, state)
         print('Already published: ' + state['video_id'])
         return
     if not state.get('song'):
@@ -266,17 +267,20 @@ def run(run_id):
     if not any(h['run'] == run_id for h in history):
         history.append({'run': run_id, 'title': song['title'], 'hash': state['hash'], 'video_id': state['video_id']})
         store.save('history.json', history)
-    from cleanup_drive import cleanup
-    cleanup(store, client, run_id, state)
+    if not defer_drive_cleanup:
+        from cleanup_drive import cleanup
+        cleanup(store, client, run_id, state)
     print(json.dumps({'phase': state['phase'], 'video_id': state['video_id']}))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id', required=True)
+    parser.add_argument('--defer-drive-cleanup', action='store_true',
+                        help='Leave verified media cleanup to the separate workflow job')
     args = parser.parse_args()
     try:
-        run(args.run_id)
+        run(args.run_id, defer_drive_cleanup=args.defer_drive_cleanup)
     except Exception as error:
         # Avoid leaking OAuth/API credentials through raw exception response bodies.
         print('Pipeline failed: ' + type(error).__name__ + '. Inspect checkpoint and configuration.')
