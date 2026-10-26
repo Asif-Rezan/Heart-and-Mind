@@ -199,6 +199,7 @@ jobs:
           path: |
             output/*/song.json
             output/*/alignment.json
+            output/*/vocal-timing-candidate.json
             output/*/storyboard.json
           retention-days: 7
   images:

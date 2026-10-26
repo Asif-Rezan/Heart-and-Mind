@@ -42,6 +42,12 @@ class LyricVideoTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'reliably timed'):
             timed_shots(LYRICS, [dict(start=0, end=1, word='अलगबात')], 180)
 
+    def test_zero_duration_and_padding_words_are_skipped_without_guessing_times(self):
+        words = [dict(start=0, end=0, word='तेरी')] + TIMED + [dict(start=181, end=182, word='आवाज')]
+        shots = timed_shots(LYRICS, words, 180)
+        self.assertEqual(len(shots), 36)
+        self.assertEqual(shots[1]['start'], 5)
+
     def test_invalid_or_incomplete_timeline_is_rejected(self):
         original = plan()
         validate_plan(original)

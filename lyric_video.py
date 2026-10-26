@@ -42,11 +42,18 @@ def align_words(lyrics, words, seconds):
     heard, timed = [], []
     previous_start = -1
     for word in words:
+        tokens = lyric_words(word['word'])
+        if not tokens:
+            continue
         start, end = float(word['start']), float(word['end'])
-        if not math.isfinite(start+end) or not 0 <= start < end <= seconds + .25 or start < previous_start:
+        if not math.isfinite(start+end) or start < 0 or end < start:
             raise RuntimeError('Invalid vocal timing')
+        # Recognition can emit zero-duration words, overlapping segment boundaries,
+        # or padding beyond the song. They supply no trustworthy lyric interval.
+        if end == start or start < previous_start or start >= seconds or end > seconds+.25:
+            continue
         previous_start = start
-        for token in lyric_words(word['word']):
+        for token in tokens:
             heard.append(token)
             timed.append(dict(start=start, end=min(end, seconds)))
     matcher = difflib.SequenceMatcher(None, original, heard, autojunk=False)
@@ -74,8 +81,10 @@ def timed_shots(lyrics, words, seconds):
             context = ' '.join(original[max(0, first-2):min(len(original), last+3)])
         else:
             context = ' '.join(original[max(0, anchor-3):min(len(original), anchor+8)])
+        heard = [word['word'] for word in words if float(word['start']) < end and
+                 float(word['end']) > start and float(word['end']) > float(word['start']) and lyric_words(word['word'])]
         shots.append(dict(index=index, start=start, duration=end-start, lyrics=context,
-                          instrumental=not bool(active)))
+                          heard=' '.join(heard), instrumental=not bool(heard)))
     return shots
 
 
@@ -94,6 +103,8 @@ def transcribe(root, song, audio_hash, seconds):
         beam_size=5, vad_filter=False, condition_on_previous_text=False)
     words = [dict(start=word.start, end=word.end, word=word.word)
              for segment in segments for word in (segment.words or [])]
+    # Preserve recognition output for diagnosis; only validated output is reusable.
+    save_json(root/'vocal-timing-candidate.json', dict(audio_hash=audio_hash, revision=ASR_REVISION, words=words))
     # Reject weak alignment before saving it as a reusable checkpoint.
     align_words(song['lyrics'], words, seconds)
     save_json(path, dict(audio_hash=audio_hash, revision=ASR_REVISION, words=words))
@@ -149,15 +160,15 @@ def prepare_storyboard(root, song):
                 'type': 'object', 'additionalProperties': False, 'required': ['index', 'prompt'], 'properties': {
                     'index': {'type': 'integer', 'enum': ids},
                     'prompt': {'type': 'string', 'minLength': 30, 'maxLength': 320}}}}}}
-        prompt = ('Storyboard this Hindi album song. For each timed lyric excerpt, write a DIFFERENT '
-            '20-35 word English photographic scene that literally reflects its action, objects and emotion. '
-            'For metaphorical lines use a clear visual symbol. For instrumental gaps use a related establishing shot. '
+        prompt = ('Storyboard this Hindi album song. Each interval includes recognized sung words (heard) '
+            'and nearby supplied lyrics. Write a DIFFERENT 20-35 word English photographic scene '
+            'that reflects the sung words, action, objects and emotion. For metaphorical lines use a clear visual symbol. For instrumental gaps use a related establishing shot. '
             'Consistent fictional Indian adult couple age 28: man with short black hair in navy shirt, '
             'woman with long black hair in a teal salwar kameez. Show them only where the lyrics fit; vary '
             'close-ups, river/city/rain/nature locations, props and camera angle. Fully clothed, cinematic light, '
             'no celebrities, text, logos or tool names. Do not repeat the same generic sunset scene. '
             'Return every index exactly once in input order. Song context: ' + song['prompt'] + '\n' +
-            json.dumps([{key: shot[key] for key in ('index', 'lyrics', 'instrumental')} for shot in batch], ensure_ascii=False))
+            json.dumps([{key: shot[key] for key in ('index', 'lyrics', 'heard', 'instrumental')} for shot in batch], ensure_ascii=False))
         result = request_story('chat/completions', dict(model=MODEL_ID,
             messages=[{'role': 'user', 'content': prompt}], max_completion_tokens=2500,
             response_format={'json_schema': {'schema': schema}}))
