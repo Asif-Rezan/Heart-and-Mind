@@ -12,17 +12,32 @@ from zoneinfo import ZoneInfo
 from storage import Store, required
 
 
+def normalize_lyrics(text):
+    """Decode only escaped layout markers, preserving Unicode lyrics verbatim."""
+    if not isinstance(text, str):
+        return text
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    text = re.sub(r'\\+(?:r\\+n|n|r)', '\n', text)
+    return re.sub(r'\\+t', ' ', text)
+
+
+def validate_hindi_lyrics(text):
+    text = normalize_lyrics(text)
+    sung = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', text)
+    if re.search(r'[A-Za-z\u0980-\u09ff]', sung):
+        raise ValueError('Sung lyrics must use Devanagari only')
+    if not re.search(r'[\u0900-\u097f]', sung):
+        raise ValueError('Hindi Devanagari lyrics required')
+    return text
+
+
 def validate_song(song):
     for field in ('title', 'lyrics', 'prompt', 'description'):
         if not isinstance(song.get(field), str) or not song[field].strip():
             raise ValueError('Missing song ' + field)
     if len(song['title']) > 100 or len(song['description']) > 4400:
         raise ValueError('YouTube metadata too long')
-    sung = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', song['lyrics'])
-    if re.search(r'[A-Za-z\u0980-\u09ff]', sung):
-        raise ValueError('Sung lyrics must use Devanagari only')
-    if not re.search(r'[\u0900-\u097f]', sung):
-        raise ValueError('Hindi Devanagari lyrics required')
+    song['lyrics'] = validate_hindi_lyrics(song['lyrics'])
     if not 180 <= song.get('duration', 0) <= 360:
         raise ValueError('Song must be 180-360 seconds')
     if 'tags' in song and (not isinstance(song['tags'], list) or
@@ -112,10 +127,12 @@ def make_song(day, history, draft_path=None):
         Draft202012Validator(core_schema).validate(song)
     else:
         song = request(prompt, core_schema, 6000)
-        if draft_path is not None:
-            temporary = draft_path.with_suffix('.tmp')
-            temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
-            temporary.replace(draft_path)
+    song['lyrics'] = validate_hindi_lyrics(song['lyrics'])
+    Draft202012Validator(core_schema).validate(song)
+    if draft_path is not None:
+        temporary = draft_path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
+        temporary.replace(draft_path)
     packaging_schema = {'type': 'object', 'additionalProperties': False,
         'required': ['description', 'tags', 'thumbnail_text', 'thumbnail_prompt'],
         'properties': {
