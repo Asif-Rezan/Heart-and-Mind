@@ -227,6 +227,8 @@ def run(run_id):
             history.append({'run': run_id, 'title': state['song']['title'],
                             'hash': state['hash'], 'video_id': state['video_id']})
             store.save('history.json', history)
+        from cleanup_drive import cleanup
+        cleanup(store, client, run_id, state)
         print('Already published: ' + state['video_id'])
         return
     if not state.get('song'):
@@ -264,6 +266,8 @@ def run(run_id):
     if not any(h['run'] == run_id for h in history):
         history.append({'run': run_id, 'title': song['title'], 'hash': state['hash'], 'video_id': state['video_id']})
         store.save('history.json', history)
+    from cleanup_drive import cleanup
+    cleanup(store, client, run_id, state)
     print(json.dumps({'phase': state['phase'], 'video_id': state['video_id']}))
 
 

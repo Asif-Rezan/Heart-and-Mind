@@ -23,6 +23,14 @@ SSD-1B uses revision `60987f37e94cd59c36b1cba832b9f97b57395a10`, matching Rezan 
 
 For local image preparation, install CPU PyTorch and `requirements-images-cpu.txt` alongside `requirements.txt`, then run `python prepare_music.py --run-id YOUR_RUN_ID --stage images` after lyrics preparation. The publishing renderer requires both generated source images. Font: bundled Oswald under the SIL Open Font License in `assets/artwork/FONT-LICENSE.txt`.
 
+## Drive cleanup after successful publication
+
+After the upload is freshly verified as public, processed in HD, on the expected channel, with matching title, description and tags and a confirmed thumbnail upload, temporary media for that exact song is permanently deleted from the dedicated private Drive folder. This follows the reference project's exact-ID cleanup journal approach. It removes `song.wav`, `video.mp4`, `thumbnail.jpg` and generated source images; it retains `song.json`, publishing state, history, image-generation settings and the cleanup journal. Unrelated files and other runs are untouched. Failed or incomplete uploads retain their media.
+
+Cleanup checks each target's exact filename, hashed workflow key, parent folder, owner-only permissions and non-folder type before deletion. It saves a durable manifest before deleting anything and checkpoints progress after each file. Rerunning an already published song resumes cleanup without generating or uploading another video.
+
+The **Clean published song media from Drive** workflow also runs after a successful publishing workflow, including a generation that started before the cleanup code was added. It reads the completed song identity from that run's JSON artifact and uses trusted default-branch code to verify YouTube again. For cleanup-only recovery, manually run this workflow with the exact `run_id`; no song generation or video upload occurs.
+
 ## Start or resume
 
 Open GitHub Actions → **Hindi music generation and public publishing** → **Run workflow**.
