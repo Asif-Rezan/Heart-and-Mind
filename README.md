@@ -6,18 +6,29 @@ All AI inference and video rendering run on standard **GitHub Actions CPU runner
 
 1. **Lyrics job:** original Hindi Devanagari lyrics and metadata using the same pinned Qwen3-4B CPU model as [Rezan After Dark](https://github.com/Asif-Rezan/Rezan-After-Dark).
 2. **Music job:** ACE-Step 1.5 `acestep-v15-turbo` runs directly on the GitHub CPU. Hindi vocals, one complete 180–360 second song, eight diffusion steps. Optional ACE-Step planning LM is disabled because lyrics and the musical prompt are already supplied.
-3. **Publish job:** measure the real audio duration, render a 1920×1080 branded waveform video and thumbnail, back up privately to Drive, upload publicly to the exact Heart & Mind channel, and verify actual public visibility and HD processing.
+3. **Images job (alongside music):** the reference project’s pinned `segmind/SSD-1B` diffusion model generates two fresh song-specific images on CPU: a cinematic background and a separate expressive thumbnail scene. Qwen writes both visual prompts from the song’s story; seeds differ by lyrics and image purpose.
+4. **Publish job:** measure the real audio duration, render a 1920×1080 branded waveform video and thumbnail, back up privately to Drive, upload publicly to the exact Heart & Mind channel, and verify actual public visibility and HD processing.
 
-Songs are never looped or padded to meet the duration requirement. Images are a locally drawn branded background and thumbnail; AI scene-image generation is not implemented.
+Songs are never looped or padded to meet the duration requirement. Artwork is generated anew for each song, never selected from a shared image library. Romantic songs feature adult couples; heartbreak and healing songs use appropriate reflective people or symbolic settings. The thumbnail adds a short Romanized Hindi hook with large high-contrast lettering and small channel branding; the video uses its own generated scene with a low-positioned waveform.
 
-The three jobs run sequentially on separate workers to release memory between models. Only the publishing job receives Google credentials. Music inference has a 350-minute deadline, a CPU-only PyTorch installation, and 16 GB of additional swap. CPU generation can be slow; successful completion still depends on the runner's memory, disk and time limits. A failed run is not reported as published.
+Lyrics run first; music and images then run on separate CPU workers; publishing waits for both. Only publishing receives Google credentials. The image job has a 120-minute deadline and 12 GB swap. It uses public weights without an image inference API or extra secret. Image failures stop publishing rather than substitute the old channel-name graphic. Music inference has a 350-minute deadline, a CPU-only PyTorch installation, and 16 GB of additional swap. CPU generation can be slow; successful completion still depends on the runner's memory, disk and time limits. A failed run is not reported as published.
+
+## Songwriting and packaging
+
+Eight daily directions rotate across acoustic romance, piano heartbreak, indie dream pop, uplifting folk, celebratory dance pop, contemporary ghazal-inspired ballads, cinematic soul and monsoon lo-fi. Each direction changes the story, arrangement and vocal delivery. Lyrics ask for concrete scenes, singable phrasing, a consistent chorus and a developing emotional arc. Rotation uses the Dhaka calendar date, so it also works in the isolated lyrics job without Drive access.
+
+New `song.json` files carry `tags`, `thumbnail_text`, `visual_mood`, `background_prompt` and `thumbnail_prompt`. Titles lead with the song name and an accurate genre phrase; descriptions explain the specific song in Hindi and English, with at most three relevant hashtags. Uploads use the generated tags, deduplicate them and enforce a conservative YouTube character budget. Packaging avoids invented famous-artist associations and popularity claims. These changes improve relevance and readability; CTR and search performance require real audience data to evaluate.
+
+SSD-1B uses revision `60987f37e94cd59c36b1cba832b9f97b57395a10`, matching Rezan After Dark. It generates 1024×576 sources at 20 steps in Actions, which are composed into 1920×1080 video artwork and a 1280×720 thumbnail. The model’s output safety handling stays enabled, with bounded retries and no blank-image fallback. Seeds, prompts, dimensions, steps and model revision are recorded in `image-manifest.json`. Cached images are reused only for the same song and generation settings. Two images take additional CPU time; quality and timing need live verification on the runner.
+
+For local image preparation, install CPU PyTorch and `requirements-images-cpu.txt` alongside `requirements.txt`, then run `python prepare_music.py --run-id YOUR_RUN_ID --stage images` after lyrics preparation. The publishing renderer requires both generated source images. Font: bundled Oswald under the SIL Open Font License in `assets/artwork/FONT-LICENSE.txt`.
 
 ## Start or resume
 
 Open GitHub Actions → **Hindi music generation and public publishing** → **Run workflow**.
 
 - `run_id`: stable song identifier, e.g. `first-hindi-song-20261025`.
-- `prepared_run`: optional numeric previous GitHub run ID with a `generated-music-<ID>` artifact. Reuse the same `run_id` to restore its lyrics and any completed audio.
+- `prepared_run`: optional numeric previous GitHub run ID with a `generated-music-<ID>` artifact. Reuse the same `run_id` to restore its lyrics and any completed audio. When available, the separate `generated-artwork-<ID>` artifact restores completed image work too; older runs without it generate fresh scenes from their saved song.
 
 Old checkpoints from the removed hosted backend can supply the lyrics. The CPU worker does not resubmit their remote tasks. A failed local music process can restart with the saved lyrics. Completed audio is reused. An interrupted YouTube upload without a saved video ID still requires reconciliation to prevent duplicate publishing.
 
@@ -55,6 +66,6 @@ The wrapper checks the source commit before importing it and initializes with `d
 
 ## Checks
 
-`python -m unittest -v` exercises duration and Hindi validation, the pinned anonymous downloads, CPU-only generation parameters, safe local retries, and rejection of private-only upload results. A live Actions run additionally imports the real pinned ACE-Step runtime before downloading its model weights and generating audio. Unit tests alone do not establish actual song quality or completed publication.
+`python -m unittest -v` exercises duration and Hindi validation, the pinned anonymous downloads, CPU-only generation parameters, safe local retries, rejection of private-only upload results, per-song image seeds, image checkpoint recovery, safety rejection handling, style rotation and metadata budgets. A live Actions run additionally imports the real pinned ACE-Step runtime before downloading its model weights and generating audio. Unit tests alone do not establish actual song quality or completed publication.
 
 CPU synthesis configures the native `ACESTEP_GENERATION_TIMEOUT` to 18,000 seconds before importing ACE-Step (its default is only 600 seconds). Startup verifies the actual imported native timeout. The child worker has a separate 18,900-second hard deadline, within the 350-minute music job. A one-minute heartbeat reports elapsed CPU time and peak memory while synthesis runs. These are limits, not completion-time promises.
