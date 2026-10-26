@@ -11,7 +11,7 @@ on:
         required: false
         type: string
   schedule:
-    - cron: '0 14 * * *' # 20:00 Asia/Dhaka
+    - cron: '0 21 * * *' # 03:00 Asia/Dhaka (next local day)
 permissions:
   contents: read
   actions: read
