@@ -8,9 +8,9 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 ASSETS = Path(__file__).resolve().parent / 'assets' / 'artwork'
 MOODS = {
-    'romance': ('#ffdf96', 'HINDI LOVE SONG', 'TERE SAATH'),
-    'heartbreak': ('#c4dcff', 'HINDI SAD SONG', 'ADHURI BAATEIN'),
-    'healing': ('#ffe4a1', 'HINDI SOULFUL SONG', 'NAYI SUBAH'),
+    'romance': ('#ffdf96', 'BANGLA LOVE SONG', 'TOMAR SATHE'),
+    'heartbreak': ('#c4dcff', 'BANGLA SAD SONG', 'NA BOLA KOTHA'),
+    'healing': ('#ffe4a1', 'BANGLA SOULFUL SONG', 'NOTUN BHOR'),
 }
 
 
@@ -72,7 +72,7 @@ def create_artwork(root, song):
     mood = visual_mood(song)
     accent, label, _ = MOODS[mood]
     def compose(kind):
-        scene = root/f'{kind}-source.png'
+        scene = root/('scene-000.png' if kind == 'background' else 'thumbnail-source.png')
         if not scene.exists():
             raise RuntimeError('Generated song artwork missing; run the images stage first')
         with Image.open(scene) as source:

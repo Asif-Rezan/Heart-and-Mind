@@ -1,4 +1,4 @@
-name: Hindi music generation and public publishing
+name: Bangla album music generation and public publishing
 on:
   workflow_dispatch:
     inputs:
@@ -65,7 +65,7 @@ jobs:
           run-id: ${{ inputs.prepared_run }}
           github-token: ${{ github.token }}
           path: output/
-      - name: Generate original Hindi lyrics on GitHub CPU
+      - name: Generate original Bangla lyrics on GitHub CPU
         env:
           SONG_RUN_ID: ${{ steps.identity.outputs.run_id }}
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage lyrics
@@ -133,7 +133,7 @@ jobs:
         with:
           name: music-input-${{ github.run_id }}
           path: output/
-      - name: Generate full Hindi song with ACE-Step on GitHub CPU
+      - name: Generate full Bangla song with ACE-Step on GitHub CPU
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage music
       - uses: actions/upload-artifact@v4
         if: always()
@@ -144,12 +144,76 @@ jobs:
             output/*/song.wav
             output/*/generation-state.json
           retention-days: 7
-  images:
-    needs: lyrics
+  storyboard:
+    name: Time Bangla lyrics and plan five-second scenes
+    needs: [lyrics, music]
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 60
     env:
       SONG_RUN_ID: ${{ needs.lyrics.outputs.run_id }}
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt -r requirements-lyrics.txt -r requirements-alignment.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: generated-music-${{ github.run_id }}
+          path: output/
+      - name: Restore saved lyric timeline when available
+        if: inputs.prepared_run != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: song-storyboard-${{ inputs.prepared_run }}
+          run-id: ${{ inputs.prepared_run }}
+          github-token: ${{ github.token }}
+          path: saved-storyboard/
+      - name: Restore matching timeline checkpoints
+        run: |
+          python - <<'PYTHON'
+          import os, shutil
+          from pathlib import Path
+          run_id = os.environ['SONG_RUN_ID']
+          for name in ('alignment.json', 'storyboard.json'):
+              source = Path('saved-storyboard')/run_id/name
+              if source.exists():
+                  shutil.copy2(source, Path('output')/run_id/name)
+          PYTHON
+      - name: Match sung lyrics and storyboard each five-second interval
+        run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage storyboard
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: song-storyboard-${{ github.run_id }}
+          path: |
+            output/*/song.json
+            output/*/alignment.json
+            output/*/storyboard.json
+          retention-days: 7
+  images:
+    name: Generate lyric scenes (shard ${{ matrix.shard }})
+    needs: [lyrics, storyboard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    env:
+      SONG_RUN_ID: ${{ needs.lyrics.outputs.run_id }}
+      IMAGE_SHARD: ${{ matrix.shard }}
       CUDA_VISIBLE_DEVICES: ''
       OMP_NUM_THREADS: '4'
       HF_HUB_DISABLE_XET: '1'
@@ -172,36 +236,36 @@ jobs:
           sudo chmod 600 /swapfile-images
           sudo mkswap /swapfile-images
           sudo swapon /swapfile-images
-      - name: Install reference SSD-1B CPU image runtime
+      - name: Install reference CPU image runtime
         run: |
           pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements.txt -r requirements-images-cpu.txt
       - uses: actions/download-artifact@v4
         with:
-          name: music-input-${{ github.run_id }}
+          name: song-storyboard-${{ github.run_id }}
           path: output/
-      - name: Restore previous song artwork when available
+      - name: Restore matching image shard when available
         if: inputs.prepared_run != ''
-        continue-on-error: true # Earlier runs may predate the artwork job.
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
-          name: generated-artwork-${{ inputs.prepared_run }}
+          name: generated-artwork-${{ inputs.prepared_run }}-${{ matrix.shard }}
           run-id: ${{ inputs.prepared_run }}
           github-token: ${{ github.token }}
           path: output/
-      - name: Generate unique song background and thumbnail scenes
+      - name: Generate distinct lyric scenes and thumbnail
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage images
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: generated-artwork-${{ github.run_id }}
+          name: generated-artwork-${{ github.run_id }}-${{ matrix.shard }}
           path: |
-            output/*/background-source.png
+            output/*/scene-*.png
             output/*/thumbnail-source.png
-            output/*/image-manifest.json
+            output/*/image-shard-*.json
           retention-days: 7
   publish:
-    needs: [lyrics, music, images]
+    needs: [lyrics, music, storyboard, images]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -228,7 +292,12 @@ jobs:
           path: output/
       - uses: actions/download-artifact@v4
         with:
-          name: generated-artwork-${{ github.run_id }}
+          pattern: generated-artwork-${{ github.run_id }}-*
+          merge-multiple: true
+          path: output/
+      - uses: actions/download-artifact@v4
+        with:
+          name: song-storyboard-${{ github.run_id }}
           path: output/
       - name: Render video on GitHub CPU
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage render

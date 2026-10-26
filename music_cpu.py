@@ -107,7 +107,7 @@ def synthesize(song, target, source, model_root):
     if not ready or handler.device != 'cpu':
         raise RuntimeError('ACE-Step CPU initialization failed')
     params = Params(caption=song['prompt'], lyrics=song['lyrics'],
-        duration=song['duration'], vocal_language='hi', instrumental=False,
+        duration=song['duration'], vocal_language='bn', instrumental=False,
         inference_steps=8, thinking=False, use_cot_metas=False,
         use_cot_caption=False, use_cot_language=False)
     config = Config(batch_size=1, audio_format='wav', allow_lm_batch=False)

@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 import music_cpu as music
 
-SONG = dict(title='याद', lyrics='तेरी यादों में मेरा दिल खो गया', prompt='Hindi acoustic pop', duration=240, description='Original Hindi music')
+SONG = dict(title='স্মৃতি', lyrics='তোমার স্মৃতিতে আমার মন হারিয়ে যায়', prompt='Bangla acoustic pop', duration=240, description='Original Bangla music')
 
 
 class CpuMusicTests(unittest.TestCase):
@@ -30,7 +30,7 @@ class CpuMusicTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'revision'):
                 music.runtime(Path('source'))
 
-    def test_music_runs_only_on_cpu_with_original_hindi_and_full_duration(self):
+    def test_music_runs_only_on_cpu_with_original_bangla_and_full_duration(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             audio = root/'native.wav'
@@ -48,6 +48,7 @@ class CpuMusicTests(unittest.TestCase):
             self.assertEqual(handler.initialize_service.call_args.kwargs['device'], 'cpu')
             self.assertEqual(params.call_args.kwargs['duration'], 240)
             self.assertEqual(params.call_args.kwargs['lyrics'], SONG['lyrics'])
+            self.assertEqual(params.call_args.kwargs['vocal_language'], 'bn')
             self.assertFalse(params.call_args.kwargs['thinking'])
             self.assertEqual(config.call_args.kwargs['batch_size'], 1)
             self.assertIsNone(infer.call_args.args[1])
