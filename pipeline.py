@@ -293,7 +293,7 @@ def make_song(day, history, draft_path=None, generation_id=None):
       For healing: an adult moving toward warm light with a hopeful expression.
       Medium-wide framing: people large enough to recognize, on the right, with room on the left
       and lower edge for the existing song overlay. One setting, natural anatomy, realistic skin,
-      black-and-white 1990s film photography, soft silver-gelatin light. No collage, floating props or lettering.
+      bright black-and-white 1990s film photography, generous soft frontal fill light, visible facial details. No collage, floating props or lettering.
       Base the setting and action on an actual image in the lyrics, not a random luxury scene.
     thumbnail_prompt: a DIFFERENT 20-25 word English scene that sells THIS song's feeling.
       Start with the adult South Asian subject and ONE clear emotion: tender reunion,
@@ -301,9 +301,12 @@ def make_song(day, history, draft_path=None, generation_id=None):
       Show a chest-up portrait or close couple, faces large and sharp with readable eyes.
       For a couple, use one lead face and one supporting face, natural eye contact or distance
       that communicates the relationship. No exaggerated crying or unrelated shock expressions.
-      Both faces together in the LEFT third, continuous detailed setting across the FULL frame.
+      For romance show exactly ONE adult couple, only TWO people; for healing or solo heartbreak
+      use ONE adult lead, with no extras. Close chest-up poster portraits, the faces
+      large on the LEFT half, continuous setting across the FULL frame.
       Keep the right side atmospheric and softly lit for an overlaid title, never a blank panel. Black-and-white
-      1990s romantic film-poster photography, soft luminous facial light, deep shadows,
+      1990s romantic album-cover photography, bright studio-quality frontal key light,
+      glowing skin midtones, crisp expressive eyes, gentle fill shadows; no silhouettes or backlighting,
       subtle film grain, period-appropriate simple clothing and a softly blurred setting.
       Use original fictional adult faces; do not imitate actors or existing film posters.
       Must read as a single emotional moment at small phone size: no tiny full-body people,

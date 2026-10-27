@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from PIL import Image, ImageChops
-from artwork import create_artwork, vintage_finish, vintage_thumbnail
+from artwork import brighten_scene, create_artwork, vintage_finish, vintage_thumbnail
 from demo_artwork import SONG
 
 
@@ -53,3 +53,10 @@ class VintageArtworkTests(unittest.TestCase):
         self.assertNotIn('2026', drawn)
         self.assertNotIn('Romantic Song', drawn)
         self.assertNotIn('HEART', drawn)
+
+    def test_dark_midtones_are_lifted_without_clipping_endpoints(self):
+        source = Image.new('RGB', (100, 100), (45, 45, 45))
+        output = brighten_scene(source)
+        self.assertGreater(output.getpixel((50, 50))[0], 80)
+        self.assertEqual(brighten_scene(Image.new('RGB', (10, 10), 'black')).getpixel((5, 5)), (0, 0, 0))
+        self.assertEqual(brighten_scene(Image.new('RGB', (10, 10), 'white')).getpixel((5, 5)), (255, 255, 255))

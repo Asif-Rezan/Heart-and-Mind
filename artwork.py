@@ -67,10 +67,22 @@ def draw_hook(image, hook, accent):
         y += int(size*1.12)
 
 
+def brighten_scene(image):
+    """Lift dark photographic midtones while preserving black and white endpoints."""
+    import math
+    import numpy as np
+    gray = ImageOps.grayscale(image)
+    median = float(np.median(np.asarray(gray)))
+    if 0 < median < 120:
+        gamma = max(0.55, min(1.0, math.log(120/255) / math.log(median/255)))
+        gray = gray.point([round(255*(value/255)**gamma) for value in range(256)])
+    return gray.convert('RGB')
+
+
 def vintage_finish(image):
     """Reproducible silver-gelatin tones and a lightly worn photographic border."""
     import numpy as np
-    gray = ImageEnhance.Contrast(ImageOps.grayscale(image)).enhance(1.16)
+    gray = ImageEnhance.Contrast(ImageOps.grayscale(image)).enhance(1.03)
     rng = np.random.default_rng(1994)
     pixels = np.asarray(gray, dtype=np.float32)
     pixels = np.clip(pixels + rng.normal(0, 2.2, pixels.shape), 0, 255).astype('uint8')
@@ -92,11 +104,11 @@ def vintage_finish(image):
 def vintage_thumbnail(source, song, mood):
     # Full-bleed photograph, with only a translucent shadow for title legibility.
     image = ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
-    image = ImageOps.grayscale(image).convert('RGBA')
+    image = brighten_scene(image).convert('RGBA')
     overlay = Image.new('RGBA', image.size)
     draw = ImageDraw.Draw(overlay)
     for x in range(570, 1280):
-        alpha = int(100 * min(1, (x-570)/350))
+        alpha = int(45 * min(1, (x-570)/350))
         draw.line((x, 0, x, 720), fill=(0, 0, 0, alpha))
     image = Image.alpha_composite(image, overlay).convert('RGB')
     title = re.sub(r'\b20\d{2}\b', '', song['title'].split('|')[0]).strip()
@@ -134,15 +146,15 @@ def create_artwork(root, song):
         if not scene.exists():
             raise RuntimeError('Generated song artwork missing; run the images stage first')
         with Image.open(scene) as source:
-            base = ImageOps.fit(source.convert('RGB'), (1920, 1080), method=Image.Resampling.LANCZOS)
+            base = brighten_scene(ImageOps.fit(source.convert('RGB'), (1920, 1080), method=Image.Resampling.LANCZOS))
         overlay = Image.new('RGBA', base.size)
         gradient = ImageDraw.Draw(overlay)
         for x in range(base.width):
-            alpha = int(205 * max(0, 1-x/1450))
+            alpha = int(45 * max(0, 1-x/1450))
             gradient.line((x, 0, x, 1080), fill=(8, 12, 24, alpha))
         return Image.alpha_composite(base.convert('RGBA'), overlay).convert('RGB')
     base = compose('background')
-    cover = ImageEnhance.Brightness(base).enhance(.88)
+    cover = base
     draw = ImageDraw.Draw(cover)
     # Keep the video scene calm; waveform sits below the people, not across their faces.
     draw.text((92, 86), 'HEART & MIND', font=font(28), fill='#f0e9e2')
