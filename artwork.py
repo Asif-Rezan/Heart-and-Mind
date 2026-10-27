@@ -90,13 +90,17 @@ def vintage_finish(image):
 
 
 def vintage_thumbnail(source, song, mood):
-    image = ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
+    # Fit the whole scene into the portrait panel: prompt framing alone cannot
+    # guarantee that both faces land on the same side of a generated image.
+    scene = ImageOps.contain(source.convert('RGB'), (700, 680), method=Image.Resampling.LANCZOS)
+    image = Image.new('RGB', (1280, 720), '#101010')
+    image.paste(scene, (12 + (700-scene.width)//2, (720-scene.height)//2))
     image = ImageOps.grayscale(image).convert('RGBA')
     overlay = Image.new('RGBA', image.size)
     draw = ImageDraw.Draw(overlay)
     # A fixed title panel prevents text crossing faces when model framing drifts.
-    for x in range(570, 1280):
-        alpha = int(245 * min(1, (x-570)/170))
+    for x in range(700, 1280):
+        alpha = int(245 * min(1, (x-700)/40))
         draw.line((x, 0, x, 720), fill=(9, 9, 9, alpha))
     image = Image.alpha_composite(image, overlay).convert('RGB')
     title = song['title'].split('|')[0].strip()

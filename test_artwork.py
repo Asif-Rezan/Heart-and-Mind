@@ -35,3 +35,10 @@ class VintageArtworkTests(unittest.TestCase):
         output = vintage_thumbnail(source, SONG, 'romance')
         self.assertGreater(output.getpixel((400, 400))[0], 230)
         self.assertLess(output.getpixel((1000, 430))[0], 35)
+
+    def test_whole_source_remains_visible_in_portrait_panel(self):
+        source = Image.new('RGB', (1024, 576), '#ffffff')
+        source.paste(Image.new('RGB', (512, 576), '#888888'), (512, 0))
+        output = vintage_thumbnail(source, SONG, 'romance')
+        self.assertGreater(output.getpixel((100, 400))[0], 230)
+        self.assertTrue(70 < output.getpixel((600, 400))[0] < 180)
