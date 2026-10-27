@@ -38,6 +38,19 @@ class QwenTests(unittest.TestCase):
         self.assertNotIn('reasoning_effort', sent)
         self.assertIn('JSON Schema', sent['messages'][-1]['content'])
 
+    def test_per_song_seed_reaches_runtime_and_retry_uses_next_seed(self):
+        payload = dict(self.payload(), seed=28471)
+        model = self.model(create_chat_completion=Mock(side_effect=[self.result('{}'), self.result()]))
+        with patch.object(s, 'load_model', return_value=model):
+            s.request_story('chat/completions', payload)
+        self.assertEqual([call.kwargs['seed'] for call in model.create_chat_completion.call_args_list],
+                         [28471, 28472])
+        for invalid in (-1, 2**31, '28471', True):
+            with patch.object(s, 'load_model') as load:
+                with self.assertRaises(s.StoryGenerationError):
+                    s.request_story('chat/completions', dict(payload, seed=invalid))
+            load.assert_not_called()
+
     def test_invalid_type_extra_fields_and_truncation_never_accepted(self):
         for content, finish in [('{"ready":"yes"}', 'stop'),
                                 ('{"ready":true,"extra":1}', 'stop'),

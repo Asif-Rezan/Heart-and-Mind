@@ -73,6 +73,23 @@ class SongGenerationTests(unittest.TestCase):
             prompts.add(song['prompt'])
         self.assertEqual(len(prompts), 8)
 
+    def test_new_run_changes_seed_and_brief_but_retry_keeps_identity(self):
+        requests = []
+        def request(endpoint, payload):
+            requests.append(payload)
+            schema = payload['response_format']['json_schema']['schema']
+            value = ({k: v for k, v in CORE.items() if k != 'prompt'}
+                     if 'lyrics' in schema['properties'] else PACKAGE)
+            return response(value)
+        with patch('lyrics_cpu.request_story', side_effect=request):
+            for identity in ('daily-2026-10-27', 'new-video-01', 'new-video-01'):
+                make_song('2026-10-27', [], generation_id=identity)
+        first, second, retry = requests[0], requests[2], requests[4]
+        self.assertNotEqual(first['seed'], second['seed'])
+        self.assertNotEqual(first['messages'], second['messages'])
+        self.assertEqual(second, retry)
+        self.assertEqual(requests[2]['seed'], requests[3]['seed'])
+
     def test_retry_reports_field_and_constraint_without_quoting_generated_content(self):
         import lyrics_cpu
         from unittest.mock import Mock

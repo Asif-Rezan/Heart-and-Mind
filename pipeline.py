@@ -12,6 +12,18 @@ from zoneinfo import ZoneInfo
 from storage import Store, required
 
 
+class DuplicateSongError(RuntimeError):
+    """A safe diagnostic; never expose raw API responses or checkpoint contents."""
+
+
+def pipeline_failure_message(error):
+    if isinstance(error, DuplicateSongError):
+        return ('Pipeline failed [duplicate_song]: lyrics or title already published. '
+                'Create a fresh song with a new run ID; do not retry duplicate media.')
+    return ('Pipeline failed: ' + type(error).__name__ +
+            '. Inspect checkpoint and configuration.')
+
+
 def normalize_lyrics(text):
     """Repair escaped layout markers without changing the Hindi words."""
     text = text.replace('\r\n', '\n').replace('\r', '\n')
@@ -60,16 +72,26 @@ def song_profile(day):
     return SONG_PROFILES[dt.date.fromisoformat(day).toordinal() % len(SONG_PROFILES)]
 
 
-def make_song(day, history, draft_path=None):
+def make_song(day, history, draft_path=None, generation_id=None):
     mood, genre, story, arrangement, hook = song_profile(day)
     search_term = {'romance': 'Hindi Romantic Song', 'heartbreak': 'Hindi Sad Song',
                    'healing': 'Heart Touching Hindi Song'}[mood]
     hindi_term = {'romance': 'हिंदी रोमांटिक गाना', 'heartbreak': 'हिंदी दर्द भरा गाना',
                   'healing': 'दिल छू लेने वाला हिंदी गाना'}[mood]
     year = day[:4]
+    identity = generation_id or day
+    seed = int.from_bytes(hashlib.sha256(identity.encode()).digest()[:4], 'big') % (2**31 - 3)
+    places = ('a quiet railway platform', 'a rooftop garden', 'a riverside tea stall',
+              'a bookshop at closing time', 'a lantern-lit courtyard', 'a seaside promenade',
+              'a mountain bus stop', 'a rain-washed city street')
+    objects = ('a folded letter', 'a shared umbrella', 'an old photograph', 'a cup of tea',
+               'a handwritten note', 'a train ticket', 'a pressed flower', 'a familiar scarf')
+    scene = f'{places[seed % len(places)]}, with {objects[(seed // len(places)) % len(objects)]}'
     prompt = f'''Write an ORIGINAL Hindi song for Heart and Mind on {day}.
     Today's direction: {genre}. Emotional story: {story}.
     Musical arrangement: {arrangement}. Visual mood: {mood}.
+    Unique creative brief {identity}: set the story around {scene}.
+    Use this brief as inspiration only; never include its identifier in public text.
     Develop a specific original scene, characters and emotional progression in this direction.
     Do not recycle a generic love song. Use concrete sensory details, conversational poetic
     Hindi, fresh metaphors, natural breath-length phrases and consistent viewpoint.
@@ -117,7 +139,7 @@ def make_song(day, history, draft_path=None):
             'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter and truthful music editor. Write natural, singable Hindi in Devanagari.'},
                          {'role': 'user', 'content': instructions}],
             'response_format': {'type': 'json_schema', 'json_schema': {'schema': schema}},
-            'max_completion_tokens': tokens})
+            'max_completion_tokens': tokens, 'seed': seed})
         return json.loads(result['choices'][0]['message']['content'])
 
     # Keep the full song and packaging out of the same completion. Small CPU models
@@ -321,10 +343,10 @@ def run(run_id, defer_drive_cleanup=False):
     if not state.get('song'):
         day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
         song = (validate_song(json.loads((root/'song.json').read_text()))
-                if (root/'song.json').exists() else make_song(day, [h['title'] for h in history[-30:]], root/'song-draft.json'))
+                if (root/'song.json').exists() else make_song(day, [h['title'] for h in history[-30:]], root/'song-draft.json', generation_id=run_id))
         digest = hashlib.sha256(song['lyrics'].encode()).hexdigest()
         if any(h.get('hash') == digest or h['title'] == song['title'] for h in history):
-            raise RuntimeError('Duplicate song rejected')
+            raise DuplicateSongError()
         state.update(song=song, hash=digest)
         save()
     song = validate_song(state['song'])
@@ -369,5 +391,5 @@ if __name__ == '__main__':
         run(args.run_id, defer_drive_cleanup=args.defer_drive_cleanup)
     except Exception as error:
         # Avoid leaking OAuth/API credentials through raw exception response bodies.
-        print('Pipeline failed: ' + type(error).__name__ + '. Inspect checkpoint and configuration.')
+        print(pipeline_failure_message(error))
         raise SystemExit(1)
