@@ -95,32 +95,50 @@ class SongGenerationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             draft = Path(temp)/'song-draft.json'
             draft.write_text(json.dumps(CORE))
-            with patch('lyrics_cpu.request_story', side_effect=[
-                    response({'title': 'सुनहरी राह | Sunehri Raah | Heart Touching Hindi Song 2026'}),
-                    response(PACKAGE)]) as request:
+            with patch('lyrics_cpu.request_story', return_value=response(PACKAGE)) as request:
                 song = make_song('2026-10-27', history, draft, generation_id='new-run')
             self.assertEqual(song['lyrics'], CORE['lyrics'])
             self.assertNotEqual(song['title'], CORE['title'])
-            self.assertEqual(request.call_count, 2)
-            self.assertEqual(set(request.call_args_list[0].args[1]['response_format']['json_schema']['schema']['properties']), {'title'})
-            self.assertIn(song['title'], request.call_args_list[1].args[1]['messages'][-1]['content'])
+            self.assertEqual(request.call_count, 1)
+            self.assertIn(song['title'], request.call_args_list[0].args[1]['messages'][-1]['content'])
+            self.assertLessEqual(len(song['title']), 100)
             self.assertEqual(json.loads(draft.read_text())['title'], song['title'])
 
     def test_repeated_title_recovery_is_bounded_and_preserves_checkpoint(self):
-        from pipeline import DuplicateSongError
+        from pipeline import DuplicateSongError, lyric_title_candidates
+        history = [{'title': title} for title in [CORE['title']] +
+                   lyric_title_candidates(CORE['lyrics'], 'Hindi Romantic Song', '2026')]
         with tempfile.TemporaryDirectory() as temp:
             draft = Path(temp)/'song-draft.json'
             draft.write_text(json.dumps(CORE))
-            with patch('lyrics_cpu.request_story', return_value=response({'title': CORE['title']})) as request:
+            with patch('lyrics_cpu.request_story') as request:
                 with self.assertRaises(DuplicateSongError):
-                    make_song('2026-10-27', [{'title': CORE['title']}], draft)
-            self.assertEqual(request.call_count, 3)
+                    make_song('2026-10-27', history, draft)
+            request.assert_not_called()
             self.assertEqual(json.loads(draft.read_text())['lyrics'], CORE['lyrics'])
+
+    def test_title_fallback_skips_used_phrases_and_bracket_labels(self):
+        from pipeline import lyric_title_candidates
+        lyrics = '[Chorus]\nतेरे साथ नई राहों पर\nमेरे सपनों का घर मिला\n'
+        candidates = lyric_title_candidates(lyrics, 'Hindi Romantic Song', '2026')
+        self.assertEqual(len(candidates), 2)
+        self.assertTrue(all(len(title) <= 100 for title in candidates))
+        self.assertTrue(all('Chorus' not in title for title in candidates))
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            core = dict(CORE, lyrics=lyrics*20)
+            draft.write_text(json.dumps(core))
+            with patch('lyrics_cpu.request_story', return_value=response(PACKAGE)) as request:
+                song = make_song('2026-10-27', [{'title': CORE['title']}, {'title': candidates[0]}], draft)
+            self.assertEqual(song['title'], candidates[1])
+            self.assertEqual(song['lyrics'], core['lyrics'])
+            request.assert_called_once()
 
     def test_identical_lyrics_cannot_be_disguised_with_new_title(self):
         import hashlib
         from pipeline import DuplicateSongError
-        history = [{'title': 'Other title', 'hash': hashlib.sha256(CORE['lyrics'].encode()).hexdigest()}]
+        history = [{'title': CORE['title'], 'hash': 'other'},
+                   {'title': 'Other title', 'hash': hashlib.sha256(CORE['lyrics'].encode()).hexdigest()}]
         with tempfile.TemporaryDirectory() as temp:
             draft = Path(temp)/'song-draft.json'
             draft.write_text(json.dumps(CORE))

@@ -26,14 +26,30 @@ def pipeline_failure_message(error):
 
 def song_duplicate_reason(song, history, run_id=None):
     digest = hashlib.sha256(normalize_lyrics(song['lyrics']).encode()).hexdigest()
-    for entry in history:
-        if run_id is not None and entry.get('run') == run_id:
-            continue
-        if entry.get('hash') == digest:
-            return 'lyrics'
-        if entry.get('title') == song['title']:
-            return 'title'
+    entries = [entry for entry in history if run_id is None or entry.get('run') != run_id]
+    if any(entry.get('hash') == digest for entry in entries):
+        return 'lyrics'
+    if any(entry.get('title') == song['title'] for entry in entries):
+        return 'title'
     return None
+
+
+def lyric_title_candidates(lyrics, search_term, year):
+    """Bounded public titles from actual sung lines, without model retries."""
+    candidates = []
+    suffix = f' | {search_term} {year}'
+    for line in normalize_lyrics(lyrics).splitlines():
+        line = re.sub(r'\[[^]]*\]', '', line).strip()
+        words = re.findall(r'[\u0900-\u097f]+', line)
+        phrase = ' '.join(words[:6])
+        if len(words) < 2 or not phrase:
+            continue
+        while len(phrase + suffix) > 100 and ' ' in phrase:
+            phrase = phrase.rsplit(' ', 1)[0]
+        title = phrase + suffix
+        if len(title) <= 100 and title not in candidates:
+            candidates.append(title)
+    return candidates
 
 
 def normalize_lyrics(text):
@@ -174,20 +190,14 @@ def make_song(day, history, draft_path=None, generation_id=None):
     if song_duplicate_reason(song, history) == 'lyrics':
         raise DuplicateSongError()
     avoided_titles = [entry['title'] for entry in history if entry.get('title')]
-    title_schema = {'type': 'object', 'additionalProperties': False, 'required': ['title'],
-                    'properties': {'title': core_schema['properties']['title']}}
-    for attempt in range(3):
-        if song['title'] not in avoided_titles:
-            break
-        print(json.dumps({'phase': 'title conflict recovery', 'attempt': attempt + 1}), flush=True)
-        title_prompt = (f'Give this original Hindi song a DISTINCTIVE new title, <=100 characters. '
-            f'Use a specific phrase from its lyrics, then Romanized Hindi and {search_term} {year}. '
-            'Do not use any title in the avoid list. Do not change or return lyrics. '
-            f'Avoid list: {json.dumps(avoided_titles, ensure_ascii=False)}. '
-            f'Lyrics: {song["lyrics"]}')
-        song['title'] = request(title_prompt, title_schema, 256, attempt + 1)['title']
     if song['title'] in avoided_titles:
-        raise DuplicateSongError()
+        # Models can repeat a rejected title despite instructions and new seeds.
+        # Select a real sung phrase instead; no random suffix or internal run ID.
+        candidates = lyric_title_candidates(song['lyrics'], search_term, year)
+        song['title'] = next((title for title in candidates if title not in avoided_titles), '')
+        if not song['title']:
+            raise DuplicateSongError()
+        print(json.dumps({'phase': 'title conflict recovered', 'source': 'song lyrics'}), flush=True)
     if draft_path is not None:
         temporary = draft_path.with_suffix('.tmp')
         temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
