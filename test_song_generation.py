@@ -25,26 +25,28 @@ class SongGenerationTests(unittest.TestCase):
         requests = []
         def request(endpoint, payload):
             schema = payload['response_format']['json_schema']['schema']
-            value = {k: v for k, v in CORE.items() if k != 'prompt'} if 'lyrics' in schema['properties'] else PACKAGE
+            value = ({k: v for k, v in CORE.items() if k != 'prompt'} if 'title' in schema['properties']
+                     else {'lyrics': CORE['lyrics']}) if 'lyrics' in schema['properties'] else PACKAGE
             Draft202012Validator(schema).validate(value)
             requests.append(payload)
             return response(value)
         with patch('lyrics_cpu.request_story', side_effect=request):
             song = make_song('2026-10-26', [])
-        self.assertEqual(len(requests), 2)
+        self.assertEqual(len(requests), 3)
         self.assertEqual(song['lyrics'], CORE['lyrics'])
+        self.assertEqual(song['duration'], 195)
         self.assertEqual(song['thumbnail_prompt'], PACKAGE['thumbnail_prompt'])
         self.assertNotIn('prompt', requests[0]['response_format']['json_schema']['schema']['properties'])
         self.assertTrue(20 <= len(song['prompt']) <= 600)
         self.assertNotIn('tags', requests[0]['response_format']['json_schema']['schema']['properties'])
-        self.assertNotIn('lyrics', requests[1]['response_format']['json_schema']['schema']['properties'])
-        self.assertIn(CORE['title'], requests[1]['messages'][-1]['content'])
-        self.assertLess(requests[1]['max_completion_tokens'], requests[0]['max_completion_tokens'])
+        self.assertNotIn('lyrics', requests[2]['response_format']['json_schema']['schema']['properties'])
+        self.assertIn(CORE['title'], requests[2]['messages'][-1]['content'])
+        self.assertLess(requests[2]['max_completion_tokens'], requests[0]['max_completion_tokens'])
 
     def test_valid_lyrics_survive_packaging_failure_and_are_not_regenerated(self):
         with tempfile.TemporaryDirectory() as temp:
             draft = Path(temp)/'song-draft.json'
-            with patch('lyrics_cpu.request_story', side_effect=[response(CORE), RuntimeError('interrupted')]):
+            with patch('lyrics_cpu.request_story', side_effect=[response(CORE), response({'lyrics': CORE['lyrics']}), RuntimeError('interrupted')]):
                 with self.assertRaises(RuntimeError):
                     make_song('2026-10-26', [], draft)
             saved = json.loads(draft.read_text())
@@ -62,14 +64,14 @@ class SongGenerationTests(unittest.TestCase):
             day = (dt.date(2026, 10, 27) + dt.timedelta(days=offset)).isoformat()
             def request(endpoint, payload):
                 schema = payload['response_format']['json_schema']['schema']
-                value = ({k: v for k, v in CORE.items() if k != 'prompt'}
-                         if 'lyrics' in schema['properties'] else PACKAGE)
+                value = (({k: v for k, v in CORE.items() if k != 'prompt'} if 'title' in schema['properties']
+                          else {'lyrics': CORE['lyrics']}) if 'lyrics' in schema['properties'] else PACKAGE)
                 Draft202012Validator(schema).validate(value)
                 return response(value)
             with patch('lyrics_cpu.request_story', side_effect=request):
                 song = make_song(day, [])
             self.assertTrue(20 <= len(song['prompt']) <= 600)
-            self.assertIn('Clear Hindi diction', song['prompt'])
+            self.assertIn('natural Hindi diction', song['prompt'])
             prompts.add(song['prompt'])
         self.assertEqual(len(prompts), 8)
 
@@ -78,17 +80,17 @@ class SongGenerationTests(unittest.TestCase):
         def request(endpoint, payload):
             requests.append(payload)
             schema = payload['response_format']['json_schema']['schema']
-            value = ({k: v for k, v in CORE.items() if k != 'prompt'}
-                     if 'lyrics' in schema['properties'] else PACKAGE)
+            value = (({k: v for k, v in CORE.items() if k != 'prompt'} if 'title' in schema['properties']
+                      else {'lyrics': CORE['lyrics']}) if 'lyrics' in schema['properties'] else PACKAGE)
             return response(value)
         with patch('lyrics_cpu.request_story', side_effect=request):
             for identity in ('daily-2026-10-27', 'new-video-01', 'new-video-01'):
                 make_song('2026-10-27', [], generation_id=identity)
-        first, second, retry = requests[0], requests[2], requests[4]
+        first, second, retry = requests[0], requests[3], requests[6]
         self.assertNotEqual(first['seed'], second['seed'])
         self.assertNotEqual(first['messages'], second['messages'])
         self.assertEqual(second, retry)
-        self.assertEqual(requests[2]['seed'], requests[3]['seed'])
+        self.assertEqual(requests[3]['seed'], requests[5]['seed'])
 
     def test_reused_title_is_repaired_without_rewriting_lyrics(self):
         history = [{'run': 'previous', 'title': CORE['title'], 'hash': 'different-lyrics'}]
@@ -146,6 +148,45 @@ class SongGenerationTests(unittest.TestCase):
                 with self.assertRaises(DuplicateSongError):
                     make_song('2026-10-27', history, draft)
             request.assert_not_called()
+
+    def test_editor_output_drives_metadata_and_is_checkpointed_once(self):
+        polished = '[Verse 1]\n' + 'तेरी हँसी से रोशन मेरी शाम हुई\n' * 24
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            with patch('lyrics_cpu.request_story', side_effect=[response(CORE),
+                    response({'lyrics': polished}), response(PACKAGE)]) as request:
+                song = make_song('2026-10-27', [], draft, generation_id='quality-song')
+            self.assertEqual(song['lyrics'], polished)
+            self.assertIn(json.dumps(polished, ensure_ascii=False), request.call_args_list[2].args[1]['messages'][-1]['content'])
+            self.assertEqual(json.loads(draft.read_text())['lyrics'], polished)
+            self.assertTrue(draft.with_name('lyrics-quality.json').exists())
+            with patch('lyrics_cpu.request_story', return_value=response(PACKAGE)) as request:
+                resumed = make_song('2026-10-27', [], draft, generation_id='quality-song')
+            request.assert_called_once()
+            self.assertEqual(resumed['lyrics'], polished)
+
+    def test_interrupted_editor_retains_raw_core_and_retries_edit_before_packaging(self):
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            with patch('lyrics_cpu.request_story', side_effect=[response(CORE), RuntimeError('interrupted')]):
+                with self.assertRaises(RuntimeError):
+                    make_song('2026-10-27', [], draft)
+            self.assertEqual(json.loads(draft.read_text())['lyrics'], CORE['lyrics'])
+            with patch('lyrics_cpu.request_story', side_effect=[response({'lyrics': CORE['lyrics']}),
+                    response(PACKAGE)]) as request:
+                make_song('2026-10-27', [], draft)
+            self.assertEqual(request.call_count, 2)
+            schema = request.call_args_list[0].args[1]['response_format']['json_schema']['schema']
+            self.assertEqual(set(schema['properties']), {'lyrics'})
+
+    def test_existing_cores_are_not_rewritten_under_previously_generated_audio(self):
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            draft.write_text(json.dumps(CORE))
+            with patch('lyrics_cpu.request_story', return_value=response(PACKAGE)) as request:
+                song = make_song('2026-10-27', [], draft)
+            request.assert_called_once()
+            self.assertEqual(song['lyrics'], CORE['lyrics'])
 
     def test_retry_reports_field_and_constraint_without_quoting_generated_content(self):
         import lyrics_cpu

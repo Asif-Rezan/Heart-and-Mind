@@ -127,9 +127,18 @@ def make_song(day, history, draft_path=None, generation_id=None):
     Write a memorable 2-4 line chorus with one distinctive central phrase; repeat that chorus
     consistently. Verses should advance the story, not paraphrase the chorus. Keep a singable
     syllable pattern within each section; avoid forced rhyme, filler and unrelated imagery.
-    Structure: [Intro], [Verse 1] (6-8 lines), [Pre-Chorus] (2-4), [Chorus] (4),
-    [Verse 2] (6-8), [Chorus], [Bridge] (4), [Final Chorus], [Outro] (2).
-    Intro may be instrumental. Target 140-180 sung words for a complete 3-6 minute song.
+    Structure: [Intro] (instrumental, no sung directions), [Verse 1] (4 lines),
+    [Pre-Chorus] (2), [Chorus] (4), [Verse 2] (4), [Chorus] (same 4),
+    [Bridge] (2-4), [Final Chorus] (same 4), [Outro] (2).
+    Target 180-220 sung words for a focused 3 to 3.5 minute album song.
+    Keep most lines 5-8 words, with balanced lengths that fit one melodic phrase.
+    The chorus must say something specific and emotionally meaningful, not repeat only
+    a two-word title. Establish a clear melodic hook and repeat its wording exactly.
+    Verse 1 shows one moment; verse 2 changes the situation; the bridge reveals a decision.
+    Use idiomatic everyday Hindi, correct verb agreement and consistent तू/तुम/आप usage.
+    Never translate English phrases literally or insert words such as फोल्ड लेटर or लाइट्स.
+    Prefer familiar natural Hindi over ornate vocabulary and vague philosophical filler.
+    Read every line as spoken Hindi first: if it sounds unnatural, rewrite it before singing.
     पूरा गीत हिंदी की देवनागरी लिपि में लिखो। रोमन लिपि में हिंदी मत लिखो।
     Every sung line must use Devanagari, never English transliteration; bracket labels in English.
     Never copy existing lyrics, melodies, titles, or imitate a named singer.
@@ -142,8 +151,8 @@ def make_song(day, history, draft_path=None, generation_id=None):
       Never claim a film connection, famous singer, official release, viral hit or chart success.
     lyrics: complete song as above. Musical production directions are supplied separately;
       do not return a prompt field.
-    duration: integer seconds 180-360, aim 240.
-    No spoken CTA. Keep the song concise: 140-180 sung words, including repeated choruses.
+    duration: integer seconds 180-210, aim 195.
+    No spoken CTA. Keep the song focused: 180-220 sung words, including repeated choruses.
     Do not add metadata, descriptions, tags or image prompts to this response.
     Privately revise for originality, story, meter and singability before returning.'''
     from lyrics_cpu import MODEL_ID, request_story
@@ -156,9 +165,14 @@ def make_song(day, history, draft_path=None, generation_id=None):
             'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360}}}
     # Production directions are controlled input, not creative prose. Keeping them
     # outside the completion prevents maxLength retries from discarding good lyrics.
-    production_prompt = (f'{genre}; {arrangement}. Moderate tempo appropriate to the genre. '
-        'Clear Hindi diction, natural phrasing, instrumental intro, intimate verses, '
-        'fuller choruses, emotional bridge and gentle outro. Balanced studio mix.')
+    tempos = (86, 72, 92, 96, 112, 76, 82, 80)
+    bpm = tempos[SONG_PROFILES.index(song_profile(day))]
+    production_prompt = (f'{genre}; {arrangement}; {bpm} BPM, steady 4/4 groove. '
+        'Warm expressive melodic lead vocal, natural Hindi diction, smooth legato, '
+        'short singable phrases. Brief instrumental motif; vocals within 8 seconds, '
+        'memorable chorus within 40 seconds. Intimate verses, lifted chorus, sparse bridge, '
+        'final chorus payoff, resolved ending. Vocal forward, instruments supporting the voice, '
+        'warm bass, clean balanced mix, restrained reverb; no spoken delivery or long solos.')
     generation_schema = dict(core_schema, required=['title', 'lyrics', 'duration'],
         properties={key: value for key, value in core_schema['properties'].items()
                     if key != 'prompt'})
@@ -173,18 +187,58 @@ def make_song(day, history, draft_path=None, generation_id=None):
     # Keep the full song and packaging out of the same completion. Small CPU models
     # otherwise have to satisfy many tight text bounds while writing long Hindi lyrics.
     from jsonschema import Draft202012Validator
-    if draft_path is not None and draft_path.exists():
+    fresh_core = not (draft_path is not None and draft_path.exists())
+    if not fresh_core:
         song = json.loads(draft_path.read_text())
         Draft202012Validator(core_schema).validate(song)
     else:
         song = request(prompt, generation_schema, 6000)
         song['prompt'] = production_prompt
+        # Keep the new lyric form matched to a focused 3m15s arrangement.
+        song['duration'] = 195
         Draft202012Validator(core_schema).validate(song)
         song['lyrics'] = normalize_lyrics(song['lyrics'])
     if draft_path is not None:
         temporary = draft_path.with_suffix('.tmp')
         temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
         temporary.replace(draft_path)
+    if song_duplicate_reason(song, history) == 'lyrics':
+        raise DuplicateSongError()
+    # A separate editorial pass catches grammatical Hindi that can satisfy JSON
+    # validation while remaining awkward to sing. Checkpoint it across metadata retries.
+    quality_path = draft_path.with_name('lyrics-quality.json') if draft_path is not None else None
+    lyric_hash = hashlib.sha256(song['lyrics'].encode()).hexdigest()
+    quality = json.loads(quality_path.read_text()) if quality_path is not None and quality_path.exists() else {}
+    if (fresh_core or quality.get('version') == 1) and quality.get('lyrics_hash') != lyric_hash:
+        if quality_path is not None:
+            quality_path.write_text(json.dumps({'version': 1, 'lyrics_hash': None}))
+        edit_schema = {'type': 'object', 'additionalProperties': False, 'required': ['lyrics'],
+            'properties': {'lyrics': core_schema['properties']['lyrics']}}
+        edit_prompt = f'''Act as a meticulous native Hindi lyric editor, then a vocal arranger.
+        Polish this original song for {genre}. Preserve its story, viewpoint, emotional turn
+        and distinctive hook. Return only lyrics, never commentary, credits or translations.
+        Fix unnatural Hindi, literal English translations, tense, gender and verb agreement.
+        Maintain one form of address (तू or तुम), and a consistent narrator throughout.
+        Use everyday idiomatic Hindi, concrete images and clear emotional meaning.
+        Remove nonsensical metaphors, filler and unnatural loanwords. Do not merely swap synonyms.
+        Each line must make sense when spoken aloud and be comfortable to sing in one breath.
+        Aim 5-8 words per line with comparable lengths within each section, without forced rhyme.
+        Keep a distinctive four-line chorus, repeated exactly, that expresses the central feeling.
+        Verse 2 must advance the story; the short bridge changes perspective or makes a decision.
+        Use [Verse 1], [Pre-Chorus], [Chorus], [Verse 2], [Chorus], [Bridge],
+        [Final Chorus], [Outro]. All sung words in Devanagari. No directions outside brackets.
+        Aim 180-220 sung words including repetitions. Do not expand into a long poem.
+        Privately check grammar, meaning, repetition and singability before returning.
+        Original lyrics: {song['lyrics']}'''
+        song['lyrics'] = normalize_lyrics(request(edit_prompt, edit_schema, 5000, 100)['lyrics'])
+        if draft_path is not None:
+            temporary = draft_path.with_suffix('.tmp')
+            temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
+            temporary.replace(draft_path)
+            quality = {'version': 1, 'lyrics_hash': hashlib.sha256(song['lyrics'].encode()).hexdigest()}
+            temporary = quality_path.with_suffix('.tmp')
+            temporary.write_text(json.dumps(quality))
+            temporary.replace(quality_path)
     # Check saved cores too: resumed artifacts may predate the current history.
     # A title-only correction keeps good lyrics instead of regenerating the music.
     if song_duplicate_reason(song, history) == 'lyrics':
