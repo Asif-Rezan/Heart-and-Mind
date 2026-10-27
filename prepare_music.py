@@ -25,7 +25,7 @@ def prepare(run_id, stage='all'):
     if (root/'song.json').exists():
         song = validate_song(json.loads((root/'song.json').read_text()))
     else:
-        song = make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), [], root/'song-draft.json')
+        song = make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), [], root/'song-draft.json', generation_id=run_id)
         (root/'song.json').write_text(json.dumps(song, ensure_ascii=False, indent=2))
     if stage == 'lyrics':
         print(json.dumps({'phase':'lyrics ready', 'run_id':run_id}), flush=True)

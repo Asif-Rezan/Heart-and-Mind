@@ -89,6 +89,9 @@ def request_story(endpoint, payload):
             for value in node:
                 remove_string_bounds(value)
     remove_string_bounds(grammar_schema)
+    seed = payload.get('seed', 1700)
+    if type(seed) is not int or not 0 <= seed <= 2**31 - 3:
+        raise StoryGenerationError('Lyrics seed must be a nonnegative 31-bit integer')
     model = load_model()
     # Include chat markers and the BOS token in the conservative context allowance.
     prompt_tokens = sum(len(model.tokenize(message['content'].encode(), add_bos=False)) + 16
@@ -101,7 +104,7 @@ def request_story(endpoint, payload):
             result = model.create_chat_completion(messages=messages,
                 response_format={'type': 'json_object', 'schema': grammar_schema},
                 max_tokens=limit, temperature=max(.2, float(payload.get('temperature', .7)) - .15 * attempt),
-                top_p=.8, top_k=20, repeat_penalty=1.05, seed=1700 + attempt)
+                top_p=.8, top_k=20, repeat_penalty=1.05, seed=seed + attempt)
         except Exception:
             # Runtime/configuration errors are not content errors; don't spin on them.
             raise StoryGenerationError('Qwen CPU generation failed; inspect runner memory and runtime compatibility') from None
