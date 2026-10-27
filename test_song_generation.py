@@ -90,6 +90,45 @@ class SongGenerationTests(unittest.TestCase):
         self.assertEqual(second, retry)
         self.assertEqual(requests[2]['seed'], requests[3]['seed'])
 
+    def test_reused_title_is_repaired_without_rewriting_lyrics(self):
+        history = [{'run': 'previous', 'title': CORE['title'], 'hash': 'different-lyrics'}]
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            draft.write_text(json.dumps(CORE))
+            with patch('lyrics_cpu.request_story', side_effect=[
+                    response({'title': 'सुनहरी राह | Sunehri Raah | Heart Touching Hindi Song 2026'}),
+                    response(PACKAGE)]) as request:
+                song = make_song('2026-10-27', history, draft, generation_id='new-run')
+            self.assertEqual(song['lyrics'], CORE['lyrics'])
+            self.assertNotEqual(song['title'], CORE['title'])
+            self.assertEqual(request.call_count, 2)
+            self.assertEqual(set(request.call_args_list[0].args[1]['response_format']['json_schema']['schema']['properties']), {'title'})
+            self.assertIn(song['title'], request.call_args_list[1].args[1]['messages'][-1]['content'])
+            self.assertEqual(json.loads(draft.read_text())['title'], song['title'])
+
+    def test_repeated_title_recovery_is_bounded_and_preserves_checkpoint(self):
+        from pipeline import DuplicateSongError
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            draft.write_text(json.dumps(CORE))
+            with patch('lyrics_cpu.request_story', return_value=response({'title': CORE['title']})) as request:
+                with self.assertRaises(DuplicateSongError):
+                    make_song('2026-10-27', [{'title': CORE['title']}], draft)
+            self.assertEqual(request.call_count, 3)
+            self.assertEqual(json.loads(draft.read_text())['lyrics'], CORE['lyrics'])
+
+    def test_identical_lyrics_cannot_be_disguised_with_new_title(self):
+        import hashlib
+        from pipeline import DuplicateSongError
+        history = [{'title': 'Other title', 'hash': hashlib.sha256(CORE['lyrics'].encode()).hexdigest()}]
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            draft.write_text(json.dumps(CORE))
+            with patch('lyrics_cpu.request_story') as request:
+                with self.assertRaises(DuplicateSongError):
+                    make_song('2026-10-27', history, draft)
+            request.assert_not_called()
+
     def test_retry_reports_field_and_constraint_without_quoting_generated_content(self):
         import lyrics_cpu
         from unittest.mock import Mock

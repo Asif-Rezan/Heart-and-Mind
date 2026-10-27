@@ -24,6 +24,18 @@ def pipeline_failure_message(error):
             '. Inspect checkpoint and configuration.')
 
 
+def song_duplicate_reason(song, history, run_id=None):
+    digest = hashlib.sha256(normalize_lyrics(song['lyrics']).encode()).hexdigest()
+    for entry in history:
+        if run_id is not None and entry.get('run') == run_id:
+            continue
+        if entry.get('hash') == digest:
+            return 'lyrics'
+        if entry.get('title') == song['title']:
+            return 'title'
+    return None
+
+
 def normalize_lyrics(text):
     """Repair escaped layout markers without changing the Hindi words."""
     text = text.replace('\r\n', '\n').replace('\r', '\n')
@@ -105,7 +117,7 @@ def make_song(day, history, draft_path=None, generation_id=None):
     पूरा गीत हिंदी की देवनागरी लिपि में लिखो। रोमन लिपि में हिंदी मत लिखो।
     Every sung line must use Devanagari, never English transliteration; bracket labels in English.
     Never copy existing lyrics, melodies, titles, or imitate a named singer.
-    Avoid these previous titles: {json.dumps(history, ensure_ascii=False)}.
+    Avoid these previous titles: {json.dumps([entry['title'] for entry in history if entry.get('title')], ensure_ascii=False)}.
     Return JSON only with these fields:
     title: original Hindi song name first, a short Romanized Hindi name, then the accurate
       search phrase "{search_term} {year}". Keep the whole title <=100 characters, ideally 65-90.
@@ -134,12 +146,12 @@ def make_song(day, history, draft_path=None, generation_id=None):
     generation_schema = dict(core_schema, required=['title', 'lyrics', 'duration'],
         properties={key: value for key, value in core_schema['properties'].items()
                     if key != 'prompt'})
-    def request(instructions, schema, tokens):
+    def request(instructions, schema, tokens, seed_offset=0):
         result = request_story('chat/completions', {'model': MODEL_ID,
             'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter and truthful music editor. Write natural, singable Hindi in Devanagari.'},
                          {'role': 'user', 'content': instructions}],
             'response_format': {'type': 'json_schema', 'json_schema': {'schema': schema}},
-            'max_completion_tokens': tokens, 'seed': seed})
+            'max_completion_tokens': tokens, 'seed': (seed + seed_offset) % (2**31 - 3)})
         return json.loads(result['choices'][0]['message']['content'])
 
     # Keep the full song and packaging out of the same completion. Small CPU models
@@ -153,10 +165,33 @@ def make_song(day, history, draft_path=None, generation_id=None):
         song['prompt'] = production_prompt
         Draft202012Validator(core_schema).validate(song)
         song['lyrics'] = normalize_lyrics(song['lyrics'])
-        if draft_path is not None:
-            temporary = draft_path.with_suffix('.tmp')
-            temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
-            temporary.replace(draft_path)
+    if draft_path is not None:
+        temporary = draft_path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
+        temporary.replace(draft_path)
+    # Check saved cores too: resumed artifacts may predate the current history.
+    # A title-only correction keeps good lyrics instead of regenerating the music.
+    if song_duplicate_reason(song, history) == 'lyrics':
+        raise DuplicateSongError()
+    avoided_titles = [entry['title'] for entry in history if entry.get('title')]
+    title_schema = {'type': 'object', 'additionalProperties': False, 'required': ['title'],
+                    'properties': {'title': core_schema['properties']['title']}}
+    for attempt in range(3):
+        if song['title'] not in avoided_titles:
+            break
+        print(json.dumps({'phase': 'title conflict recovery', 'attempt': attempt + 1}), flush=True)
+        title_prompt = (f'Give this original Hindi song a DISTINCTIVE new title, <=100 characters. '
+            f'Use a specific phrase from its lyrics, then Romanized Hindi and {search_term} {year}. '
+            'Do not use any title in the avoid list. Do not change or return lyrics. '
+            f'Avoid list: {json.dumps(avoided_titles, ensure_ascii=False)}. '
+            f'Lyrics: {song["lyrics"]}')
+        song['title'] = request(title_prompt, title_schema, 256, attempt + 1)['title']
+    if song['title'] in avoided_titles:
+        raise DuplicateSongError()
+    if draft_path is not None:
+        temporary = draft_path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
+        temporary.replace(draft_path)
     packaging_schema = {'type': 'object', 'additionalProperties': False,
         'required': ['description', 'tags', 'thumbnail_text', 'background_prompt', 'thumbnail_prompt'],
         'properties': {
@@ -343,9 +378,9 @@ def run(run_id, defer_drive_cleanup=False):
     if not state.get('song'):
         day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
         song = (validate_song(json.loads((root/'song.json').read_text()))
-                if (root/'song.json').exists() else make_song(day, [h['title'] for h in history[-30:]], root/'song-draft.json', generation_id=run_id))
+                if (root/'song.json').exists() else make_song(day, history, root/'song-draft.json', generation_id=run_id))
         digest = hashlib.sha256(song['lyrics'].encode()).hexdigest()
-        if any(h.get('hash') == digest or h['title'] == song['title'] for h in history):
+        if song_duplicate_reason(song, history, run_id):
             raise DuplicateSongError()
         state.update(song=song, hash=digest)
         save()
