@@ -293,7 +293,7 @@ def make_song(day, history, draft_path=None, generation_id=None):
       For healing: an adult moving toward warm light with a hopeful expression.
       Medium-wide framing: people large enough to recognize, on the right, with room on the left
       and lower edge for the existing song overlay. One setting, natural anatomy, realistic skin,
-      rich restrained colors and soft cinematic light. No collage, floating props or lettering.
+      black-and-white 1990s film photography, soft silver-gelatin light. No collage, floating props or lettering.
       Base the setting and action on an actual image in the lyrics, not a random luxury scene.
     thumbnail_prompt: a DIFFERENT 20-25 word English scene that sells THIS song's feeling.
       Start with the adult South Asian subject and ONE clear emotion: tender reunion,
@@ -301,8 +301,10 @@ def make_song(day, history, draft_path=None, generation_id=None):
       Show a chest-up portrait or close couple, faces large and sharp with readable eyes.
       For a couple, use one lead face and one supporting face, natural eye contact or distance
       that communicates the relationship. No exaggerated crying or unrelated shock expressions.
-      Faces entirely on the RIGHT, dark simple LEFT for our text. Warm facial light against a
-      cool softly blurred setting, clear silhouette and one visual anchor from the song.
+      Faces entirely on the LEFT, empty dark RIGHT for our title panel. Black-and-white
+      1990s romantic film-poster photography, soft luminous facial light, deep shadows,
+      subtle film grain, period-appropriate simple clothing and a softly blurred setting.
+      Use original fictional adult faces; do not imitate actors or existing film posters.
       Must read as a single emotional moment at small phone size: no tiny full-body people,
       busy scenery, collage, split screen, arrows, badges, model text, logos or watermarks.
       Do not put the song title or hook into the image prompt; lettering is added separately.

@@ -21,11 +21,11 @@ def image_plan(song):
         scene = song.get(field) or defaults[mood]
         # Keep long saved scene prose from pushing framing beyond encoder limits.
         scene = ' '.join(scene.split()[:26]).rstrip(',.;')
-        composition = ('Medium-wide cinematic scene, recognizable faces on right, open left, gentle depth'
+        composition = ('1990s black-and-white romantic film still, couple on right, visible faces, open left'
                        if kind == 'background' else
-                       'Chest-up portrait on right, large expressive faces, sharp eyes, dark empty left, blurred backdrop')
+                       '1990s black-and-white romance poster, close adult couple on left, expressive eyes, empty dark right')
         # Put framing first: previously it was appended after long scene paragraphs.
-        prompt = composition + '. ' + scene + '. Natural skin, fully clothed adults, cinematic photograph, no lettering.'
+        prompt = composition + '. ' + scene + '. Fully clothed adults, soft silver-gelatin light, film grain, no lettering.'
         # Seed depends on the song and purpose; never the same fixed seed for every upload.
         seed = int(hashlib.sha256((identity + kind).encode()).hexdigest()[:8], 16)
         plans.append(dict(kind=kind, prompt=prompt,

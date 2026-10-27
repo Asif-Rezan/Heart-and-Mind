@@ -4,7 +4,7 @@ The SSD-1B image job supplies a separate background and thumbnail source.
 """
 from pathlib import Path
 import re
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps, features
 
 ASSETS = Path(__file__).resolve().parent / 'assets' / 'artwork'
 MOODS = {
@@ -67,6 +67,71 @@ def draw_hook(image, hook, accent):
         y += int(size*1.12)
 
 
+def vintage_finish(image):
+    """Reproducible silver-gelatin tones and a lightly worn photographic border."""
+    import numpy as np
+    gray = ImageEnhance.Contrast(ImageOps.grayscale(image)).enhance(1.16)
+    rng = np.random.default_rng(1994)
+    pixels = np.asarray(gray, dtype=np.float32)
+    pixels = np.clip(pixels + rng.normal(0, 2.2, pixels.shape), 0, 255).astype('uint8')
+    image = Image.fromarray(pixels).convert('RGB')
+    draw = ImageDraw.Draw(image)
+    width, height = image.size
+    draw.rectangle((3, 3, width-4, height-4), outline='#d8d8d8', width=2)
+    for _ in range(650):
+        x, y = int(rng.integers(0, width)), int(rng.integers(0, height))
+        edge = int(rng.integers(0, 4))
+        if edge == 0: y = int(rng.integers(0, 9))
+        elif edge == 1: y = height-1-int(rng.integers(0, 9))
+        elif edge == 2: x = int(rng.integers(0, 9))
+        else: x = width-1-int(rng.integers(0, 9))
+        draw.line((x, y, min(width-1, x+int(rng.integers(1, 14))), y), fill='#dddddd', width=1)
+    return image
+
+
+def vintage_thumbnail(source, song, mood):
+    image = ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
+    image = ImageOps.grayscale(image).convert('RGBA')
+    overlay = Image.new('RGBA', image.size)
+    draw = ImageDraw.Draw(overlay)
+    # A fixed title panel prevents text crossing faces when model framing drifts.
+    for x in range(570, 1280):
+        alpha = int(245 * min(1, (x-570)/170))
+        draw.line((x, 0, x, 720), fill=(9, 9, 9, alpha))
+    image = Image.alpha_composite(image, overlay).convert('RGB')
+    title = song['title'].split('|')[0].strip()
+    hindi = bool(re.search(r'[\u0900-\u097f]', title)) and features.check_feature('raqm')
+    if not hindi:
+        title = hook_text(song, mood).title()
+    draw = ImageDraw.Draw(image)
+    for size in range(102, 35, -2):
+        face = ImageFont.truetype(str(ASSETS/'NotoSerifDevanagari.ttf'), size) if hindi else font(size)
+        lines, line = [], ''
+        for word in title.split():
+            candidate = (line + ' ' + word).strip()
+            if line and draw.textlength(candidate, font=face) > 510:
+                lines.append(line)
+                line = word
+            else:
+                line = candidate
+        if line: lines.append(line)
+        if len(lines) <= 3 and all(draw.textlength(line, font=face) <= 510 for line in lines):
+            break
+    line_height = int(size*1.45)
+    y = 280 - len(lines)*line_height//2
+    for line in lines:
+        draw.text((720, y), line, font=face, fill='#f6f6f6', stroke_width=1)
+        y += line_height
+    year = re.search(r'20\d{2}', song['title'])
+    label = {'romance': 'Hindi Romantic Song', 'heartbreak': 'Hindi Sad Song',
+             'healing': 'Heart Touching Hindi Song'}[mood]
+    if year: label += ' ' + year.group()
+    draw.rectangle((715, 505, 1238, 555), fill='#e5e5e5')
+    draw.text((733, 512), label, font=font(25), fill='#111111')
+    draw.text((724, 627), 'HEART & MIND', font=font(20), fill='#dddddd')
+    return vintage_finish(image)
+
+
 def create_artwork(root, song):
     root = Path(root)
     mood = visual_mood(song)
@@ -90,11 +155,8 @@ def create_artwork(root, song):
     draw.text((92, 86), 'HEART & MIND', font=font(28), fill='#f0e9e2')
     draw.text((92, 825), hook_text(song, mood), font=font(64), fill=accent)
     draw.text((96, 918), label, font=font(24), fill='#ffffff')
+    cover = vintage_finish(cover)
     cover.save(root/'cover.png')
-    thumb = compose('thumbnail').resize((1280, 720), Image.Resampling.LANCZOS)
-    draw = ImageDraw.Draw(thumb)
-    draw.rounded_rectangle((62, 130, 410, 176), radius=8, fill=accent)
-    draw.text((78, 139), label, font=font(22), fill='#141820')
-    draw_hook(thumb, hook_text(song, mood), accent)
-    draw.text((64, 625), 'HEART & MIND', font=font(20), fill='#ffffff')
+    with Image.open(root/'thumbnail-source.png') as source:
+        thumb = vintage_thumbnail(source, song, mood)
     thumb.save(root/'thumbnail.jpg', quality=92, optimize=True)
