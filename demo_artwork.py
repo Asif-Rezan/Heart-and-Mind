@@ -14,8 +14,8 @@ SONG = {
     'duration': 195,
     'visual_mood': 'romance',
     'thumbnail_text': 'TERE SAATH',
-    'background_prompt': 'Adult South Asian couple sharing an umbrella on a rainwashed riverside walkway, exchanging tender smiles, amber streetlamp reflections, blue twilight, gentle monsoon romance.',
-    'thumbnail_prompt': 'Adult South Asian couple reuniting under an umbrella, woman smiling softly toward her partner, luminous eyes, warm lamplight on faces, cool rainy evening bokeh.',
+    'background_prompt': 'Adult South Asian couple sharing an umbrella on a rainwashed riverside walkway, exchanging tender smiles, glowing streetlamp reflections, misty twilight, nostalgic monsoon romance.',
+    'thumbnail_prompt': 'Adult South Asian couple reuniting under an umbrella, woman smiling softly toward her partner, luminous eyes, soft lamplight on faces, rainy evening bokeh.',
 }
 
 
