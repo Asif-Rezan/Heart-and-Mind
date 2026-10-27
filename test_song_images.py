@@ -29,9 +29,9 @@ class SongImageTests(unittest.TestCase):
         long_scene = 'Adult South Asian couple sharing a quiet reunion under a courtyard lamp ' + 'long scenery description ' * 60
         plans = image_plan(dict(SONG, background_prompt=long_scene, thumbnail_prompt=long_scene))
         self.assertTrue(plans[0]['prompt'].startswith('1990s black-and-white romantic film still'))
-        self.assertTrue(plans[1]['prompt'].startswith('1990s black-and-white romance poster'))
-        self.assertIn('close adult couple on left', plans[1]['prompt'])
-        self.assertIn('empty dark right', plans[1]['prompt'])
+        self.assertTrue(plans[1]['prompt'].startswith('1990s black-and-white film photo'))
+        self.assertIn('couple together in left third', plans[1]['prompt'])
+        self.assertIn('continuous scenic background on right', plans[1]['prompt'])
         for plan in plans:
             self.assertLessEqual(len(plan['prompt'].split()), 62)
             self.assertIn('courtyard lamp', plan['prompt'])
