@@ -25,6 +25,19 @@ class SongImageTests(unittest.TestCase):
         self.assertEqual(first, image_plan(SONG))
         self.assertTrue(all(item['revision'] == image_cpu.REVISION for item in first))
 
+    def test_framing_survives_long_scene_prompts_and_purposes_stay_distinct(self):
+        long_scene = 'Adult South Asian couple sharing a quiet reunion under a courtyard lamp ' + 'long scenery description ' * 60
+        plans = image_plan(dict(SONG, background_prompt=long_scene, thumbnail_prompt=long_scene))
+        self.assertTrue(plans[0]['prompt'].startswith('Medium-wide'))
+        self.assertTrue(plans[1]['prompt'].startswith('Chest-up'))
+        self.assertIn('large expressive faces', plans[1]['prompt'])
+        self.assertIn('dark empty left', plans[1]['prompt'])
+        for plan in plans:
+            self.assertLessEqual(len(plan['prompt'].split()), 62)
+            self.assertIn('courtyard lamp', plan['prompt'])
+            self.assertIn('fully clothed adults', plan['prompt'])
+            self.assertNotIn('Hopeful Hindi folk pop', plan['prompt'])
+
     def test_checkpoint_reuses_only_matching_song_and_prompt(self):
         def generate(prompt, target, seed):
             Image.new('RGB', (256, 256), 'navy').save(target)

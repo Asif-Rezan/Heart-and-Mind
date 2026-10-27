@@ -280,23 +280,32 @@ def make_song(day, history, draft_path=None, generation_id=None):
       "new Hindi song {year}", the actual musical genre, one suitable listening context,
       "original Hindi music", and "Heart and Mind". Use specific Hindi/English searches,
       not broad unrelated self-help terms. No other singers, films, tools, models or trend bait.
-    thumbnail_text: 2-4 short ASCII Romanized Hindi words, <=26 characters, drawn from the
-      chorus or central emotional promise. Make the hook easy to read at phone size and
-      complementary to the title. Avoid generic channel-name text and unsupported clickbait.
-      Mood example ONLY: {hook}.
-    background_prompt: 20-30 English words depicting a specific scene from THIS song's story,
-      setting, time, weather, colors and emotional action. For love/reunion show a fully clothed
-      adult South Asian couple; for loss/healing show a reflective adult or symbolic landscape.
-      Cinematic photorealism, subjects on right half, no lettering. Put the scene first.
-    thumbnail_prompt: a DIFFERENT 20-30 word English photographic scene for THIS song.
-      Put the key emotion and adult subject first so they survive the image encoder's limit.
-      For love/longing, show an expressive adult South Asian couple with natural eye contact;
-      for heartbreak/healing, use an emotionally appropriate adult portrait or pair. Tight
-      chest-up framing, sharp expressive eyes, clear separation from a simple cinematic
-      background, strong warm/cool light contrast. Keep faces entirely in the RIGHT half
-      and the LEFT 45 percent dark and empty for large text. One clear emotional focal point.
-      Fully clothed adults, natural anatomy, no clutter, collage, generated text or watermark.
-      The image must communicate the song's emotion at phone size without any channel logo.
+    thumbnail_text: 2-4 familiar Romanized Hindi words, <=26 ASCII characters, expressing
+      the chorus's emotional promise. Use natural Hindi transliteration, never mixed English
+      slogans such as MILE AGAIN. Prefer a complete relatable phrase over generic love labels.
+      Complement the title instead of copying it. No channel name, fake claims or punctuation bait.
+      Mood reference only, do not copy mechanically: {hook}.
+    background_prompt: 20-25 English words describing ONE beautiful music-video frame.
+      Start with the people and their emotional action, then the lyric-specific setting,
+      weather and lighting. Keep the romance or emotional story visible; avoid empty generic scenery.
+      For love/reunion: a fully clothed adult South Asian couple sharing a natural affectionate
+      moment. For separation: an adult with a meaningful keepsake or a couple visibly apart.
+      For healing: an adult moving toward warm light with a hopeful expression.
+      Medium-wide framing: people large enough to recognize, on the right, with room on the left
+      and lower edge for the existing song overlay. One setting, natural anatomy, realistic skin,
+      rich restrained colors and soft cinematic light. No collage, floating props or lettering.
+      Base the setting and action on an actual image in the lyrics, not a random luxury scene.
+    thumbnail_prompt: a DIFFERENT 20-25 word English scene that sells THIS song's feeling.
+      Start with the adult South Asian subject and ONE clear emotion: tender reunion,
+      quiet longing, painful separation or hopeful relief, as supported by the lyrics.
+      Show a chest-up portrait or close couple, faces large and sharp with readable eyes.
+      For a couple, use one lead face and one supporting face, natural eye contact or distance
+      that communicates the relationship. No exaggerated crying or unrelated shock expressions.
+      Faces entirely on the RIGHT, dark simple LEFT for our text. Warm facial light against a
+      cool softly blurred setting, clear silhouette and one visual anchor from the song.
+      Must read as a single emotional moment at small phone size: no tiny full-body people,
+      busy scenery, collage, split screen, arrows, badges, model text, logos or watermarks.
+      Do not put the song title or hook into the image prompt; lettering is added separately.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
     The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
     Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.

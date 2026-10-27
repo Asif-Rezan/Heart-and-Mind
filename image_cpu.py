@@ -28,8 +28,7 @@ def safer_prompt(prompt):
     for pattern, replacement in replacements:
         prompt = re.sub(pattern, replacement, prompt, flags=re.I)
     # Preserve the scene's visual anchor before the encoders' token limit.
-    return (prompt + ' Cinematic music photography; fully clothed adults, '
-            'no violence or exposed bodies.')
+    return prompt + ' Respectful fully clothed adults, no violence.'
 
 def recovery_prompt(prompt):
     """Keep the musical mood with a restrained fully clothed composition."""
@@ -73,7 +72,7 @@ def generate(prompt, path, seed):
         candidate = initial_prompt if attempt < 5 else rewritten
         if attempt == 5:
             print('Five safety rejections; retrying a restrained music portrait.', flush=True)
-        result = pipeline(prompt=candidate, negative_prompt='anime, cartoon, watercolor, flat colors, line art, cel shading, blurry, low detail, poor quality, 3D render, CGI, extra arms, extra legs, deformed hands, duplicate person, text, letters, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
+        result = pipeline(prompt=candidate, negative_prompt='anime, cartoon, watercolor, flat colors, line art, cel shading, blurry, low detail, poor quality, 3D render, CGI, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, text, letters, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
             num_inference_steps=steps, guidance_scale=7.0,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):

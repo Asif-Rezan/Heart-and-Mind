@@ -18,12 +18,17 @@ def image_plan(song):
     }
     plans = []
     for kind, field in (('background', 'background_prompt'), ('thumbnail', 'thumbnail_prompt')):
-        scene = song.get(field) or defaults[mood] + ', ' + song['prompt'][:100]
-        composition = ('wide cinematic music still, subjects on right, peaceful landscape' if kind == 'background'
-                       else 'expressive face close-up on right half, dark empty left half, dramatic cinematic light')
+        scene = song.get(field) or defaults[mood]
+        # Keep long saved scene prose from pushing framing beyond encoder limits.
+        scene = ' '.join(scene.split()[:26]).rstrip(',.;')
+        composition = ('Medium-wide cinematic scene, recognizable faces on right, open left, gentle depth'
+                       if kind == 'background' else
+                       'Chest-up portrait on right, large expressive faces, sharp eyes, dark empty left, blurred backdrop')
+        # Put framing first: previously it was appended after long scene paragraphs.
+        prompt = composition + '. ' + scene + '. Natural skin, fully clothed adults, cinematic photograph, no lettering.'
         # Seed depends on the song and purpose; never the same fixed seed for every upload.
         seed = int(hashlib.sha256((identity + kind).encode()).hexdigest()[:8], 16)
-        plans.append(dict(kind=kind, prompt=scene + ', ' + composition + ', fully clothed adults, no text',
+        plans.append(dict(kind=kind, prompt=prompt,
                           seed=seed, model=MODEL, revision=REVISION,
                           width=int(os.getenv('CPU_IMAGE_WIDTH', '1024')),
                           height=int(os.getenv('CPU_IMAGE_HEIGHT', '576')),
