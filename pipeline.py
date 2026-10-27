@@ -301,13 +301,15 @@ def make_song(day, history, draft_path=None, generation_id=None):
       Show a chest-up portrait or close couple, faces large and sharp with readable eyes.
       For a couple, use one lead face and one supporting face, natural eye contact or distance
       that communicates the relationship. No exaggerated crying or unrelated shock expressions.
-      Faces entirely on the LEFT, empty dark RIGHT for our title panel. Black-and-white
+      Both faces together in the LEFT third, continuous detailed setting across the FULL frame.
+      Keep the right side atmospheric and softly lit for an overlaid title, never a blank panel. Black-and-white
       1990s romantic film-poster photography, soft luminous facial light, deep shadows,
       subtle film grain, period-appropriate simple clothing and a softly blurred setting.
       Use original fictional adult faces; do not imitate actors or existing film posters.
       Must read as a single emotional moment at small phone size: no tiny full-body people,
       busy scenery, collage, split screen, arrows, badges, model text, logos or watermarks.
-      Do not put the song title or hook into the image prompt; lettering is added separately.
+      Do not put the song title, release year, genre badge or hook into the image prompt;
+      only the short song title is added separately. No borders inside the scene or inset photo.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
     The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
     Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.

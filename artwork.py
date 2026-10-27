@@ -90,20 +90,16 @@ def vintage_finish(image):
 
 
 def vintage_thumbnail(source, song, mood):
-    # Fit the whole scene into the portrait panel: prompt framing alone cannot
-    # guarantee that both faces land on the same side of a generated image.
-    scene = ImageOps.contain(source.convert('RGB'), (700, 680), method=Image.Resampling.LANCZOS)
-    image = Image.new('RGB', (1280, 720), '#101010')
-    image.paste(scene, (12 + (700-scene.width)//2, (720-scene.height)//2))
+    # Full-bleed photograph, with only a translucent shadow for title legibility.
+    image = ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
     image = ImageOps.grayscale(image).convert('RGBA')
     overlay = Image.new('RGBA', image.size)
     draw = ImageDraw.Draw(overlay)
-    # A fixed title panel prevents text crossing faces when model framing drifts.
-    for x in range(700, 1280):
-        alpha = int(245 * min(1, (x-700)/40))
-        draw.line((x, 0, x, 720), fill=(9, 9, 9, alpha))
+    for x in range(570, 1280):
+        alpha = int(100 * min(1, (x-570)/350))
+        draw.line((x, 0, x, 720), fill=(0, 0, 0, alpha))
     image = Image.alpha_composite(image, overlay).convert('RGB')
-    title = song['title'].split('|')[0].strip()
+    title = re.sub(r'\b20\d{2}\b', '', song['title'].split('|')[0]).strip()
     hindi = bool(re.search(r'[\u0900-\u097f]', title)) and features.check_feature('raqm')
     if not hindi:
         title = hook_text(song, mood).title()
@@ -124,15 +120,8 @@ def vintage_thumbnail(source, song, mood):
     line_height = int(size*1.45)
     y = 280 - len(lines)*line_height//2
     for line in lines:
-        draw.text((720, y), line, font=face, fill='#f6f6f6', stroke_width=1)
+        draw.text((720, y), line, font=face, fill='#f6f6f6', stroke_width=2, stroke_fill='#181818')
         y += line_height
-    year = re.search(r'20\d{2}', song['title'])
-    label = {'romance': 'Hindi Romantic Song', 'heartbreak': 'Hindi Sad Song',
-             'healing': 'Heart Touching Hindi Song'}[mood]
-    if year: label += ' ' + year.group()
-    draw.rectangle((715, 505, 1238, 555), fill='#e5e5e5')
-    draw.text((733, 512), label, font=font(25), fill='#111111')
-    draw.text((724, 627), 'HEART & MIND', font=font(20), fill='#dddddd')
     return vintage_finish(image)
 
 

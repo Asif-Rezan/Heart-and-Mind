@@ -7,15 +7,15 @@ from artwork import create_artwork
 from song_images import image_plan
 
 SONG = {
-    'title': 'बारिश में तेरा साथ | Baarish Mein Tera Saath | Hindi Romantic Song 2026',
-    'lyrics': '[Verse 1]\nभीगी राहों पर तेरा हाथ मिला\nखामोश शामों को नया साथ मिला\n[Chorus]\nतेरे साथ ये बारिश गुनगुनाए\nहर बूंद मुझे तेरे पास बुलाए\n',
+    'title': 'चाँदनी में तेरा साथ | Chandni Mein Tera Saath | Hindi Romantic Song 2026',
+    'lyrics': '[Verse 1]\nपुरानी किताबों में तेरा खत मिला\nखामोश शामों को नया साथ मिला\n[Chorus]\nतेरे साथ ये चाँदनी गुनगुनाए\nहर पन्ना मुझे तेरे पास बुलाए\n',
     'prompt': 'Hindi romantic acoustic pop, intimate melodic vocal, warm guitar and piano',
-    'description': 'An original Hindi romantic song about sharing an umbrella after a long-awaited reunion.',
+    'description': 'An original Hindi romantic song about reuniting in a moonlit old bookshop.',
     'duration': 195,
     'visual_mood': 'romance',
     'thumbnail_text': 'TERE SAATH',
-    'background_prompt': 'Adult South Asian couple sharing an umbrella on a rainwashed riverside walkway, exchanging tender smiles, glowing streetlamp reflections, misty twilight, nostalgic monsoon romance.',
-    'thumbnail_prompt': 'Adult South Asian couple reuniting under an umbrella, woman smiling softly toward her partner, luminous eyes, soft lamplight on faces, rainy evening bokeh.',
+    'background_prompt': 'Adult South Asian couple meeting in a moonlit old bookshop, exchanging tender smiles beside wooden shelves, glowing lantern, tall arched window, nostalgic quiet romance.',
+    'thumbnail_prompt': 'Two original South Asian adults embracing together at far left, woman resting against partner, antique bookshop extending across frame, moonlit arched window and lantern at right.',
 }
 
 

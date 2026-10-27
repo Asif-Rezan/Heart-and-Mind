@@ -23,7 +23,7 @@ def image_plan(song):
         scene = ' '.join(scene.split()[:26]).rstrip(',.;')
         composition = ('1990s black-and-white romantic film still, couple on right, visible faces, open left'
                        if kind == 'background' else
-                       '1990s black-and-white romance poster, close adult couple on left, expressive eyes, empty dark right')
+                       '1990s black-and-white film photo, couple together in left third, continuous scenic background on right')
         # Put framing first: previously it was appended after long scene paragraphs.
         prompt = composition + '. ' + scene + '. Fully clothed adults, soft silver-gelatin light, film grain, no lettering.'
         # Seed depends on the song and purpose; never the same fixed seed for every upload.
