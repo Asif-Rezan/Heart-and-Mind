@@ -26,13 +26,11 @@ def pipeline_failure_message(error):
 
 def song_duplicate_reason(song, history, run_id=None):
     digest = hashlib.sha256(normalize_lyrics(song['lyrics']).encode()).hexdigest()
-    for entry in history:
-        if run_id is not None and entry.get('run') == run_id:
-            continue
-        if entry.get('hash') == digest:
-            return 'lyrics'
-        if entry.get('title') == song['title']:
-            return 'title'
+    entries = [entry for entry in history if run_id is None or entry.get('run') != run_id]
+    if any(entry.get('hash') == digest for entry in entries):
+        return 'lyrics'
+    if any(entry.get('title') == song['title'] for entry in entries):
+        return 'title'
     return None
 
 

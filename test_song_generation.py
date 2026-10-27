@@ -137,7 +137,8 @@ class SongGenerationTests(unittest.TestCase):
     def test_identical_lyrics_cannot_be_disguised_with_new_title(self):
         import hashlib
         from pipeline import DuplicateSongError
-        history = [{'title': 'Other title', 'hash': hashlib.sha256(CORE['lyrics'].encode()).hexdigest()}]
+        history = [{'title': CORE['title'], 'hash': 'other'},
+                   {'title': 'Other title', 'hash': hashlib.sha256(CORE['lyrics'].encode()).hexdigest()}]
         with tempfile.TemporaryDirectory() as temp:
             draft = Path(temp)/'song-draft.json'
             draft.write_text(json.dumps(CORE))
