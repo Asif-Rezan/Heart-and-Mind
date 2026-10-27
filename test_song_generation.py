@@ -25,7 +25,7 @@ class SongGenerationTests(unittest.TestCase):
         requests = []
         def request(endpoint, payload):
             schema = payload['response_format']['json_schema']['schema']
-            value = CORE if 'lyrics' in schema['properties'] else PACKAGE
+            value = {k: v for k, v in CORE.items() if k != 'prompt'} if 'lyrics' in schema['properties'] else PACKAGE
             Draft202012Validator(schema).validate(value)
             requests.append(payload)
             return response(value)
@@ -34,6 +34,8 @@ class SongGenerationTests(unittest.TestCase):
         self.assertEqual(len(requests), 2)
         self.assertEqual(song['lyrics'], CORE['lyrics'])
         self.assertEqual(song['thumbnail_prompt'], PACKAGE['thumbnail_prompt'])
+        self.assertNotIn('prompt', requests[0]['response_format']['json_schema']['schema']['properties'])
+        self.assertTrue(20 <= len(song['prompt']) <= 600)
         self.assertNotIn('tags', requests[0]['response_format']['json_schema']['schema']['properties'])
         self.assertNotIn('lyrics', requests[1]['response_format']['json_schema']['schema']['properties'])
         self.assertIn(CORE['title'], requests[1]['messages'][-1]['content'])
@@ -45,11 +47,31 @@ class SongGenerationTests(unittest.TestCase):
             with patch('lyrics_cpu.request_story', side_effect=[response(CORE), RuntimeError('interrupted')]):
                 with self.assertRaises(RuntimeError):
                     make_song('2026-10-26', [], draft)
-            self.assertEqual(json.loads(draft.read_text()), CORE)
+            saved = json.loads(draft.read_text())
+            self.assertEqual(saved['lyrics'], CORE['lyrics'])
+            self.assertTrue(20 <= len(saved['prompt']) <= 600)
             with patch('lyrics_cpu.request_story', return_value=response(PACKAGE)) as request:
                 song = make_song('2026-10-26', [], draft)
             request.assert_called_once()
             self.assertEqual(song['lyrics'], CORE['lyrics'])
+
+    def test_every_daily_style_uses_bounded_directions_without_generated_prose(self):
+        import datetime as dt
+        prompts = set()
+        for offset in range(8):
+            day = (dt.date(2026, 10, 27) + dt.timedelta(days=offset)).isoformat()
+            def request(endpoint, payload):
+                schema = payload['response_format']['json_schema']['schema']
+                value = ({k: v for k, v in CORE.items() if k != 'prompt'}
+                         if 'lyrics' in schema['properties'] else PACKAGE)
+                Draft202012Validator(schema).validate(value)
+                return response(value)
+            with patch('lyrics_cpu.request_story', side_effect=request):
+                song = make_song(day, [])
+            self.assertTrue(20 <= len(song['prompt']) <= 600)
+            self.assertIn('Clear Hindi diction', song['prompt'])
+            prompts.add(song['prompt'])
+        self.assertEqual(len(prompts), 8)
 
     def test_retry_reports_field_and_constraint_without_quoting_generated_content(self):
         import lyrics_cpu

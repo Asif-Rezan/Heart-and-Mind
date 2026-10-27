@@ -90,8 +90,8 @@ def make_song(day, history, draft_path=None):
       Format example ONLY: तेरे बिना | Tere Bina | Hindi Sad Song {year}.
       Use the supplied mood's search phrase; do not label a hopeful song sad or a ballad dance.
       Never claim a film connection, famous singer, official release, viral hit or chart success.
-    lyrics: complete song as above. prompt: English musical production directions including
-      {genre}, {arrangement}, tempo, dynamic arc and clear Hindi diction. No named artists.
+    lyrics: complete song as above. Musical production directions are supplied separately;
+      do not return a prompt field.
     duration: integer seconds 180-360, aim 240.
     No spoken CTA. Keep the song concise: 140-180 sung words, including repeated choruses.
     Do not add metadata, descriptions, tags or image prompts to this response.
@@ -104,6 +104,14 @@ def make_song(day, history, draft_path=None):
             'lyrics': {'type': 'string', 'minLength': 500, 'pattern': '[ऀ-ॿ]'},
             'prompt': {'type': 'string', 'minLength': 20, 'maxLength': 600},
             'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360}}}
+    # Production directions are controlled input, not creative prose. Keeping them
+    # outside the completion prevents maxLength retries from discarding good lyrics.
+    production_prompt = (f'{genre}; {arrangement}. Moderate tempo appropriate to the genre. '
+        'Clear Hindi diction, natural phrasing, instrumental intro, intimate verses, '
+        'fuller choruses, emotional bridge and gentle outro. Balanced studio mix.')
+    generation_schema = dict(core_schema, required=['title', 'lyrics', 'duration'],
+        properties={key: value for key, value in core_schema['properties'].items()
+                    if key != 'prompt'})
     def request(instructions, schema, tokens):
         result = request_story('chat/completions', {'model': MODEL_ID,
             'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter and truthful music editor. Write natural, singable Hindi in Devanagari.'},
@@ -119,7 +127,9 @@ def make_song(day, history, draft_path=None):
         song = json.loads(draft_path.read_text())
         Draft202012Validator(core_schema).validate(song)
     else:
-        song = request(prompt, core_schema, 6000)
+        song = request(prompt, generation_schema, 6000)
+        song['prompt'] = production_prompt
+        Draft202012Validator(core_schema).validate(song)
         song['lyrics'] = normalize_lyrics(song['lyrics'])
         if draft_path is not None:
             temporary = draft_path.with_suffix('.tmp')
