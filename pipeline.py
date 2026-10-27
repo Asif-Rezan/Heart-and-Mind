@@ -194,6 +194,8 @@ def make_song(day, history, draft_path=None, generation_id=None):
     else:
         song = request(prompt, generation_schema, 6000)
         song['prompt'] = production_prompt
+        # Keep the new lyric form matched to a focused 3m15s arrangement.
+        song['duration'] = 195
         Draft202012Validator(core_schema).validate(song)
         song['lyrics'] = normalize_lyrics(song['lyrics'])
     if draft_path is not None:

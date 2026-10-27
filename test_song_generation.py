@@ -34,6 +34,7 @@ class SongGenerationTests(unittest.TestCase):
             song = make_song('2026-10-26', [])
         self.assertEqual(len(requests), 3)
         self.assertEqual(song['lyrics'], CORE['lyrics'])
+        self.assertEqual(song['duration'], 195)
         self.assertEqual(song['thumbnail_prompt'], PACKAGE['thumbnail_prompt'])
         self.assertNotIn('prompt', requests[0]['response_format']['json_schema']['schema']['properties'])
         self.assertTrue(20 <= len(song['prompt']) <= 600)
