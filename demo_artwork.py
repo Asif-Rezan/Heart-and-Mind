@@ -1,0 +1,39 @@
+"""Generate a review-only example through the production artwork pipeline."""
+import argparse
+import json
+from pathlib import Path
+
+from artwork import create_artwork
+from song_images import image_plan
+
+SONG = {
+    'title': 'बारिश में तेरा साथ | Baarish Mein Tera Saath | Hindi Romantic Song 2026',
+    'lyrics': '[Verse 1]\nभीगी राहों पर तेरा हाथ मिला\nखामोश शामों को नया साथ मिला\n[Chorus]\nतेरे साथ ये बारिश गुनगुनाए\nहर बूंद मुझे तेरे पास बुलाए\n',
+    'prompt': 'Hindi romantic acoustic pop, intimate melodic vocal, warm guitar and piano',
+    'description': 'An original Hindi romantic song about sharing an umbrella after a long-awaited reunion.',
+    'duration': 195,
+    'visual_mood': 'romance',
+    'thumbnail_text': 'TERE SAATH',
+    'background_prompt': 'Adult South Asian couple sharing an umbrella on a rainwashed riverside walkway, exchanging tender smiles, amber streetlamp reflections, blue twilight, gentle monsoon romance.',
+    'thumbnail_prompt': 'Adult South Asian couple reuniting under an umbrella, woman smiling softly toward her partner, luminous eyes, warm lamplight on faces, cool rainy evening bokeh.',
+}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--kind', choices=['background', 'thumbnail', 'compose'], required=True)
+    parser.add_argument('--output', type=Path, default=Path('output/artwork-demo'))
+    args = parser.parse_args()
+    args.output.mkdir(parents=True, exist_ok=True)
+    (args.output/'song.json').write_text(json.dumps(SONG, ensure_ascii=False, indent=2))
+    if args.kind == 'compose':
+        create_artwork(args.output, SONG)
+    else:
+        from image_cpu import generate
+        plan = next(plan for plan in image_plan(SONG) if plan['kind'] == args.kind)
+        generate(plan['prompt'], args.output/f'{args.kind}-source.png', seed=plan['seed'])
+        (args.output/f'{args.kind}-plan.json').write_text(json.dumps(plan, indent=2))
+
+
+if __name__ == '__main__':
+    main()
