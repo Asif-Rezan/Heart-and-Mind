@@ -71,37 +71,22 @@ def brighten_scene(image):
     """Lift dark photographic midtones while preserving black and white endpoints."""
     import math
     import numpy as np
-    gray = ImageOps.grayscale(image)
-    median = float(np.median(np.asarray(gray)))
+    color = image.convert('RGB')
+    median = float(np.median(np.asarray(ImageOps.grayscale(color))))
     if 0 < median < 120:
         gamma = max(0.55, min(1.0, math.log(120/255) / math.log(median/255)))
-        gray = gray.point([round(255*(value/255)**gamma) for value in range(256)])
-    return gray.convert('RGB')
+        lut = [round(255*(value/255)**gamma) for value in range(256)]
+        color = color.point(lut * 3)
+    return color
 
 
-def vintage_finish(image):
-    """Reproducible silver-gelatin tones and a lightly worn photographic border."""
-    import numpy as np
-    gray = ImageEnhance.Contrast(ImageOps.grayscale(image)).enhance(1.03)
-    rng = np.random.default_rng(1994)
-    pixels = np.asarray(gray, dtype=np.float32)
-    pixels = np.clip(pixels + rng.normal(0, 2.2, pixels.shape), 0, 255).astype('uint8')
-    image = Image.fromarray(pixels).convert('RGB')
-    draw = ImageDraw.Draw(image)
-    width, height = image.size
-    draw.rectangle((3, 3, width-4, height-4), outline='#d8d8d8', width=2)
-    for _ in range(650):
-        x, y = int(rng.integers(0, width)), int(rng.integers(0, height))
-        edge = int(rng.integers(0, 4))
-        if edge == 0: y = int(rng.integers(0, 9))
-        elif edge == 1: y = height-1-int(rng.integers(0, 9))
-        elif edge == 2: x = int(rng.integers(0, 9))
-        else: x = width-1-int(rng.integers(0, 9))
-        draw.line((x, y, min(width-1, x+int(rng.integers(1, 14))), y), fill='#dddddd', width=1)
-    return image
+def poster_finish(image):
+    """Rich, clean album-poster color without grain, distress or monochrome conversion."""
+    image = ImageEnhance.Color(image.convert('RGB')).enhance(1.14)
+    return ImageEnhance.Contrast(image).enhance(1.04)
 
 
-def vintage_thumbnail(source, song, mood):
+def poster_thumbnail(source, song, mood):
     # Full-bleed photograph, with only a translucent shadow for title legibility.
     image = ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
     image = brighten_scene(image).convert('RGBA')
@@ -131,10 +116,21 @@ def vintage_thumbnail(source, song, mood):
             break
     line_height = int(size*1.45)
     y = 280 - len(lines)*line_height//2
-    for line in lines:
-        draw.text((720, y), line, font=face, fill='#f6f6f6', stroke_width=2, stroke_fill='#181818')
+    for index, line in enumerate(lines):
+        # A short red brush ribbon supports each line, without hiding the whole setting.
+        width = min(522, int(draw.textlength(line, font=face)) + 22)
+        bounds = draw.textbbox((720, y), line, font=face)
+        top, bottom = bounds[1]-6, bounds[3]+8
+        brush = Image.new('RGBA', image.size)
+        paint = ImageDraw.Draw(brush)
+        paint.polygon([(704, top+7), (718+width, top), (710+width, bottom-4),
+                       (700, bottom), (713, bottom-12)], fill=(145, 13, 31, 205))
+        image = Image.alpha_composite(image.convert('RGBA'), brush).convert('RGB')
+        draw = ImageDraw.Draw(image)
+        draw.text((720, y), line, font=face, fill=('#ffdf24' if index % 2 == 0 else '#ffffff'),
+                  stroke_width=3, stroke_fill='#251010')
         y += line_height
-    return vintage_finish(image)
+    return poster_finish(image)
 
 
 def create_artwork(root, song):
@@ -160,8 +156,8 @@ def create_artwork(root, song):
     draw.text((92, 86), 'HEART & MIND', font=font(28), fill='#f0e9e2')
     draw.text((92, 825), hook_text(song, mood), font=font(64), fill=accent)
     draw.text((96, 918), label, font=font(24), fill='#ffffff')
-    cover = vintage_finish(cover)
+    cover = poster_finish(cover)
     cover.save(root/'cover.png')
     with Image.open(root/'thumbnail-source.png') as source:
-        thumb = vintage_thumbnail(source, song, mood)
+        thumb = poster_thumbnail(source, song, mood)
     thumb.save(root/'thumbnail.jpg', quality=92, optimize=True)

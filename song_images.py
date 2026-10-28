@@ -23,11 +23,11 @@ def image_plan(song):
         scene = ' '.join(scene.split()[:26]).rstrip(',.;')
         portrait = ('exactly one adult couple, two large well-lit faces on left' if mood == 'romance'
                     else 'one adult lead, large well-lit face on left, no other people')
-        composition = ('Bright 1990s black-and-white romantic film still, medium portrait on right, clearly lit faces'
+        composition = ('Bright colorful romantic music still, medium portrait on right, clearly lit faces'
                        if kind == 'background' else
-                       'Bright 1990s black-and-white romance poster, ' + portrait)
+                       'Vibrant colorful romantic album poster, ' + portrait)
         # Put framing first: previously it was appended after long scene paragraphs.
-        prompt = composition + '. ' + scene + '. Bright soft frontal lighting, full-frame scenic backdrop, fully clothed adults, no lettering.'
+        prompt = composition + '. ' + scene + '. Golden face light, vivid blue backdrop, rich colors, fully clothed adults, no lettering.'
         # Seed depends on the song and purpose; never the same fixed seed for every upload.
         seed = int(hashlib.sha256((identity + kind).encode()).hexdigest()[:8], 16)
         plans.append(dict(kind=kind, prompt=prompt,

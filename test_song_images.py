@@ -28,8 +28,8 @@ class SongImageTests(unittest.TestCase):
     def test_framing_survives_long_scene_prompts_and_purposes_stay_distinct(self):
         long_scene = 'Adult South Asian couple sharing a quiet reunion under a courtyard lamp ' + 'long scenery description ' * 60
         plans = image_plan(dict(SONG, visual_mood='romance', background_prompt=long_scene, thumbnail_prompt=long_scene))
-        self.assertTrue(plans[0]['prompt'].startswith('Bright 1990s black-and-white romantic film still'))
-        self.assertTrue(plans[1]['prompt'].startswith('Bright 1990s black-and-white romance poster'))
+        self.assertTrue(plans[0]['prompt'].startswith('Bright colorful romantic music still'))
+        self.assertTrue(plans[1]['prompt'].startswith('Vibrant colorful romantic album poster'))
         self.assertIn('exactly one adult couple', plans[1]['prompt'])
         self.assertIn('two large well-lit faces on left', plans[1]['prompt'])
         for plan in plans:

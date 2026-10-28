@@ -293,7 +293,7 @@ def make_song(day, history, draft_path=None, generation_id=None):
       For healing: an adult moving toward warm light with a hopeful expression.
       Medium-wide framing: people large enough to recognize, on the right, with room on the left
       and lower edge for the existing song overlay. One setting, natural anatomy, realistic skin,
-      bright black-and-white 1990s film photography, generous soft frontal fill light, visible facial details. No collage, floating props or lettering.
+      bright colorful cinematic photography, warm golden frontal light, vivid blue and emerald setting, natural skin tones. No collage, floating props or lettering.
       Base the setting and action on an actual image in the lyrics, not a random luxury scene.
     thumbnail_prompt: a DIFFERENT 20-25 word English scene that sells THIS song's feeling.
       Start with the adult South Asian subject and ONE clear emotion: tender reunion,
@@ -304,10 +304,12 @@ def make_song(day, history, draft_path=None, generation_id=None):
       For romance show exactly ONE adult couple, only TWO people; for healing or solo heartbreak
       use ONE adult lead, with no extras. Close chest-up poster portraits, the faces
       large on the LEFT half, continuous setting across the FULL frame.
-      Keep the right side atmospheric and softly lit for an overlaid title, never a blank panel. Black-and-white
-      1990s romantic album-cover photography, bright studio-quality frontal key light,
+      Keep the right side scenic and colorful for an overlaid title, never a blank panel.
+      Vibrant contemporary romantic album-poster photography, bright golden frontal key light,
       glowing skin midtones, crisp expressive eyes, gentle fill shadows; no silhouettes or backlighting,
-      subtle film grain, period-appropriate simple clothing and a softly blurred setting.
+      rich ruby, emerald and cobalt color accents, natural skin, colorful traditional clothing
+      where appropriate, a softly blurred scenic setting and warm lanterns or soft moonlight.
+      No monochrome, sepia, distressed border, film grain or faded vintage treatment.
       Use original fictional adult faces; do not imitate actors or existing film posters.
       Must read as a single emotional moment at small phone size: no tiny full-body people,
       busy scenery, collage, split screen, arrows, badges, model text, logos or watermarks.
