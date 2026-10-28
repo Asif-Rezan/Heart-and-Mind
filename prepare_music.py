@@ -32,7 +32,8 @@ def prepare(run_id, stage='all', check_history=False):
     if check_history and (root/'song.json').exists():
         existing = validate_song(json.loads((root/'song.json').read_text()))
         if song_duplicate_reason(existing, history):
-            core = {key: existing[key] for key in ('title', 'lyrics', 'prompt', 'duration')}
+            core = {key: existing[key] for key in ('title', 'lyrics', 'prompt', 'duration', 'vocal_gender', 'song_date')
+                    if key in existing}
             (root/'song-draft.json').write_text(json.dumps(core, ensure_ascii=False))
             (root/'song.json').unlink()
     if (root/'song.json').exists():

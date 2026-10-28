@@ -100,8 +100,16 @@ def song_profile(day):
     return SONG_PROFILES[dt.date.fromisoformat(day).toordinal() % len(SONG_PROFILES)]
 
 
+def vocal_gender_for_day(day):
+    # Calendar days, not day-of-month parity: stays alternating across month/leap boundaries.
+    anchor = dt.date(2026, 10, 28)
+    return ('male', 'female')[(dt.date.fromisoformat(day)-anchor).days % 2]
+
+
 def make_song(day, history, draft_path=None, generation_id=None):
     mood, genre, story, arrangement, hook = song_profile(day)
+    vocal_gender = vocal_gender_for_day(day)
+    opposite_gender = 'female' if vocal_gender == 'male' else 'male'
     search_term = {'romance': 'Hindi Romantic Song', 'heartbreak': 'Hindi Sad Song',
                    'healing': 'Heart Touching Hindi Song'}[mood]
     hindi_term = {'romance': 'हिंदी रोमांटिक गाना', 'heartbreak': 'हिंदी दर्द भरा गाना',
@@ -118,6 +126,8 @@ def make_song(day, history, draft_path=None, generation_id=None):
     prompt = f'''Write an ORIGINAL Hindi song for Heart and Mind on {day}.
     Today's direction: {genre}. Emotional story: {story}.
     Musical arrangement: {arrangement}. Visual mood: {mood}.
+    Write for a solo {vocal_gender} singer, using consistent first-person Hindi grammar
+    appropriate to that narrator. Do not add singer labels to sung lines.
     Unique creative brief {identity}: set the story around {scene}.
     Use this brief as inspiration only; never include its identifier in public text.
     Develop a specific original scene, characters and emotional progression in this direction.
@@ -162,20 +172,22 @@ def make_song(day, history, draft_path=None, generation_id=None):
             'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
             'lyrics': {'type': 'string', 'minLength': 500, 'pattern': '[ऀ-ॿ]'},
             'prompt': {'type': 'string', 'minLength': 20, 'maxLength': 600},
-            'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360}}}
+            'duration': {'type': 'integer', 'minimum': 180, 'maximum': 360},
+            'vocal_gender': {'type': 'string', 'enum': ['male', 'female']},
+            'song_date': {'type': 'string', 'pattern': r'^\d{4}-\d{2}-\d{2}$'}}}
     # Production directions are controlled input, not creative prose. Keeping them
     # outside the completion prevents maxLength retries from discarding good lyrics.
     tempos = (86, 72, 92, 96, 112, 76, 82, 80)
     bpm = tempos[SONG_PROFILES.index(song_profile(day))]
-    production_prompt = (f'{genre}; {arrangement}; {bpm} BPM, steady 4/4 groove. '
-        'Warm expressive melodic lead vocal, natural Hindi diction, smooth legato, '
-        'short singable phrases. Brief instrumental motif; vocals within 8 seconds, '
-        'memorable chorus within 40 seconds. Intimate verses, lifted chorus, sparse bridge, '
-        'final chorus payoff, resolved ending. Vocal forward, instruments supporting the voice, '
-        'warm bass, clean balanced mix, restrained reverb; no spoken delivery or long solos.')
+    production_prompt = (f'Solo {vocal_gender} lead vocal; no {opposite_gender} singer or duet. '
+        f'{genre}; {arrangement}; {bpm} BPM, 4/4. '
+        'Warm melodic tone, natural Hindi diction, legato phrasing. '
+        'Vocal entry within 8s; catchy chorus by 40s. Intimate verses, lifted chorus, '
+        'sparse bridge, final chorus, resolved ending. Vocal-forward balanced mix, '
+        'warm bass, restrained reverb; no speech or long solos.')
     generation_schema = dict(core_schema, required=['title', 'lyrics', 'duration'],
         properties={key: value for key, value in core_schema['properties'].items()
-                    if key != 'prompt'})
+                    if key in ('title', 'lyrics', 'duration')})
     def request(instructions, schema, tokens, seed_offset=0):
         result = request_story('chat/completions', {'model': MODEL_ID,
             'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter and truthful music editor. Write natural, singable Hindi in Devanagari.'},
@@ -194,6 +206,8 @@ def make_song(day, history, draft_path=None, generation_id=None):
     else:
         song = request(prompt, generation_schema, 6000)
         song['prompt'] = production_prompt
+        song['vocal_gender'] = vocal_gender
+        song['song_date'] = day
         # Keep the new lyric form matched to a focused 3m15s arrangement.
         song['duration'] = 195
         Draft202012Validator(core_schema).validate(song)
@@ -204,6 +218,10 @@ def make_song(day, history, draft_path=None, generation_id=None):
         temporary.replace(draft_path)
     if song_duplicate_reason(song, history) == 'lyrics':
         raise DuplicateSongError()
+    # Saved cores retain their original voice, even when retried on the next calendar day.
+    editorial_voice = song.get('vocal_gender')
+    narrator_instruction = (f'Keep the first-person narrator consistent with a solo {editorial_voice} singer.'
+                            if editorial_voice else 'Preserve the original narrator and grammatical gender.')
     # A separate editorial pass catches grammatical Hindi that can satisfy JSON
     # validation while remaining awkward to sing. Checkpoint it across metadata retries.
     quality_path = draft_path.with_name('lyrics-quality.json') if draft_path is not None else None
@@ -218,6 +236,7 @@ def make_song(day, history, draft_path=None, generation_id=None):
         Polish this original song for {genre}. Preserve its story, viewpoint, emotional turn
         and distinctive hook. Return only lyrics, never commentary, credits or translations.
         Fix unnatural Hindi, literal English translations, tense, gender and verb agreement.
+        {narrator_instruction}
         Maintain one form of address (तू or तुम), and a consistent narrator throughout.
         Use everyday idiomatic Hindi, concrete images and clear emotional meaning.
         Remove nonsensical metaphors, filler and unnatural loanwords. Do not merely swap synonyms.
