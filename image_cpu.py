@@ -38,8 +38,24 @@ def recovery_prompt(prompt):
 # Pinned to the same public model as the Rezan After Dark reference project.
 MODEL = 'segmind/SSD-1B'
 REVISION = '60987f37e94cd59c36b1cba832b9f97b57395a10'
+GUIDANCE_SCALE = 7.0
+
+
+def negative_prompt():
+    return ('text, letters, typography, captions, Hindi writing, title, signature, watermark, logo, '
+            'poster, magazine, red brushwork, elderly, old man, gray hair, deep wrinkles, '
+            'orange skin, underexposed faces, silhouette, crowd, extra people, fused faces, '
+            'duplicated face, cropped head, extreme close-up, deformed hands, extra limbs, '
+            'plastic skin, blur, low quality, cartoon, anime, CGI, collage, split screen, '
+            'black panel, border, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''))
+
+
+
 _pipeline = None
+
 def generate(prompt, path, seed, allow_text=False):
+    if allow_text:
+        raise ValueError('Heart and Mind artwork must be text-free')
     global _pipeline
     import torch
     from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
@@ -72,9 +88,8 @@ def generate(prompt, path, seed, allow_text=False):
         candidate = initial_prompt if attempt < 5 else rewritten
         if attempt == 5:
             print('Five safety rejections; retrying a restrained music portrait.', flush=True)
-        lettering = 'misspelled title, gibberish, random extra words, ' if allow_text else 'text, letters, '
-        result = pipeline(prompt=candidate, negative_prompt=lettering + 'monochrome, grayscale, sepia, faded colors, underexposed, dark faces, silhouette, backlit face, group, crowd, third person, duplicate faces, anime, cartoon, watercolor, flat colors, line art, cel shading, blurry, low detail, poor quality, 3D render, CGI, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, letterbox bars, inset picture, solid black panel, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
-            num_inference_steps=steps, guidance_scale=7.0,
+        result = pipeline(prompt=candidate, negative_prompt=negative_prompt(), width=width, height=height,
+            num_inference_steps=steps, guidance_scale=GUIDANCE_SCALE,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):
             print(f'Image safety check rejected attempt {attempt+1}/10.', flush=True)
@@ -92,6 +107,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--prompt', required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--allow-text', action='store_true')
     args = parser.parse_args()
-    generate(args.prompt, args.output, seed=42, allow_text=args.allow_text)
+    generate(args.prompt, args.output, seed=42)

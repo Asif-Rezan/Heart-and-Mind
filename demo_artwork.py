@@ -15,7 +15,7 @@ SONG = {
     'visual_mood': 'romance',
     'thumbnail_text': 'TERE SAATH',
     'background_prompt': 'Adult South Asian couple meeting in a moonlit old bookshop, exchanging tender smiles beside wooden shelves, golden lantern light, cobalt moonlit window, colorful clothing, warm romance.',
-    'thumbnail_prompt': 'Two original South Asian adults embracing together at far left, woman resting against partner, colorful bookshop across frame, cobalt moonlight, warm lantern glow, ruby and emerald clothing.',
+    'thumbnail_prompt': 'Young adult South Asian couple sharing tender eye contact beside a moonlit bookshop window, separate faces, warm lantern glow, teal-gold bokeh.',
 }
 
 

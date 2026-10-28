@@ -68,7 +68,7 @@ def poster_finish(image):
 
 
 def poster_thumbnail(source, song, mood):
-    """Export the model's complete poster, without drawing text or other overlays."""
+    """Export the text-free thumbnail scene without drawing text or overlays."""
     return ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
 
 

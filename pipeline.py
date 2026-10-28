@@ -308,38 +308,27 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
       slogans such as MILE AGAIN. Prefer a complete relatable phrase over generic love labels.
       Complement the title instead of copying it. No channel name, fake claims or punctuation bait.
       Mood reference only, do not copy mechanically: {hook}.
-    background_prompt: 20-25 English words describing ONE beautiful music-video frame.
-      Start with the people and their emotional action, then the lyric-specific setting,
-      weather and lighting. Keep the romance or emotional story visible; avoid empty generic scenery.
-      For love/reunion: a fully clothed adult South Asian couple sharing a natural affectionate
-      moment. For separation: an adult with a meaningful keepsake or a couple visibly apart.
-      For healing: an adult moving toward warm light with a hopeful expression.
-      Medium-wide framing: people large enough to recognize, on the right, with room on the left
-      and lower edge for the existing song overlay. One setting, natural anatomy, realistic skin,
-      bright colorful cinematic photography, warm golden frontal light, vivid blue and emerald setting, natural skin tones. No collage, floating props or lettering.
-      Base the setting and action on an actual image in the lyrics, not a random luxury scene.
-    thumbnail_prompt: a DIFFERENT 20-25 word English scene that sells THIS song's feeling.
-      Start with the adult South Asian subject and ONE clear emotion: tender reunion,
-      quiet longing, painful separation or hopeful relief, as supported by the lyrics.
-      Show a chest-up portrait or close couple, faces large and sharp with readable eyes.
-      For a couple, use one lead face and one supporting face, natural eye contact or distance
-      that communicates the relationship. No exaggerated crying or unrelated shock expressions.
-      For romance show exactly ONE adult couple, only TWO people; for healing or solo heartbreak
-      use ONE adult lead, with no extras. Close chest-up poster portraits, the faces
-      large on the LEFT half, continuous setting across the FULL frame.
-      Keep the right side scenic and colorful for integrated poster typography, never a blank panel.
-      Vibrant contemporary romantic album-poster photography, bright golden frontal key light,
-      glowing skin midtones, crisp expressive eyes, gentle fill shadows; no silhouettes or backlighting,
-      rich ruby, emerald and cobalt color accents, natural skin, colorful traditional clothing
-      where appropriate, a softly blurred scenic setting and warm lanterns or soft moonlight.
-      No monochrome, sepia, distressed border, film grain or faded vintage treatment.
-      Use original fictional adult faces; do not imitate actors or existing film posters.
-      Must read as a single emotional moment at small phone size: no tiny full-body people,
-      busy scenery, collage, split screen, arrows, badges, model text, logos or watermarks.
-      Do not put the song title, release year, genre badge or hook into the image prompt;
-      the final image-generation prompt supplies the exact short hook for the model to render.
-      The model creates the entire poster including lettering; there is no later text overlay.
-      No borders inside the scene or inset photo.
+    background_prompt: 16-22 English words describing one beautiful, lyric-specific music-video scene.
+      Show the emotional action and the actual location, weather, meaningful prop and light from these lyrics.
+      Romance: a beautiful South Asian adult couple sharing a tender moment. Separation: the same young
+      adult couple visibly apart, with quiet longing. Healing: a beautiful young adult South Asian woman
+      in a hopeful moment. All adults are 25-35, fully clothed; use original fictional faces.
+      Use a medium-wide environmental view with recognizable people, scenic depth and a clear lower edge
+      for the waveform. Natural skin, soft diffused face light, balanced warm/cool color and an uncluttered
+      scene. Keep both people within the frame. No enormous cropped male face, elderly man, copied actor,
+      vintage poster, collage, title lettering, captions, logos or watermarks.
+    thumbnail_prompt: a DIFFERENT 16-22 word English scene selling this song's real emotional promise.
+      Romance: exactly one beautiful young adult South Asian couple, tender eye contact or a joyful reunion.
+      Separation: exactly that adult couple with readable longing and a little distance; no fake cheerful
+      romance or exaggerated tears. Healing: one beautiful young adult South Asian woman with hopeful relief.
+      All adults are 25-35, naturally expressive and fully clothed. Close chest-up framing, both couple
+      faces clearly separated, sharp eyes, soft natural skin light and a softly blurred lyric-specific setting.
+      One clear emotional moment that reads at phone size; no unrelated older man, collage or busy props.
+      Use the full frame for the scene; no blank typography panel, no red paint strokes.
+      This is a TEXT-FREE photograph: no Hindi, Romanized Hindi or English lettering, song title, hook,
+      year, badge, logo, watermark or signature. Do not ask the image model to draw writing.
+      The thumbnail_text field is retained only as metadata and for the existing video overlay;
+      it is never rendered on the thumbnail or sent to the image model.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
     The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
     Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.
