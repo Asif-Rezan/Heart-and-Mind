@@ -224,6 +224,31 @@ class SongGenerationTests(unittest.TestCase):
             self.assertEqual(resumed['song_date'], '2026-10-28')
             self.assertEqual(resumed['prompt'], first['prompt'])
 
+    def test_manual_female_choice_does_not_change_daily_rotation(self):
+        from pipeline import vocal_gender_for_day
+        with patch('lyrics_cpu.request_story', side_effect=[response(CORE),
+                response({'lyrics': CORE['lyrics']}), response(PACKAGE)]):
+            song = make_song('2026-10-28', [], vocal_gender_override='female')
+        self.assertEqual(song['vocal_gender'], 'female')
+        self.assertIn('Solo female lead vocal', song['prompt'])
+        self.assertEqual(vocal_gender_for_day('2026-10-28'), 'male')
+        self.assertEqual(vocal_gender_for_day('2026-10-29'), 'female')
+
+    def test_override_refuses_to_relabel_saved_male_song(self):
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            draft.write_text(json.dumps(dict(CORE, vocal_gender='male', song_date='2026-10-28')))
+            with patch('lyrics_cpu.request_story') as request:
+                with self.assertRaisesRegex(ValueError, 'new run ID'):
+                    make_song('2026-10-28', [], draft, vocal_gender_override='female')
+            request.assert_not_called()
+
+    def test_invalid_voice_override_stops_before_generation(self):
+        with patch('lyrics_cpu.request_story') as request:
+            with self.assertRaises(ValueError):
+                make_song('2026-10-28', [], vocal_gender_override='unknown')
+        request.assert_not_called()
+
     def test_retry_reports_field_and_constraint_without_quoting_generated_content(self):
         import lyrics_cpu
         from unittest.mock import Mock

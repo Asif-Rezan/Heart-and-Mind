@@ -18,7 +18,7 @@ class PreparationHistoryTests(unittest.TestCase):
             root = Path(temp)/'output'/'new-run'
             root.mkdir(parents=True)
             (root/'song.json').write_text(json.dumps(dict(CORE, **PACKAGE)))
-            def generate(day, seen, draft, generation_id):
+            def generate(day, seen, draft, generation_id, vocal_gender_override='auto'):
                 store.load.assert_called_once_with('history.json', [])
                 self.assertEqual(seen, history[:1])
                 self.assertEqual(json.loads(draft.read_text())['lyrics'], CORE['lyrics'])

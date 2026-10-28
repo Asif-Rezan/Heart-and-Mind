@@ -11,7 +11,9 @@ from music_cpu import generate
 import os
 
 
-def prepare(run_id, stage='all', check_history=False):
+def prepare(run_id, stage='all', check_history=False, vocal_gender='auto'):
+    if vocal_gender not in ('auto', 'male', 'female'):
+        raise ValueError('Vocal choice must be auto, male or female')
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', run_id):
         raise ValueError('Invalid run ID')
     root = Path('output')/run_id
@@ -39,8 +41,10 @@ def prepare(run_id, stage='all', check_history=False):
     if (root/'song.json').exists():
         song = validate_song(json.loads((root/'song.json').read_text()))
     else:
-        song = make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id)
+        song = make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
         (root/'song.json').write_text(json.dumps(song, ensure_ascii=False, indent=2))
+    if vocal_gender != 'auto' and song.get('vocal_gender') != vocal_gender:
+        raise ValueError('Saved song voice differs from the request; use a new run ID')
     if stage == 'lyrics':
         print(json.dumps({'phase':'lyrics ready', 'run_id':run_id}), flush=True)
         return
@@ -80,9 +84,10 @@ if __name__ == '__main__':
     parser.add_argument('--stage', choices=['all', 'lyrics', 'music', 'images', 'render'], default='all')
     parser.add_argument('--check-history', action='store_true',
                         help='Verify title and lyrics against Drive publication history before costly stages')
+    parser.add_argument('--vocal-gender', choices=['auto', 'male', 'female'], default='auto')
     args = parser.parse_args()
     try:
-        prepare(args.run_id, args.stage, check_history=args.check_history)
+        prepare(args.run_id, args.stage, check_history=args.check_history, vocal_gender=args.vocal_gender)
     except Exception as error:
         print(pipeline_failure_message(error), flush=True)
         raise SystemExit(1)
