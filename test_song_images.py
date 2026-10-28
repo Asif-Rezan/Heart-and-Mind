@@ -33,13 +33,22 @@ class SongImageTests(unittest.TestCase):
         self.assertIn('exactly one adult couple', plans[1]['prompt'])
         self.assertIn('two large well-lit faces on left', plans[1]['prompt'])
         for plan in plans:
-            self.assertLessEqual(len(plan['prompt'].split()), 70)
+            self.assertLessEqual(len(plan['prompt'].split()), 82)
             self.assertIn('courtyard lamp', plan['prompt'])
             self.assertIn('fully clothed adults', plan['prompt'])
             self.assertNotIn('Hopeful Hindi folk pop', plan['prompt'])
 
+    def test_only_thumbnail_requests_integrated_model_lettering(self):
+        background, thumbnail = image_plan(dict(SONG, thumbnail_text='NAI SUBAH'))
+        self.assertFalse(background['allow_text'])
+        self.assertTrue(thumbnail['allow_text'])
+        self.assertIn('Title "NAI SUBAH"', thumbnail['prompt'])
+        self.assertNotIn('no lettering', thumbnail['prompt'])
+        self.assertIn('clear of faces', thumbnail['prompt'])
+        self.assertNotIn('2026', thumbnail['prompt'])
+
     def test_checkpoint_reuses_only_matching_song_and_prompt(self):
-        def generate(prompt, target, seed):
+        def generate(prompt, target, seed, allow_text=False):
             Image.new('RGB', (256, 256), 'navy').save(target)
         with tempfile.TemporaryDirectory() as temp, patch('image_cpu.generate', side_effect=generate) as worker:
             root = Path(temp)
@@ -53,7 +62,7 @@ class SongImageTests(unittest.TestCase):
             self.assertEqual(worker.call_count, 5)
 
     def test_partial_failure_keeps_first_image_for_retry(self):
-        def generate(prompt, target, seed):
+        def generate(prompt, target, seed, allow_text=False):
             if 'thumbnail' in str(target):
                 raise RuntimeError('interrupted')
             Image.new('RGB', (256, 256), 'navy').save(target)
@@ -74,6 +83,22 @@ class SongImageTests(unittest.TestCase):
                 image_cpu.generate('Adult couple walking in a park', path, seed=123)
             self.assertEqual(worker.call_count, 10)
             self.assertFalse(path.exists())
+
+    def test_text_is_allowed_only_for_complete_thumbnail_generation(self):
+        worker = Mock(return_value=types.SimpleNamespace(nsfw_content_detected=[False], images=[Image.new('RGB', (256, 256))]))
+        torch = types.SimpleNamespace(set_num_threads=Mock(), Generator=Mock())
+        diffusers = types.SimpleNamespace(DiffusionPipeline=Mock(), DPMSolverMultistepScheduler=Mock())
+        with tempfile.TemporaryDirectory() as temp, patch.object(image_cpu, '_pipeline', worker), patch.dict('sys.modules', {'torch': torch, 'diffusers': diffusers}):
+            for allow in (False, True):
+                image_cpu.generate('Poster title TERE SAATH', Path(temp)/f'{allow}.png', seed=3, allow_text=allow)
+                negative = worker.call_args.kwargs['negative_prompt']
+                self.assertEqual('text, letters,' in negative, not allow)
+                self.assertIn('watermark', negative)
+
+    def test_hook_year_is_not_passed_to_thumbnail_model(self):
+        plan = image_plan(dict(SONG, thumbnail_text='TERE SAATH 2026'))[1]
+        self.assertIn('Title "TERE SAATH"', plan['prompt'])
+        self.assertNotIn('2026', plan['prompt'])
 
     def test_metadata_tags_are_unique_and_fit_upload_limit(self):
         tags = metadata_tags(SONG)

@@ -4,7 +4,7 @@ The SSD-1B image job supplies a separate background and thumbnail source.
 """
 from pathlib import Path
 import re
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps, features
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 ASSETS = Path(__file__).resolve().parent / 'assets' / 'artwork'
 MOODS = {
@@ -41,30 +41,11 @@ def font(size):
 
 def hook_text(song, mood):
     hook = song.get('thumbnail_text', '').strip().upper()
+    hook = ' '.join(re.sub(r'\b20\d{2}\b', '', hook).split())
     if (not re.fullmatch(r'[A-Z0-9 !?]{3,26}', hook) or
             not 2 <= len(hook.split()) <= 4 or 'HEART' in hook or 'MIND' in hook):
         return MOODS[mood][2]
     return hook
-
-
-def draw_hook(image, hook, accent):
-    draw = ImageDraw.Draw(image)
-    words = hook.split()
-    # At most three large lines; keep the people on the right unobstructed.
-    candidates = [[hook]]
-    candidates += [[' '.join(words[:i]), ' '.join(words[i:])] for i in range(1, len(words))]
-    if len(words) >= 3:
-        candidates.append([' '.join(words[:-2]), words[-2], words[-1]])
-    for size in range(112, 43, -2):
-        face = font(size)
-        fitting = [lines for lines in candidates if all(draw.textbbox((0, 0), line, font=face)[2] <= 570 for line in lines)]
-        if fitting:
-            lines = min(fitting, key=lambda lines: max(len(line) for line in lines) - min(len(line) for line in lines))
-            break
-    y = 275 - (len(lines)-1)*size//3
-    for line in lines:
-        draw.text((62, y), line, font=face, fill=accent, stroke_width=3, stroke_fill='#11151f')
-        y += int(size*1.12)
 
 
 def brighten_scene(image):
@@ -86,93 +67,9 @@ def poster_finish(image):
     return ImageEnhance.Contrast(image).enhance(1.04)
 
 
-def portrait_boxes(image):
-    """Detect faces locally before placing text; no image leaves the runner."""
-    import cv2
-    import numpy as np
-    cv2.setNumThreads(1)
-    image = image.convert('RGB')
-    detector = cv2.FaceDetectorYN.create(str(ASSETS/'face-detector.onnx'), '',
-        (image.width, image.height), score_threshold=0.7)
-    _, faces = detector.detect(cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR))
-    boxes = []
-    for face in ([] if faces is None else faces):
-        x, y, width, height = map(float, face[:4])
-        margin = width*.12
-        boxes.append((x-margin, y-margin, x+width+margin, y+height+margin))
-    return boxes
-
-
-def title_position(width, height, faces):
-    """Prefer the reference's right-side title, but never intersect detected faces."""
-    candidates = [(720, 100), (720, 720-height-32), (36, 100), (36, 720-height-32)]
-    for x, y in candidates:
-        if y < 24:
-            continue
-        if not any(x < right and x+width > left and y < bottom and y+height > top
-                   for left, top, right, bottom in faces):
-            return x, y
-    return None
-
-
-def poster_font(size, hindi):
-    if not hindi:
-        return font(size)
-    face = ImageFont.truetype(str(ASSETS/'NotoSerifDevanagari.ttf'), size)
-    face.set_variation_by_axes([800, 100])
-    return face
-
-
 def poster_thumbnail(source, song, mood):
-    # Full-bleed photograph, with only a translucent shadow for title legibility.
-    image = ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
-    faces = portrait_boxes(image)
-    image = brighten_scene(image).convert('RGBA')
-    overlay = Image.new('RGBA', image.size)
-    draw = ImageDraw.Draw(overlay)
-    for x in range(570, 1280):
-        alpha = int(45 * min(1, (x-570)/350))
-        draw.line((x, 0, x, 720), fill=(0, 0, 0, alpha))
-    image = Image.alpha_composite(image, overlay).convert('RGB')
-    title = re.sub(r'\b20\d{2}\b', '', song['title'].split('|')[0]).strip()
-    hindi = bool(re.search(r'[\u0900-\u097f]', title)) and features.check_feature('raqm')
-    if not hindi:
-        title = hook_text(song, mood).title()
-    draw = ImageDraw.Draw(image)
-    for size in range(102, 35, -2):
-        face = poster_font(size, hindi)
-        lines, line = [], ''
-        for word in title.split():
-            candidate = (line + ' ' + word).strip()
-            if line and draw.textlength(candidate, font=face) > 510:
-                lines.append(line)
-                line = word
-            else:
-                line = candidate
-        if line: lines.append(line)
-        line_height = int(size*1.45)
-        position = title_position(540, len(lines)*line_height+30, faces)
-        if len(lines) <= 3 and all(draw.textlength(line, font=face) <= 510 for line in lines) and position:
-            break
-    if not position:
-        raise RuntimeError('No face-free title area; regenerate thumbnail framing before publishing')
-    x, y = position
-    for index, line in enumerate(lines):
-        # A short red brush ribbon supports each line, without hiding the whole setting.
-        width = min(522, int(draw.textlength(line, font=face)) + 22)
-        bounds = draw.textbbox((x, y), line, font=face)
-        top, bottom = bounds[1]-6, bounds[3]+8
-        brush = Image.new('RGBA', image.size)
-        paint = ImageDraw.Draw(brush)
-        paint.polygon([(x-16, top+7), (x-2+width, top), (x-10+width, bottom-4),
-                       (x-20, bottom), (x-7, bottom-12)], fill=(145, 13, 31, 205))
-        image = Image.alpha_composite(image.convert('RGBA'), brush).convert('RGB')
-        draw = ImageDraw.Draw(image)
-        draw.text((x+4, y+5), line, font=face, fill='#28110d', stroke_width=4, stroke_fill='#28110d')
-        draw.text((x, y), line, font=face, fill=('#ffdf24' if index % 2 == 0 else '#ffffff'),
-                  stroke_width=3, stroke_fill='#251010')
-        y += line_height
-    return poster_finish(image)
+    """Export the model's complete poster, without drawing text or other overlays."""
+    return ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
 
 
 def create_artwork(root, song):

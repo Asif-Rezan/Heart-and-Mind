@@ -304,7 +304,7 @@ def make_song(day, history, draft_path=None, generation_id=None):
       For romance show exactly ONE adult couple, only TWO people; for healing or solo heartbreak
       use ONE adult lead, with no extras. Close chest-up poster portraits, the faces
       large on the LEFT half, continuous setting across the FULL frame.
-      Keep the right side scenic and colorful for an overlaid title, never a blank panel.
+      Keep the right side scenic and colorful for integrated poster typography, never a blank panel.
       Vibrant contemporary romantic album-poster photography, bright golden frontal key light,
       glowing skin midtones, crisp expressive eyes, gentle fill shadows; no silhouettes or backlighting,
       rich ruby, emerald and cobalt color accents, natural skin, colorful traditional clothing
@@ -314,7 +314,9 @@ def make_song(day, history, draft_path=None, generation_id=None):
       Must read as a single emotional moment at small phone size: no tiny full-body people,
       busy scenery, collage, split screen, arrows, badges, model text, logos or watermarks.
       Do not put the song title, release year, genre badge or hook into the image prompt;
-      only the short song title is added separately. No borders inside the scene or inset photo.
+      the final image-generation prompt supplies the exact short hook for the model to render.
+      The model creates the entire poster including lettering; there is no later text overlay.
+      No borders inside the scene or inset photo.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
     The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
     Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.

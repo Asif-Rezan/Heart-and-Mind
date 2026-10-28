@@ -8,6 +8,3 @@ google-auth-oauthlib>=1.2,<2
 
 cryptography>=44,<47
 jsonschema>=4.23,<5
-
-# Local face detection for unobstructed artwork titles.
-opencv-python-headless==4.11.0.86

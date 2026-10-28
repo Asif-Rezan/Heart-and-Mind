@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from PIL import Image, ImageChops
-from artwork import title_position, brighten_scene, create_artwork, poster_finish, poster_thumbnail
+from artwork import brighten_scene, create_artwork, poster_finish, poster_thumbnail
 from demo_artwork import SONG
 
 
@@ -68,13 +68,10 @@ class PosterArtworkTests(unittest.TestCase):
         self.assertGreater(green, blue)
         self.assertGreater(green, 40)
 
-    def test_title_moves_below_a_right_hand_face(self):
-        faces = [(740, 60, 1230, 470)]
-        position = title_position(540, 160, faces)
-        self.assertEqual(position, (720, 528))
-        x, y = position
-        self.assertTrue(all(y >= bottom or y+160 <= top or x >= right or x+540 <= left
-                            for left, top, right, bottom in faces))
-
-    def test_title_placement_refuses_a_frame_with_no_free_area(self):
-        self.assertIsNone(title_position(540, 300, [(0, 0, 1280, 720)]))
+    def test_complete_generated_poster_is_exported_without_overlays(self):
+        from unittest.mock import patch
+        source = Image.new('RGB', (1280, 720), '#e17a35')
+        with patch('artwork.ImageDraw.ImageDraw.text', autospec=True) as draw_text:
+            output = poster_thumbnail(source, SONG, 'romance')
+        draw_text.assert_not_called()
+        self.assertIsNone(ImageChops.difference(source, output).getbbox())

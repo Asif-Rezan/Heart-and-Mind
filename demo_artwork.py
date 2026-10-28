@@ -31,7 +31,7 @@ def main():
     else:
         from image_cpu import generate
         plan = next(plan for plan in image_plan(SONG) if plan['kind'] == args.kind)
-        generate(plan['prompt'], args.output/f'{args.kind}-source.png', seed=plan['seed'])
+        generate(plan['prompt'], args.output/f'{args.kind}-source.png', seed=plan['seed'], allow_text=plan['allow_text'])
         (args.output/f'{args.kind}-plan.json').write_text(json.dumps(plan, indent=2))
 
 
