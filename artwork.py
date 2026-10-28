@@ -86,9 +86,47 @@ def poster_finish(image):
     return ImageEnhance.Contrast(image).enhance(1.04)
 
 
+def portrait_boxes(image):
+    """Detect faces locally before placing text; no image leaves the runner."""
+    import cv2
+    import numpy as np
+    cv2.setNumThreads(1)
+    image = image.convert('RGB')
+    detector = cv2.FaceDetectorYN.create(str(ASSETS/'face-detector.onnx'), '',
+        (image.width, image.height), score_threshold=0.7)
+    _, faces = detector.detect(cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR))
+    boxes = []
+    for face in ([] if faces is None else faces):
+        x, y, width, height = map(float, face[:4])
+        margin = width*.12
+        boxes.append((x-margin, y-margin, x+width+margin, y+height+margin))
+    return boxes
+
+
+def title_position(width, height, faces):
+    """Prefer the reference's right-side title, but never intersect detected faces."""
+    candidates = [(720, 100), (720, 720-height-32), (36, 100), (36, 720-height-32)]
+    for x, y in candidates:
+        if y < 24:
+            continue
+        if not any(x < right and x+width > left and y < bottom and y+height > top
+                   for left, top, right, bottom in faces):
+            return x, y
+    return None
+
+
+def poster_font(size, hindi):
+    if not hindi:
+        return font(size)
+    face = ImageFont.truetype(str(ASSETS/'NotoSerifDevanagari.ttf'), size)
+    face.set_variation_by_axes([800, 100])
+    return face
+
+
 def poster_thumbnail(source, song, mood):
     # Full-bleed photograph, with only a translucent shadow for title legibility.
     image = ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
+    faces = portrait_boxes(image)
     image = brighten_scene(image).convert('RGBA')
     overlay = Image.new('RGBA', image.size)
     draw = ImageDraw.Draw(overlay)
@@ -102,7 +140,7 @@ def poster_thumbnail(source, song, mood):
         title = hook_text(song, mood).title()
     draw = ImageDraw.Draw(image)
     for size in range(102, 35, -2):
-        face = ImageFont.truetype(str(ASSETS/'NotoSerifDevanagari.ttf'), size) if hindi else font(size)
+        face = poster_font(size, hindi)
         lines, line = [], ''
         for word in title.split():
             candidate = (line + ' ' + word).strip()
@@ -112,22 +150,26 @@ def poster_thumbnail(source, song, mood):
             else:
                 line = candidate
         if line: lines.append(line)
-        if len(lines) <= 3 and all(draw.textlength(line, font=face) <= 510 for line in lines):
+        line_height = int(size*1.45)
+        position = title_position(540, len(lines)*line_height+30, faces)
+        if len(lines) <= 3 and all(draw.textlength(line, font=face) <= 510 for line in lines) and position:
             break
-    line_height = int(size*1.45)
-    y = 280 - len(lines)*line_height//2
+    if not position:
+        raise RuntimeError('No face-free title area; regenerate thumbnail framing before publishing')
+    x, y = position
     for index, line in enumerate(lines):
         # A short red brush ribbon supports each line, without hiding the whole setting.
         width = min(522, int(draw.textlength(line, font=face)) + 22)
-        bounds = draw.textbbox((720, y), line, font=face)
+        bounds = draw.textbbox((x, y), line, font=face)
         top, bottom = bounds[1]-6, bounds[3]+8
         brush = Image.new('RGBA', image.size)
         paint = ImageDraw.Draw(brush)
-        paint.polygon([(704, top+7), (718+width, top), (710+width, bottom-4),
-                       (700, bottom), (713, bottom-12)], fill=(145, 13, 31, 205))
+        paint.polygon([(x-16, top+7), (x-2+width, top), (x-10+width, bottom-4),
+                       (x-20, bottom), (x-7, bottom-12)], fill=(145, 13, 31, 205))
         image = Image.alpha_composite(image.convert('RGBA'), brush).convert('RGB')
         draw = ImageDraw.Draw(image)
-        draw.text((720, y), line, font=face, fill=('#ffdf24' if index % 2 == 0 else '#ffffff'),
+        draw.text((x+4, y+5), line, font=face, fill='#28110d', stroke_width=4, stroke_fill='#28110d')
+        draw.text((x, y), line, font=face, fill=('#ffdf24' if index % 2 == 0 else '#ffffff'),
                   stroke_width=3, stroke_fill='#251010')
         y += line_height
     return poster_finish(image)
