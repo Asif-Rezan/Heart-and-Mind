@@ -106,9 +106,11 @@ def vocal_gender_for_day(day):
     return ('male', 'female')[(dt.date.fromisoformat(day)-anchor).days % 2]
 
 
-def make_song(day, history, draft_path=None, generation_id=None):
+def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_override='auto'):
     mood, genre, story, arrangement, hook = song_profile(day)
-    vocal_gender = vocal_gender_for_day(day)
+    if vocal_gender_override not in ('auto', 'male', 'female'):
+        raise ValueError('Vocal choice must be auto, male or female')
+    vocal_gender = (vocal_gender_for_day(day) if vocal_gender_override == 'auto' else vocal_gender_override)
     opposite_gender = 'female' if vocal_gender == 'male' else 'male'
     search_term = {'romance': 'Hindi Romantic Song', 'heartbreak': 'Hindi Sad Song',
                    'healing': 'Heart Touching Hindi Song'}[mood]
@@ -203,6 +205,8 @@ def make_song(day, history, draft_path=None, generation_id=None):
     if not fresh_core:
         song = json.loads(draft_path.read_text())
         Draft202012Validator(core_schema).validate(song)
+        if vocal_gender_override != 'auto' and song.get('vocal_gender') != vocal_gender_override:
+            raise ValueError('Saved song voice differs from the request; use a new run ID')
     else:
         song = request(prompt, generation_schema, 6000)
         song['prompt'] = production_prompt

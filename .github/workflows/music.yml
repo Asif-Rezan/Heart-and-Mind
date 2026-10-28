@@ -6,6 +6,15 @@ on:
         description: Stable run ID; reuse it to resume an interrupted song
         required: true
         type: string
+      vocal_gender:
+        description: Voice for a NEW song only; auto follows the daily male/female rotation
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - male
+          - female
       prepared_run:
         description: Optional previous GitHub run ID containing saved lyrics or music
         required: false
@@ -32,6 +41,7 @@ jobs:
       HF_HUB_DISABLE_XET: '1'
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
       REQUESTED_RUN_ID: ${{ inputs.run_id }}
+      REQUESTED_VOCAL_GENDER: ${{ inputs.vocal_gender || 'auto' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,7 +97,7 @@ jobs:
           SONG_RUN_ID: ${{ steps.identity.outputs.run_id }}
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-        run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage lyrics --check-history
+        run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage lyrics --check-history --vocal-gender "$REQUESTED_VOCAL_GENDER"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
