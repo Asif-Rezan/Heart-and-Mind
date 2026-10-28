@@ -188,6 +188,42 @@ class SongGenerationTests(unittest.TestCase):
             request.assert_called_once()
             self.assertEqual(song['lyrics'], CORE['lyrics'])
 
+    def test_daily_voice_alternates_across_month_year_and_leap_boundaries(self):
+        import datetime as dt
+        from pipeline import vocal_gender_for_day
+        self.assertEqual(vocal_gender_for_day('2026-10-28'), 'male')
+        self.assertEqual(vocal_gender_for_day('2026-10-29'), 'female')
+        for start in ('2026-10-28', '2026-12-30', '2028-02-27'):
+            day = dt.date.fromisoformat(start)
+            voices = [vocal_gender_for_day((day+dt.timedelta(days=i)).isoformat()) for i in range(6)]
+            self.assertTrue(all(a != b for a, b in zip(voices, voices[1:])))
+
+    def test_new_songs_guide_voice_in_caption_lyrics_and_editor(self):
+        for day, gender, other in [('2026-10-28', 'male', 'female'), ('2026-10-29', 'female', 'male')]:
+            with patch('lyrics_cpu.request_story', side_effect=[response(CORE),
+                    response({'lyrics': CORE['lyrics']}), response(PACKAGE)]) as request:
+                song = make_song(day, [], generation_id='daily-'+day)
+            self.assertEqual(song['vocal_gender'], gender)
+            self.assertEqual(song['song_date'], day)
+            self.assertIn(f'Solo {gender} lead vocal', song['prompt'])
+            self.assertIn(f'no {other} singer or duet', song['prompt'])
+            self.assertLessEqual(len(song['prompt']), 600)
+            self.assertIn(f'solo {gender} singer', request.call_args_list[0].args[1]['messages'][-1]['content'])
+            self.assertIn(f'solo {gender} singer', request.call_args_list[1].args[1]['messages'][-1]['content'])
+
+    def test_cross_midnight_resume_keeps_saved_voice_and_date(self):
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            with patch('lyrics_cpu.request_story', side_effect=[response(CORE),
+                    response({'lyrics': CORE['lyrics']}), response(PACKAGE)]):
+                first = make_song('2026-10-28', [], draft, generation_id='stable-song')
+            with patch('lyrics_cpu.request_story', return_value=response(PACKAGE)) as request:
+                resumed = make_song('2026-10-29', [], draft, generation_id='stable-song')
+            request.assert_called_once()
+            self.assertEqual(resumed['vocal_gender'], 'male')
+            self.assertEqual(resumed['song_date'], '2026-10-28')
+            self.assertEqual(resumed['prompt'], first['prompt'])
+
     def test_retry_reports_field_and_constraint_without_quoting_generated_content(self):
         import lyrics_cpu
         from unittest.mock import Mock
