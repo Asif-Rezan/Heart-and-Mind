@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from PIL import Image
 from image_cpu import MODEL, REVISION
-from artwork import visual_mood
+from artwork import visual_mood, hook_text
 
 
 def image_plan(song):
@@ -19,20 +19,24 @@ def image_plan(song):
     plans = []
     for kind, field in (('background', 'background_prompt'), ('thumbnail', 'thumbnail_prompt')):
         scene = song.get(field) or defaults[mood]
-        # Keep long saved scene prose from pushing framing beyond encoder limits.
-        scene = ' '.join(scene.split()[:26]).rstrip(',.;')
-        composition = ('1990s black-and-white romantic film still, couple on right, visible faces, open left'
-                       if kind == 'background' else
-                       '1990s black-and-white film photo, couple together in left third, continuous scenic background on right')
-        # Put framing first: previously it was appended after long scene paragraphs.
-        prompt = composition + '. ' + scene + '. Fully clothed adults, soft silver-gelatin light, film grain, no lettering.'
+        # Keep exact lettering and layout ahead of scenic detail in the encoder.
+        scene = ' '.join(scene.split()[:18 if kind == 'thumbnail' else 26]).rstrip(',.;')
+        if kind == 'thumbnail':
+            portrait = ('exactly one adult couple, two large well-lit faces on left' if mood == 'romance'
+                        else 'one adult lead, large well-lit face on left')
+            prompt = ('Vibrant colorful romantic album poster. Title "' + hook_text(song, mood) +
+                '", bold yellow-white lettering on red brush, right side, clear of faces. ' +
+                portrait + '. ' + scene + '. Golden light, fully clothed adults, full-frame scenery.')
+        else:
+            prompt = ('Bright colorful romantic music still, medium portrait on right, clearly lit faces. ' +
+                scene + '. Golden face light, vivid blue backdrop, rich colors, fully clothed adults, no lettering.')
         # Seed depends on the song and purpose; never the same fixed seed for every upload.
         seed = int(hashlib.sha256((identity + kind).encode()).hexdigest()[:8], 16)
         plans.append(dict(kind=kind, prompt=prompt,
                           seed=seed, model=MODEL, revision=REVISION,
                           width=int(os.getenv('CPU_IMAGE_WIDTH', '1024')),
                           height=int(os.getenv('CPU_IMAGE_HEIGHT', '576')),
-                          steps=int(os.getenv('CPU_IMAGE_STEPS', '16'))))
+                          steps=int(os.getenv('CPU_IMAGE_STEPS', '16')), allow_text=(kind == 'thumbnail')))
     return plans
 
 
@@ -55,7 +59,7 @@ def generate_song_images(root, song):
                 pass
         if not valid:
             temporary = target.with_suffix('.tmp.png')
-            generate(plan['prompt'], temporary, seed=plan['seed'])
+            generate(plan['prompt'], temporary, seed=plan['seed'], allow_text=plan['allow_text'])
             with Image.open(temporary) as image:
                 image.verify()
             temporary.replace(target)

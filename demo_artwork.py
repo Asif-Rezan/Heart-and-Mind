@@ -14,8 +14,8 @@ SONG = {
     'duration': 195,
     'visual_mood': 'romance',
     'thumbnail_text': 'TERE SAATH',
-    'background_prompt': 'Adult South Asian couple meeting in a moonlit old bookshop, exchanging tender smiles beside wooden shelves, glowing lantern, tall arched window, nostalgic quiet romance.',
-    'thumbnail_prompt': 'Two original South Asian adults embracing together at far left, woman resting against partner, antique bookshop extending across frame, moonlit arched window and lantern at right.',
+    'background_prompt': 'Adult South Asian couple meeting in a moonlit old bookshop, exchanging tender smiles beside wooden shelves, golden lantern light, cobalt moonlit window, colorful clothing, warm romance.',
+    'thumbnail_prompt': 'Two original South Asian adults embracing together at far left, woman resting against partner, colorful bookshop across frame, cobalt moonlight, warm lantern glow, ruby and emerald clothing.',
 }
 
 
@@ -31,7 +31,7 @@ def main():
     else:
         from image_cpu import generate
         plan = next(plan for plan in image_plan(SONG) if plan['kind'] == args.kind)
-        generate(plan['prompt'], args.output/f'{args.kind}-source.png', seed=plan['seed'])
+        generate(plan['prompt'], args.output/f'{args.kind}-source.png', seed=plan['seed'], allow_text=plan['allow_text'])
         (args.output/f'{args.kind}-plan.json').write_text(json.dumps(plan, indent=2))
 
 

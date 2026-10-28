@@ -293,7 +293,7 @@ def make_song(day, history, draft_path=None, generation_id=None):
       For healing: an adult moving toward warm light with a hopeful expression.
       Medium-wide framing: people large enough to recognize, on the right, with room on the left
       and lower edge for the existing song overlay. One setting, natural anatomy, realistic skin,
-      black-and-white 1990s film photography, soft silver-gelatin light. No collage, floating props or lettering.
+      bright colorful cinematic photography, warm golden frontal light, vivid blue and emerald setting, natural skin tones. No collage, floating props or lettering.
       Base the setting and action on an actual image in the lyrics, not a random luxury scene.
     thumbnail_prompt: a DIFFERENT 20-25 word English scene that sells THIS song's feeling.
       Start with the adult South Asian subject and ONE clear emotion: tender reunion,
@@ -301,15 +301,22 @@ def make_song(day, history, draft_path=None, generation_id=None):
       Show a chest-up portrait or close couple, faces large and sharp with readable eyes.
       For a couple, use one lead face and one supporting face, natural eye contact or distance
       that communicates the relationship. No exaggerated crying or unrelated shock expressions.
-      Both faces together in the LEFT third, continuous detailed setting across the FULL frame.
-      Keep the right side atmospheric and softly lit for an overlaid title, never a blank panel. Black-and-white
-      1990s romantic film-poster photography, soft luminous facial light, deep shadows,
-      subtle film grain, period-appropriate simple clothing and a softly blurred setting.
+      For romance show exactly ONE adult couple, only TWO people; for healing or solo heartbreak
+      use ONE adult lead, with no extras. Close chest-up poster portraits, the faces
+      large on the LEFT half, continuous setting across the FULL frame.
+      Keep the right side scenic and colorful for integrated poster typography, never a blank panel.
+      Vibrant contemporary romantic album-poster photography, bright golden frontal key light,
+      glowing skin midtones, crisp expressive eyes, gentle fill shadows; no silhouettes or backlighting,
+      rich ruby, emerald and cobalt color accents, natural skin, colorful traditional clothing
+      where appropriate, a softly blurred scenic setting and warm lanterns or soft moonlight.
+      No monochrome, sepia, distressed border, film grain or faded vintage treatment.
       Use original fictional adult faces; do not imitate actors or existing film posters.
       Must read as a single emotional moment at small phone size: no tiny full-body people,
       busy scenery, collage, split screen, arrows, badges, model text, logos or watermarks.
       Do not put the song title, release year, genre badge or hook into the image prompt;
-      only the short song title is added separately. No borders inside the scene or inset photo.
+      the final image-generation prompt supplies the exact short hook for the model to render.
+      The model creates the entire poster including lettering; there is no later text overlay.
+      No borders inside the scene or inset photo.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
     The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
     Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.

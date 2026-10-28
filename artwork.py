@@ -4,7 +4,7 @@ The SSD-1B image job supplies a separate background and thumbnail source.
 """
 from pathlib import Path
 import re
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps, features
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 ASSETS = Path(__file__).resolve().parent / 'assets' / 'artwork'
 MOODS = {
@@ -41,88 +41,35 @@ def font(size):
 
 def hook_text(song, mood):
     hook = song.get('thumbnail_text', '').strip().upper()
+    hook = ' '.join(re.sub(r'\b20\d{2}\b', '', hook).split())
     if (not re.fullmatch(r'[A-Z0-9 !?]{3,26}', hook) or
             not 2 <= len(hook.split()) <= 4 or 'HEART' in hook or 'MIND' in hook):
         return MOODS[mood][2]
     return hook
 
 
-def draw_hook(image, hook, accent):
-    draw = ImageDraw.Draw(image)
-    words = hook.split()
-    # At most three large lines; keep the people on the right unobstructed.
-    candidates = [[hook]]
-    candidates += [[' '.join(words[:i]), ' '.join(words[i:])] for i in range(1, len(words))]
-    if len(words) >= 3:
-        candidates.append([' '.join(words[:-2]), words[-2], words[-1]])
-    for size in range(112, 43, -2):
-        face = font(size)
-        fitting = [lines for lines in candidates if all(draw.textbbox((0, 0), line, font=face)[2] <= 570 for line in lines)]
-        if fitting:
-            lines = min(fitting, key=lambda lines: max(len(line) for line in lines) - min(len(line) for line in lines))
-            break
-    y = 275 - (len(lines)-1)*size//3
-    for line in lines:
-        draw.text((62, y), line, font=face, fill=accent, stroke_width=3, stroke_fill='#11151f')
-        y += int(size*1.12)
-
-
-def vintage_finish(image):
-    """Reproducible silver-gelatin tones and a lightly worn photographic border."""
+def brighten_scene(image):
+    """Lift dark photographic midtones while preserving black and white endpoints."""
+    import math
     import numpy as np
-    gray = ImageEnhance.Contrast(ImageOps.grayscale(image)).enhance(1.16)
-    rng = np.random.default_rng(1994)
-    pixels = np.asarray(gray, dtype=np.float32)
-    pixels = np.clip(pixels + rng.normal(0, 2.2, pixels.shape), 0, 255).astype('uint8')
-    image = Image.fromarray(pixels).convert('RGB')
-    draw = ImageDraw.Draw(image)
-    width, height = image.size
-    draw.rectangle((3, 3, width-4, height-4), outline='#d8d8d8', width=2)
-    for _ in range(650):
-        x, y = int(rng.integers(0, width)), int(rng.integers(0, height))
-        edge = int(rng.integers(0, 4))
-        if edge == 0: y = int(rng.integers(0, 9))
-        elif edge == 1: y = height-1-int(rng.integers(0, 9))
-        elif edge == 2: x = int(rng.integers(0, 9))
-        else: x = width-1-int(rng.integers(0, 9))
-        draw.line((x, y, min(width-1, x+int(rng.integers(1, 14))), y), fill='#dddddd', width=1)
-    return image
+    color = image.convert('RGB')
+    median = float(np.median(np.asarray(ImageOps.grayscale(color))))
+    if 0 < median < 120:
+        gamma = max(0.55, min(1.0, math.log(120/255) / math.log(median/255)))
+        lut = [round(255*(value/255)**gamma) for value in range(256)]
+        color = color.point(lut * 3)
+    return color
 
 
-def vintage_thumbnail(source, song, mood):
-    # Full-bleed photograph, with only a translucent shadow for title legibility.
-    image = ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
-    image = ImageOps.grayscale(image).convert('RGBA')
-    overlay = Image.new('RGBA', image.size)
-    draw = ImageDraw.Draw(overlay)
-    for x in range(570, 1280):
-        alpha = int(100 * min(1, (x-570)/350))
-        draw.line((x, 0, x, 720), fill=(0, 0, 0, alpha))
-    image = Image.alpha_composite(image, overlay).convert('RGB')
-    title = re.sub(r'\b20\d{2}\b', '', song['title'].split('|')[0]).strip()
-    hindi = bool(re.search(r'[\u0900-\u097f]', title)) and features.check_feature('raqm')
-    if not hindi:
-        title = hook_text(song, mood).title()
-    draw = ImageDraw.Draw(image)
-    for size in range(102, 35, -2):
-        face = ImageFont.truetype(str(ASSETS/'NotoSerifDevanagari.ttf'), size) if hindi else font(size)
-        lines, line = [], ''
-        for word in title.split():
-            candidate = (line + ' ' + word).strip()
-            if line and draw.textlength(candidate, font=face) > 510:
-                lines.append(line)
-                line = word
-            else:
-                line = candidate
-        if line: lines.append(line)
-        if len(lines) <= 3 and all(draw.textlength(line, font=face) <= 510 for line in lines):
-            break
-    line_height = int(size*1.45)
-    y = 280 - len(lines)*line_height//2
-    for line in lines:
-        draw.text((720, y), line, font=face, fill='#f6f6f6', stroke_width=2, stroke_fill='#181818')
-        y += line_height
-    return vintage_finish(image)
+def poster_finish(image):
+    """Rich, clean album-poster color without grain, distress or monochrome conversion."""
+    image = ImageEnhance.Color(image.convert('RGB')).enhance(1.14)
+    return ImageEnhance.Contrast(image).enhance(1.04)
+
+
+def poster_thumbnail(source, song, mood):
+    """Export the model's complete poster, without drawing text or other overlays."""
+    return ImageOps.fit(source.convert('RGB'), (1280, 720), method=Image.Resampling.LANCZOS)
 
 
 def create_artwork(root, song):
@@ -134,22 +81,22 @@ def create_artwork(root, song):
         if not scene.exists():
             raise RuntimeError('Generated song artwork missing; run the images stage first')
         with Image.open(scene) as source:
-            base = ImageOps.fit(source.convert('RGB'), (1920, 1080), method=Image.Resampling.LANCZOS)
+            base = brighten_scene(ImageOps.fit(source.convert('RGB'), (1920, 1080), method=Image.Resampling.LANCZOS))
         overlay = Image.new('RGBA', base.size)
         gradient = ImageDraw.Draw(overlay)
         for x in range(base.width):
-            alpha = int(205 * max(0, 1-x/1450))
+            alpha = int(45 * max(0, 1-x/1450))
             gradient.line((x, 0, x, 1080), fill=(8, 12, 24, alpha))
         return Image.alpha_composite(base.convert('RGBA'), overlay).convert('RGB')
     base = compose('background')
-    cover = ImageEnhance.Brightness(base).enhance(.88)
+    cover = base
     draw = ImageDraw.Draw(cover)
     # Keep the video scene calm; waveform sits below the people, not across their faces.
     draw.text((92, 86), 'HEART & MIND', font=font(28), fill='#f0e9e2')
     draw.text((92, 825), hook_text(song, mood), font=font(64), fill=accent)
     draw.text((96, 918), label, font=font(24), fill='#ffffff')
-    cover = vintage_finish(cover)
+    cover = poster_finish(cover)
     cover.save(root/'cover.png')
     with Image.open(root/'thumbnail-source.png') as source:
-        thumb = vintage_thumbnail(source, song, mood)
+        thumb = poster_thumbnail(source, song, mood)
     thumb.save(root/'thumbnail.jpg', quality=92, optimize=True)
