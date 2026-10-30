@@ -49,6 +49,8 @@ Regression tests replay all six production word-count/speaker patterns using dei
 
 Chapter repair implementation commit: `c98f6bba30dffbd6e8482db59b329d3b7cfe26e9`. Recovery run [41081794480](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41081794480) was started on the new code with the saved daily identity. Four chapters passed; two failed because natural 15–17-word narration was rejected. The follow-up removes that per-scene quota and can recover saved valid responses without model calls. Full story/video/publication has not yet been verified.
 
+Follow-up fix `8e44ce7a2d0259659ac3d3cc5035271d59a03ca3` passed 110 local tests and workflow lint. Recovery run [41084457350](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41084457350) starts from `main` using checkpoints from `41081794480`, with the same story ID. Actual failed chapter 6 recovered locally without any model call (210 words); chapter 5 still needs targeted narration expansion to meet its whole-chapter budget. Publication remains unverified.
+
 Recover on the new main code using `run_id=story-2026-10-30` and `prepared_run=41075270533`. This reuses the saved outline, successful chapter and failed raw drafts. Re-running the old workflow itself would execute its old code.
 
 ## Visible Drive cleanup job
