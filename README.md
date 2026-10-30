@@ -49,6 +49,7 @@ For a local script preview without Google credentials, omit `--check-history`; p
 Saved before this change on **2026-10-30**:
 
 - Repository: `Asif-Rezan/Heart-and-Mind`.
+- Story migration commit: `97b158e6d61f811d97b048bfd1182e0dfff20944` (`Add daily 8-12 minute Hindi motivational stories to Heart and Mind`).
 - Full original commit: `0fca9240b5edf786f09a806401a62dcc386eb0f6`.
 - Commit: `Generate text-free cinematic couple thumbnails and richer song backgrounds`.
 - Backup branch: `codex/archive-heart-music-20261030`.

@@ -66,4 +66,3 @@ def publish(client, root, song, state, save, upload_thumbnail=True, metadata_kin
             return
         time.sleep(20)
     raise TimeoutError('HD processing pending; rerun same run ID')
-
