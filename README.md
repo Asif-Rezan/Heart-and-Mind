@@ -1,3 +1,107 @@
+# Heart and Mind — daily Hindi emotional motivational stories
+
+The active pipeline creates **one fresh original Hindi emotional motivational story each day**, with narration and short dramatic dialogue. Each final video must measure **8–12 minutes (480–720 seconds)**. This runs in **Asif-Rezan/Heart-and-Mind**, for the existing Heart and Mind channel `UCDTjTh7ORO2J_5OrR0dESTQ`.
+
+## Story generation, voices, music and pictures
+
+- Qwen3-4B CPU writes a complete original six-chapter Hindi Devanagari story, about 1,100–1,500 words across 48 scenes. Approximately 75% is narration; the remaining scenes contain short male/female dialogue. The conclusion demonstrates the lesson through a character's decision. Each new daily identity gets a new generation seed, and recent titles/plots guide variety. There is no fixed-story fallback.
+- **Kokoro-82M**, package `kokoro==0.9.4`, `lang_code='h'`, CPU: narrator `hm_omega`, male character `hm_psi`, female character `hf_alpha`. The runner installs `espeak-ng` for Hindi phonemization. Scene boundaries come from actual speech sample counts. If necessary the entire narration is re-synthesized at a modest native speed (0.80–1.15) to meet 8–12 minutes; it is never cut short, looped or padded with minutes of silence. Speech outside the measured range fails before upload. Pronunciation and emotional performance still need listening review.
+- **ACE-Step 1.5** `acestep-v15-turbo` generates a new quiet instrumental score, using the existing pinned CPU model/source revisions. Equal parts no longer than 120 seconds cover all measured speech. Requests specify instrumental/no singing/no speech; no nursery-rhyme reference audio is supplied. The bed is faded, mixed quietly and ducked under the narration. Short music output fails instead of looping or padding.
+- **Pictures follow the supplied kids-rhyme reference style**, rather than the old Heart and Mind romantic-song style. [Saved reference example](assets/reference/storybook-look.png), from the reference repository's existing generated artwork. `story_image_cpu.py` uses the same pinned `segmind/SSD-1B`, 1024×576 sources and 20 steps; prompts request cute colorful 3D storybook rendering, rounded shapes, expressive faces, bright pastels, soft lighting, detailed backgrounds and gentle depth of field. Human characters/settings match the Hindi story. Character appearance/clothes/world are repeated within the episode. This is text-guided consistency, not reference-image conditioning, face locking or lip-sync; identical faces cannot be guaranteed. The other repository is only a style reference and is not this pipeline's upload destination.
+- Eight CPU image shards produce 48 scene illustrations. The 1920×1080 video uses gentle pan/zoom with picture changes at the actual spoken scene boundaries. Its thumbnail comes from the opening illustration, without generated lettering. Both final audio and video must measure 480–720 seconds before a new upload is allowed.
+- Hindi story title, description and tags are used for each upload, with Education category 27, general audience (`made_for_kids=false`) and AI disclosure. An additional explicit channel guard rejects any destination other than the existing Heart and Mind ID before generation/publication. Existing Heart and Mind OAuth, private Drive folder checks and accounts are reused; no credentials are copied from another repository.
+- Story history/checkpoints use `stories/` keys in Heart and Mind's existing dedicated private folder, separate from old music records. Exact titles/scripts, close summary similarity and repeated scenes are checked against reserved, unfinished and published stories. This is a practical duplicate check, not proof of global originality. Reusing a run ID resumes its reserved script. New YouTube uploads stop on an ambiguous upload checkpoint; recorded video IDs are reused for recovery rather than inserted again.
+- After fresh public HD verification, only the story's exact temporary audio/video/thumbnail Drive IDs are cleaned, with a saved cleanup journal. Story scripts, history and publication state remain. Deferred cleanup is retried on the next daily run. Storage quota guards stop rather than buy more space.
+
+## Daily operation
+
+Active workflow: [Daily Heart and Mind Hindi motivational story](.github/workflows/stories.yml).
+
+- **03:00 Asia/Dhaka every day**, cron `0 21 * * *` UTC, preserves this repository's current generation time. Existing `AUTOMATION_ENABLED=true` was verified on 2026-10-30.
+- **Public release after generation/upload**, preserving Heart and Mind's existing publication behavior. No New York release rule or 72-hour delay is introduced. CPU generation/runner queues can take time and failures can leave gaps; a scheduled start does not guarantee an exact completion time.
+- Automatic publishing remains on by default, just as in the old Heart workflow. An optional explicit repository variable `PUBLISH_ENABLED=false` produces previews without upload; an absent variable does not disable publishing.
+- Run the story workflow manually for an immediate start. Empty `run_id` becomes `story-YYYY-MM-DD` using the Dhaka date. To resume an interrupted story, supply its original `run_id` and previous numeric STORY workflow run as `prepared_run`; never restore a song/kids workflow as a story. Artifacts expire after seven days; the reserved script remains in Drive.
+- **Recover existing Hindi story publication** reconciles only an existing uploaded story run ID. It never generates or inserts another video.
+- The former daily song workflow is commented and archived, outside the active workflow directory. Its existing manual music artwork/cleanup tools remain available. New story automation has no Shorts/Facebook cross-posting jobs.
+
+Local commands (install the workflow's stage-specific CPU dependencies, models, `espeak-ng` and FFmpeg):
+
+```sh
+python daily_story.py --run-id story-example --stage plan --check-history
+python daily_story.py --run-id story-example --stage voice
+python daily_story.py --run-id story-example --stage images
+python daily_story.py --run-id story-example --stage music
+python daily_story.py --run-id story-example --stage render
+python daily_story.py --run-id story-example --stage publish
+```
+
+For a local script preview without Google credentials, omit `--check-history`; production always reserves/checks private history. References: [Kokoro model](https://huggingface.co/hexgrad/Kokoro-82M), [Hindi voices](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md). Existing source/weight pins are recorded in `story_music_cpu.py` and `story_image_cpu.py`.
+
+## Validation
+
+- Python 3.12: **87 component tests passed**, including all original Heart music tests and new story checks for Hindi/length, saved-script resumption, duplicate detection, continuous timing, public Hindi metadata, exact Heart channel rejection, instrumental CPU/no reference requests and cleanup isolation.
+- All active workflows passed actionlint 1.7.12.
+- Actual Kokoro CPU Hindi synthesis succeeded with all three configured voices on the same sample: `hm_omega` 11.12 seconds, `hm_psi` 11.22 seconds, `hf_alpha` 10.47 seconds. The reused voice module is unchanged from that runtime check; this does not establish subjective speech quality.
+- The measured scene renderer was exercised with a synthetic 480-second audio/video smoke test. It verifies the media path and timing, not generated image/story/music quality. No full generated story or successful publication is claimed by these component checks; see the actual production run.
+
+## Saved Heart and Mind music version and rollback
+
+Saved before this change on **2026-10-30**:
+
+- Repository: `Asif-Rezan/Heart-and-Mind`.
+- Full original commit: `0fca9240b5edf786f09a806401a62dcc386eb0f6`.
+- Commit: `Generate text-free cinematic couple thumbnails and richer song backgrounds`.
+- Backup branch: `codex/archive-heart-music-20261030`.
+- Exact tracked source snapshot: [`legacy/hindi-music/`](legacy/hindi-music/), including the original README, scripts, tests, assets and workflows. Original root song modules stay intact for shared infrastructure and manual recovery; new story functionality lives in separate `story_*` modules and `daily_story.py`.
+- Old daily workflow retained **commented out** at [`.github/music-hindi-songs.yml.commented`](.github/music-hindi-songs.yml.commented), outside `.github/workflows/`, so it cannot trigger alongside stories. Python is archived executable rather than commenting every line and damaging the rollback source.
+- [Full saved 40-commit log](docs/hindi-music-commit-log.txt).
+
+Inspect the exact old version in another checkout:
+
+```sh
+git fetch origin
+git worktree add ../heart-music-saved origin/codex/archive-heart-music-20261030
+```
+
+Restore it as a new reversible commit, from a clean checkout:
+
+```sh
+git fetch origin
+git switch -c codex/restore-heart-music origin/main
+git restore --source=0fca9240b5edf786f09a806401a62dcc386eb0f6 --staged --worktree -- .
+git commit -m "Restore original Heart and Mind music automation"
+git push -u origin codex/restore-heart-music
+# Review and merge this branch into main to reactivate the old daily song workflow.
+```
+
+No reset or force push is required. Git rollback restores tracked code, not repository variables/secrets, uploads or private Drive data; review those separately. In-progress runs execute their original commit. No new credentials or channel changes are needed to restore the old version.
+
+Recent commits at the saved point:
+
+```text
+0fca924 | 2026-10-28 | Generate text-free cinematic couple thumbnails and richer song backgrounds
+22f8214 | 2026-10-28 | Merge pull request #22 from Asif-Rezan/manual-vocal-choice
+bd6bc80 | 2026-10-28 | Allow one-off vocal choices without changing the daily rotation
+4e03cea | 2026-10-28 | Merge pull request #21 from Asif-Rezan/alternate-daily-vocals
+2926ba5 | 2026-10-28 | Alternate male and female lead vocal directions by Bangladesh calendar day
+5d58db9 | 2026-10-28 | Merge pull request #20 from Asif-Rezan/brighter-vintage-poster-artwork
+4680d2a | 2026-10-28 | Generate complete thumbnail lettering inside the image model without overlays
+51984b3 | 2026-10-28 | Keep poster titles clear of detected faces and strengthen display lettering
+2b7985d | 2026-10-28 | Use bright colorful album posters for thumbnails and video backgrounds
+e4417e0 | 2026-10-27 | Brighten vintage artwork and prioritize clear poster portraits
+6557273 | 2026-10-27 | Merge pull request #19 from Asif-Rezan/full-bleed-vintage-thumbnail
+a02703a | 2026-10-27 | Make vintage thumbnails full bleed with only the Hindi song title
+527ef60 | 2026-10-27 | Merge pull request #18 from Asif-Rezan/fix-vintage-couple-panel
+ef1d41f | 2026-10-27 | Preserve both faces in thumbnail panel and allow fast demo recomposition
+b4d06f4 | 2026-10-27 | Merge pull request #17 from Asif-Rezan/vintage-monochrome-thumbnails
+```
+
+## Historical Hindi music README
+
+The following is preserved as historical documentation of the saved song version. Use the story instructions above for the active daily automation.
+
+---
+
 # Heart and Mind — Hindi Music Automation
 
 All AI inference and video rendering run on standard **GitHub Actions CPU runners**. There is no hosted Hugging Face Space, ZeroGPU call, Groq key, remote music API, GPU rental, or self-hosted runner requirement. Public model weights are downloaded anonymously; downloads do not perform remote inference.

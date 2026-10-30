@@ -1,0 +1,40 @@
+0fca9240b5edf786f09a806401a62dcc386eb0f6 | 2026-10-28T12:05:37+06:00 | Generate text-free cinematic couple thumbnails and richer song backgrounds
+22f821467e2d06ee0a83ee1a563df5c190d76efa | 2026-10-28T11:09:34+06:00 | Merge pull request #22 from Asif-Rezan/manual-vocal-choice
+bd6bc80c617767cd570c9b8419ac0906d223d25a | 2026-10-28T11:08:29+06:00 | Allow one-off vocal choices without changing the daily rotation
+4e03cea4c3163d021e09ec20380f9d6df3bccbf6 | 2026-10-28T11:03:19+06:00 | Merge pull request #21 from Asif-Rezan/alternate-daily-vocals
+2926ba5a6a5995509cc388ad6b3d764c871ed493 | 2026-10-28T11:02:12+06:00 | Alternate male and female lead vocal directions by Bangladesh calendar day
+5d58db9e83e12f390cefa2df0e9b6f9e25ab8d00 | 2026-10-28T10:52:56+06:00 | Merge pull request #20 from Asif-Rezan/brighter-vintage-poster-artwork
+4680d2a39d2187547fd994d4068c5f2a8d5a2c99 | 2026-10-28T10:51:48+06:00 | Generate complete thumbnail lettering inside the image model without overlays
+51984b32782d287a3fc1be2ab078834b9fbbe07c | 2026-10-28T10:48:35+06:00 | Keep poster titles clear of detected faces and strengthen display lettering
+2b7985dacea60c45955ebc3fd0c1f0b0c85a8b1b | 2026-10-28T10:42:42+06:00 | Use bright colorful album posters for thumbnails and video backgrounds
+e4417e06246ebe81ff5d698dfdfc1bf37039706a | 2026-10-27T17:12:13+06:00 | Brighten vintage artwork and prioritize clear poster portraits
+6557273d33082aa8c523735627d7517817efb007 | 2026-10-27T16:51:25+06:00 | Merge pull request #19 from Asif-Rezan/full-bleed-vintage-thumbnail
+a02703a535c5860763bf890af622361ffa55f3fb | 2026-10-27T16:50:31+06:00 | Make vintage thumbnails full bleed with only the Hindi song title
+527ef60747f52aaa6386e23ad7caf5b890d50b36 | 2026-10-27T16:42:55+06:00 | Merge pull request #18 from Asif-Rezan/fix-vintage-couple-panel
+ef1d41f46a2daabe50dde23f370d2299cdfa0c65 | 2026-10-27T16:42:04+06:00 | Preserve both faces in thumbnail panel and allow fast demo recomposition
+b4d06f4012ac625654b8a09084e5d94ec12bee1b | 2026-10-27T16:26:01+06:00 | Merge pull request #17 from Asif-Rezan/vintage-monochrome-thumbnails
+00999c4e52f1ab30b6d8c015688acb2785b936d3 | 2026-10-27T16:25:01+06:00 | Use vintage monochrome romance artwork with a separate Hindi title panel
+494d172678c45a7fb6744f31facadb044a42ad78 | 2026-10-27T16:04:18+06:00 | Merge pull request #16 from Asif-Rezan/add-github-artwork-demo
+7d037a0c73f328ae62ef377dc37c3c7ce623f949 | 2026-10-27T16:03:32+06:00 | Add review-only GitHub Actions thumbnail and background demo
+d00e10c0d43e8732debebf339bb04c9e7b94fdcb | 2026-10-27T15:52:48+06:00 | Merge pull request #15 from Asif-Rezan/improve-song-art-direction
+794c77dc5eb2b8e648e6140a8d271ab320b64c7b | 2026-10-27T15:51:58+06:00 | Improve lyric-based backgrounds and emotion-led thumbnail prompts
+81f48002f0dc9b74c661d589754d98d1561972cf | 2026-10-27T15:45:30+06:00 | Merge pull request #14 from Asif-Rezan/improve-hindi-songwriting
+8d2bfc019f85b869c51af3733dde894f12ef165c | 2026-10-27T15:44:49+06:00 | Match new song duration to the focused lyric form
+3eb5913004a949669bf45a7a9388a49d38303c97 | 2026-10-27T15:44:03+06:00 | Improve Hindi lyric editing and focused song arrangements
+7bcd3e7d2a24f78bf88b6a5b0e11b1c6de11fce1 | 2026-10-27T12:32:01+06:00 | Merge pull request #13 from Asif-Rezan/fix-title-conflict-fallback
+b573a893bf24ce3c775d380585108145de4f68ff | 2026-10-27T12:31:25+06:00 | Prioritize matching lyrics across all publication history
+d818bbc291905f989fb9bbfc13d2d8fe6c2ef141 | 2026-10-27T12:31:03+06:00 | Resolve title collisions from sung lyrics without model retries
+bc5f68a95c1b7676d688f76e24d147d2efdba7c9 | 2026-10-27T12:27:49+06:00 | Merge pull request #12 from Asif-Rezan/fix-preflight-song-uniqueness
+fe963f22f3deecfb697c692895ca4b73d2ef6e92 | 2026-10-27T12:26:55+06:00 | Check publication history and recover reused titles before asset generation
+7a9f507e7142b7136cdd2dc2f1cdef2e00b13aef | 2026-10-27T11:46:20+06:00 | Merge pull request #11 from Asif-Rezan/fix-distinct-song-generation
+b83c3da3320088fe3d9ffa1e7a84f2a15fdc06c9 | 2026-10-27T11:45:32+06:00 | Vary song generation by run and report duplicate failures safely
+b68c72c591df94cd032d56fb5d4a46cd2c0d80a5 | 2026-10-27T10:40:34+06:00 | Merge pull request #10 from Asif-Rezan/fix-bounded-music-directions
+7a5867add3bd01a0ef14b0c22902954a910c5383 | 2026-10-27T10:39:45+06:00 | Prevent lyrics failures from overlong production directions
+c9c80a53145a61f3ec029c1930a6e09033f95446 | 2026-10-26T17:23:15+06:00 | Merge pull request #9 from Asif-Rezan/restore-run-14-packaging
+2c3d7fb3549753c116db59bde260966448ca5220 | 2026-10-26T17:21:19+06:00 | Restore successful run 14 flow with focused SEO and thumbnail prompt improvements
+0e3e43d55ac5011e786a960a9e68dafde1bc9b7b | 2026-10-26T15:12:17+06:00 | Merge pull request #8 from Asif-Rezan/daily-generation-3am
+8da66349026b6706f7adebe06a50583617d921a6 | 2026-10-26T15:10:57+06:00 | Move daily generation to 3 AM Bangladesh time
+5da5ab668d4c9c0faca5b192de09e9efc328ff92 | 2026-10-26T15:09:44+06:00 | Merge pull request #7 from Asif-Rezan/daily-generation-8pm
+85ad1f7206520e2ffa1c8e890a39ef9bcc4c9b50 | 2026-10-26T15:07:46+06:00 | Schedule daily music generation at 8 PM Bangladesh time
+4b2d4240b70413d0280b1bd65df2955c82796604 | 2026-10-26T14:32:26+06:00 | Merge pull request #6 from Asif-Rezan/choose-existing-recovery-artifacts
+536a8edda9ff9482bd34edefef9e6e74ca904fb1 | 2026-10-26T14:30:54+06:00 | Select existing recovery artifacts instead of reporting optional download errors

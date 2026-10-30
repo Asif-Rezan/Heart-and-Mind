@@ -1,0 +1,40 @@
+name: Recover existing Hindi story publication
+'on':
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Existing story run ID, not a kids-rhyme ID
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: heart-and-mind-publish
+  cancel-in-progress: false
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID }}
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      STORY_RUN_ID: ${{ inputs.run_id }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: pip install -r requirements.txt
+    - name: Verify and resume only the existing uploaded story
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage recover
+    - uses: actions/upload-artifact@v4
+      with:
+        name: story-recovery-${{ github.run_id }}
+        path: output/
+        retention-days: 7
+      if: always()

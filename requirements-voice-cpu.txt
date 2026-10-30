@@ -1,0 +1,6 @@
+# Install CPU torch separately; Hindi uses the espeak-ng hi phonemizer.
+kokoro==0.9.4
+misaki[en]>=0.9.4,<0.10
+soundfile>=0.13.1,<0.14
+# Match the existing reviewed CPU stack; avoid unbounded Transformers major changes.
+transformers>=4.51,<4.58
