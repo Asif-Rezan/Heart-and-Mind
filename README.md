@@ -42,7 +42,10 @@ For a local script preview without Google credentials, omit `--check-history`; p
 - Python 3.12: **87 component tests passed**, including all original Heart music tests and new story checks for Hindi/length, saved-script resumption, duplicate detection, continuous timing, public Hindi metadata, exact Heart channel rejection, instrumental CPU/no reference requests and cleanup isolation.
 - All active workflows passed actionlint 1.7.12.
 - Actual Kokoro CPU Hindi synthesis succeeded with all three configured voices on the same sample: `hm_omega` 11.12 seconds, `hm_psi` 11.22 seconds, `hf_alpha` 10.47 seconds. The reused voice module is unchanged from that runtime check; this does not establish subjective speech quality.
+- Full 48-scene synthetic Hindi speech fixture: actual Kokoro CPU output measured **539.34 seconds (8m 59.34s)** at native speed 0.95, with all scene timings. This validates the full narration path on test text, not a newly written production story.
 - The measured scene renderer was exercised with a synthetic 480-second audio/video smoke test. It verifies the media path and timing, not generated image/story/music quality. No full generated story or successful publication is claimed by these component checks; see the actual production run.
+
+First Heart and Mind production run: [41050567153](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41050567153), dispatched on main on 2026-10-30. At this checkpoint it is queued for a GitHub runner; a completed production story/upload is not yet verified.
 
 ## Saved Heart and Mind music version and rollback
 
