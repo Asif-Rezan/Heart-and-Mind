@@ -15,6 +15,8 @@ The active pipeline creates **one fresh original Hindi emotional motivational st
 
 ## Parallel jobs and the failed outline fix
 
+Parallel/validation update commit: `acce1c7a3b9cdd707cb5cc78f9f262bfcf7e7b35`. Previous story version: `f04ba246c1136689b3277a19b885d402d6ef7465`. The original song rollback point below is retained.
+
 Run [41050567153](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41050567153) failed before image/voice/music generation: Qwen produced a `summary` longer than the 700-character limit on three attempts. The old inference validator rejected it before the writer could save or normalize the outline.
 
 Story-specific inference now relaxes only the maximum lengths of **planning prose** (title, description, summary, character/world descriptions, chapter beats and scene visuals). It saves the raw valid JSON first, bounds those fields at sentence/word boundaries, then runs the original strict schema. Spoken Hindi text retains its original limits and is never truncated. Missing fields, wrong array sizes, invalid speakers and bad Hindi still fail validation. Tests reproduce the actual long-summary failure and verify that it passes after normalization in one inference response. Raw outline/scene responses and safe chapter validation counters are checkpointed for diagnosis/recovery.
@@ -27,6 +29,8 @@ The production dependency order is:
 4. Publication waits for rendered scenes and mixed audio, verifies clip fingerprints, joins them without re-rendering, and applies the existing duration/channel/upload guards.
 
 Image/render matrices explicitly allow up to 18 jobs; chapter/music matrices allow six. GitHub account concurrency and available runners can queue jobs, so these are parallel job requests, not a promise that every job starts simultaneously. Completed chapter, image, music-part and rendered-clip checkpoints can be reused on recovery. Each cache is bound to its canonical story/image/timing inputs. A missing or stale part stops joining rather than silently substituting content.
+
+Corrected production run: [41075270533](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41075270533), dispatched on the fixed main commit using the same daily identity and the failed run checkpoint. At this documentation checkpoint it is running; final video/publication is not yet verified.
 
 For the fixed code, start a **new workflow dispatch on main** with the failed identity `story-2026-10-30` and `prepared_run=41050567153` to reuse any available checkpoint. Re-running the old run directly executes its old commit and cannot apply this fix.
 
