@@ -30,7 +30,7 @@ The production dependency order is:
 
 Image/render matrices explicitly allow up to 18 jobs; chapter/music matrices allow six. GitHub account concurrency and available runners can queue jobs, so these are parallel job requests, not a promise that every job starts simultaneously. Completed chapter, image, music-part and rendered-clip checkpoints can be reused on recovery. Each cache is bound to its canonical story/image/timing inputs. A missing or stale part stops joining rather than silently substituting content.
 
-Corrected production run: [41075270533](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41075270533), dispatched on the fixed main commit using the same daily identity and the failed run checkpoint. At this documentation checkpoint it is running; final video/publication is not yet verified.
+Corrected production run: [41075270533](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41075270533), dispatched on the fixed main commit using the same daily identity and the failed run checkpoint. Its live outline step passed on the first inference attempt (1,957 completion tokens, 286.5 seconds), and all six chapter jobs started in parallel. Final video/publication is not yet verified.
 
 For the fixed code, start a **new workflow dispatch on main** with the failed identity `story-2026-10-30` and `prepared_run=41050567153` to reuse any available checkpoint. Re-running the old run directly executes its old commit and cannot apply this fix.
 
@@ -60,8 +60,8 @@ For a local script preview without Google credentials, omit `--check-history`; p
 
 ## Validation
 
-- Python 3.12: **98 tests passed**, including all original Heart music tests and new story checks for Hindi/length, saved-script resumption, duplicate detection, continuous timing, public Hindi metadata, exact Heart channel rejection, instrumental CPU/no reference requests and cleanup isolation.
-- All active workflows passed actionlint 1.7.12. The new regression suite runs in CI and before production outline generation, including workflow dependencies, exact 18-worker image coverage/cache reuse, independent chapter assembly, real FFmpeg six-part audio mixing and parallel clip joining.
+- Local Python 3.12: **98 tests passed**, including all original Heart music tests and new story checks for Hindi/length, saved-script resumption, duplicate detection, continuous timing, public Hindi metadata, exact Heart channel rejection, instrumental CPU/no reference requests and cleanup isolation.
+- All active workflows passed actionlint 1.7.12. The new regression suite runs in CI and before production outline generation, including workflow dependencies, exact 18-worker image coverage/cache reuse and independent chapter assembly. CI explicitly installs FFmpeg for real six-part audio mixing and parallel clip-joining checks; those two media checks also passed locally and are skipped only when FFmpeg is unavailable.
 - Actual Kokoro CPU Hindi synthesis succeeded with all three configured voices on the same sample: `hm_omega` 11.12 seconds, `hm_psi` 11.22 seconds, `hf_alpha` 10.47 seconds. The reused voice module is unchanged from that runtime check; this does not establish subjective speech quality.
 - Full 48-scene synthetic Hindi speech fixture: actual Kokoro CPU output measured **539.34 seconds (8m 59.34s)** at native speed 0.95, with all scene timings. This validates the full narration path on test text, not a newly written production story.
 - The measured scene renderer was exercised with a synthetic 480-second audio/video smoke test. It verifies the media path and timing, not generated image/story/music quality. No full generated story or successful publication is claimed by these component checks; see the actual production run.
