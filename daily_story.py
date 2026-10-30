@@ -147,7 +147,7 @@ def score(root,story,timing):
     mix_score(root,story,timing)
 
 
-def publish_story(root, story, run_id):
+def publish_story(root, story, run_id, defer_drive_cleanup=False):
     from story_publication import publish, youtube_client
     from pipeline import duration
     from storage import Store
@@ -187,7 +187,7 @@ def publish_story(root, story, run_id):
         if entry.get('run') == run_id:
             entry['video_id'] = state['video_id']
     store.save('stories/history.json', history)
-    if state['phase'] == 'published':
+    if state['phase'] == 'published' and not defer_drive_cleanup:
         from story_cleanup import cleanup
         cleanup(store,client,run_id,state)
         state['backup_cleanup_complete'] = True
@@ -235,6 +235,8 @@ def main():
     parser.add_argument('--check-history',action='store_true')
     parser.add_argument('--part',type=int)
     parser.add_argument('--prepared-clips',action='store_true')
+    parser.add_argument('--defer-drive-cleanup',action='store_true',
+        help='Let the separate verified Drive cleanup job remove temporary media')
     args = parser.parse_args()
     root = root_for(args.run_id)
     try:
@@ -273,7 +275,7 @@ def main():
             from story_video import render
             render(root,story,json.loads((root/'timing.json').read_text()),prepared_clips=args.prepared_clips)
         elif args.stage == 'publish':
-            publish_story(root,story,args.run_id)
+            publish_story(root,story,args.run_id,defer_drive_cleanup=args.defer_drive_cleanup)
     except Exception as error:
         # Do not print API response bodies or credentials into public Actions logs.
         from pipeline import pipeline_failure_message

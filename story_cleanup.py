@@ -89,6 +89,26 @@ def cleanup(store, client, run_id, state):
     return journal
 
 
+def cleanup_published_story(store,client,run_id):
+    """Standalone post-publication job; never generates, renders or uploads."""
+    if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}',run_id):
+        raise ValueError('Invalid story run ID')
+    key=f'stories/runs/{run_id}/publication.json'
+    state=store.load(key,{})
+    story=state.get('song',{})
+    if story.get('content_type')!='hindi_story' or story.get('run_id')!=run_id:
+        raise RuntimeError('Cleanup requires the exact published story identity')
+    journal=cleanup(store,client,run_id,state)
+    state['backup_cleanup_complete']=True
+    store.save(key,state)
+    from story_writer import save_json
+    from pathlib import Path
+    report=dict(run=run_id,video_id=state['video_id'],cleanup_complete=True,
+                deleted_media=len(journal['deleted']))
+    save_json(Path('output')/run_id/'cleanup.json',report)
+    return report
+
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--run-id',required=True)
@@ -96,9 +116,13 @@ def main():
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}',args.run_id):
         raise ValueError('Invalid story run ID')
     from story_publication import youtube_client
-    store=Store()
-    state=store.load(f'stories/runs/{args.run_id}/publication.json',{})
-    cleanup(store,youtube_client(),args.run_id,state)
+    cleanup_published_story(Store(),youtube_client(),args.run_id)
+
 
 if __name__=='__main__':
-    main()
+    try:
+        main()
+    except Exception as error:
+        print('Story Drive cleanup failed: '+type(error).__name__+
+              '. Saved publication and cleanup journals are retained for retry.')
+        raise SystemExit(1)

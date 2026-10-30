@@ -11,7 +11,7 @@ The active pipeline creates **one fresh original Hindi emotional motivational st
 - **18 CPU image jobs** produce 48 scene illustrations: 12 jobs make three images each and six jobs make two each. The 1920×1080 video uses gentle pan/zoom with picture changes at the actual spoken scene boundaries. Its thumbnail comes from the opening illustration, without generated lettering. Both final audio and video must measure 480–720 seconds before a new upload is allowed.
 - Hindi story title, description and tags are used for each upload, with Education category 27, general audience (`made_for_kids=false`) and AI disclosure. An additional explicit channel guard rejects any destination other than the existing Heart and Mind ID before generation/publication. Existing Heart and Mind OAuth, private Drive folder checks and accounts are reused; no credentials are copied from another repository.
 - Story history/checkpoints use `stories/` keys in Heart and Mind's existing dedicated private folder, separate from old music records. Exact titles/scripts, close summary similarity and repeated scenes are checked against reserved, unfinished and published stories. This is a practical duplicate check, not proof of global originality. Reusing a run ID resumes its reserved script. New YouTube uploads stop on an ambiguous upload checkpoint; recorded video IDs are reused for recovery rather than inserted again.
-- After fresh public HD verification, only the story's exact temporary audio/video/thumbnail Drive IDs are cleaned, with a saved cleanup journal. Story scripts, history and publication state remain. Deferred cleanup is retried on the next daily run. Storage quota guards stop rather than buy more space.
+- A separate **Drive cleanup** job runs after successful publication and repeats the public HD checks. Only the story's exact temporary audio/video/thumbnail Drive IDs are cleaned, with a saved cleanup journal. Story scripts, history and publication state remain. Deferred cleanup is retried on the next daily run. Storage quota guards stop rather than buy more space.
 
 ## Parallel jobs and the failed outline fix
 
@@ -27,12 +27,21 @@ The production dependency order is:
 2. **18 image jobs, one Kokoro voice job and six ACE-Step score jobs** become eligible together; score generation no longer waits for voice.
 3. **18 scene-render jobs** run after pictures and measured voice are ready, without waiting for music. Each job renders its own two/three scenes. Audio mixing independently waits for the voice and six score parts.
 4. Publication waits for rendered scenes and mixed audio, verifies clip fingerprints, joins them without re-rendering, and applies the existing duration/channel/upload guards.
+5. **Drive cleanup** appears separately after **publish** in the graph. Publishing uses `--defer-drive-cleanup`; the cleanup job independently rechecks public HD ownership/metadata and removes only the verified story media. Cleanup failure has its own status and does not turn an already successful upload into a failed publish job. The recovery workflow also has a separate cleanup job after publication recovery.
 
 Image/render matrices explicitly allow up to 18 jobs; chapter/music matrices allow six. GitHub account concurrency and available runners can queue jobs, so these are parallel job requests, not a promise that every job starts simultaneously. Completed chapter, image, music-part and rendered-clip checkpoints can be reused on recovery. Each cache is bound to its canonical story/image/timing inputs. A missing or stale part stops joining rather than silently substituting content.
 
 Corrected production run: [41075270533](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41075270533), dispatched on the fixed main commit using the same daily identity and the failed run checkpoint. Its live outline step passed on the first inference attempt (1,957 completion tokens, 286.5 seconds), and all six chapter jobs started in parallel. Final video/publication is not yet verified.
 
 For the fixed code, start a **new workflow dispatch on main** with the failed identity `story-2026-10-30` and `prepared_run=41050567153` to reuse any available checkpoint. Re-running the old run directly executes its old commit and cannot apply this fix.
+
+## Visible Drive cleanup job
+
+New workflow runs show **publish → Drive cleanup**. Preview-only runs (`PUBLISH_ENABLED=false`) skip cleanup. Failed, unverified or non-public uploads cannot be cleaned. A successful cleanup marks the saved story publication complete and uploads a small `story-cleanup-RUN_NUMBER` report; scripts/history/publication journals are retained. Re-running a failed cleanup re-verifies YouTube and resumes the exact-ID deletion journal, without generating or uploading another video. Local `daily_story.py --stage publish` continues to clean immediately unless `--defer-drive-cleanup` is provided.
+
+A workflow graph is frozen at dispatch: the already-started run `41075270533` uses its original workflow and performs cleanup inside publish. Its graph cannot acquire the new job; the separate job appears on newly dispatched/daily runs. That running generation is not restarted just to change its graph.
+
+For cleanup-only recovery of an existing public story, run `python story_cleanup.py --run-id ORIGINAL_STORY_ID` with the existing Heart and Mind credentials, or re-run the failed cleanup job. The **Recover existing Hindi story publication** workflow likewise shows **recover → Drive cleanup**.
 
 ## Daily operation
 
@@ -60,7 +69,7 @@ For a local script preview without Google credentials, omit `--check-history`; p
 
 ## Validation
 
-- Local Python 3.12: **98 tests passed**, including all original Heart music tests and new story checks for Hindi/length, saved-script resumption, duplicate detection, continuous timing, public Hindi metadata, exact Heart channel rejection, instrumental CPU/no reference requests and cleanup isolation.
+- Local Python 3.12: **102 tests passed**, including all original Heart music tests and new story checks for Hindi/length, saved-script resumption, duplicate detection, continuous timing, public Hindi metadata, exact Heart channel rejection, instrumental CPU/no reference requests and cleanup isolation.
 - All active workflows passed actionlint 1.7.12. The new regression suite runs in CI and before production outline generation, including workflow dependencies, exact 18-worker image coverage/cache reuse and independent chapter assembly. CI explicitly installs FFmpeg for real six-part audio mixing and parallel clip-joining checks; those two media checks also passed locally and are skipped only when FFmpeg is unavailable.
 - Actual Kokoro CPU Hindi synthesis succeeded with all three configured voices on the same sample: `hm_omega` 11.12 seconds, `hm_psi` 11.22 seconds, `hf_alpha` 10.47 seconds. The reused voice module is unchanged from that runtime check; this does not establish subjective speech quality.
 - Full 48-scene synthetic Hindi speech fixture: actual Kokoro CPU output measured **539.34 seconds (8m 59.34s)** at native speed 0.95, with all scene timings. This validates the full narration path on test text, not a newly written production story.
