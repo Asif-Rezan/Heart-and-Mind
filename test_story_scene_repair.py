@@ -105,6 +105,7 @@ class ProductionChapterRegression(unittest.TestCase):
         before=copy.deepcopy(accepted)
         selected=repair_indices(accepted)
         self.assertTrue(0<len(selected)<8)
+        self.assertTrue(all(accepted[str(i)]['speaker']=='narrator' for i in selected))
         self.assertEqual(accepted,before)
 
     def test_cross_outline_partial_checkpoint_cannot_be_reused(self):

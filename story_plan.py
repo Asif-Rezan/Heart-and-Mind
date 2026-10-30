@@ -124,7 +124,8 @@ def repair_indices(accepted):
     # Only rewrite the paragraphs needed to bring the chapter budget into range.
     # Existing text is kept until a valid model-written replacement is accepted.
     ascending=total<CHAPTER_MIN_WORDS
-    ordered=sorted(range(8),key=lambda i:len(accepted[str(i)]['text'].split()),reverse=not ascending)
+    ordered=sorted((i for i in range(8) if accepted[str(i)]['speaker']=='narrator'),
+                   key=lambda i:len(accepted[str(i)]['text'].split()),reverse=not ascending)
     selected=[]
     for i in ordered:
         words=len(accepted[str(i)]['text'].split())
