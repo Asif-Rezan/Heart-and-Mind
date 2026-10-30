@@ -49,6 +49,10 @@ def novelty_reason(story, history):
     return None
 
 
+def spoken_word_limits(speaker):
+    return (18,38) if speaker=='narrator' else (8,38)
+
+
 def validate_story(story):
     if story.get('content_type') != 'hindi_story' or story.get('writer_version') != VERSION:
         raise ValueError('Not a supported Hindi story manifest')
@@ -61,16 +65,17 @@ def validate_story(story):
         if scene['index'] != i or scene['speaker'] not in VOICES:
             raise ValueError('Invalid scene identity or speaker')
         words = scene['text'].split()
-        if not 18 <= len(words) <= 38:
-            raise ValueError('Each spoken scene requires 18-38 words')
+        minimum,maximum=spoken_word_limits(scene['speaker'])
+        if not minimum<=len(words)<=maximum:
+            raise ValueError('Spoken scene length is outside its narration/dialogue range')
         letters = [c for c in scene['text'] if c.isalpha()]
         if not letters or sum('\u0900' <= c <= '\u097f' for c in letters)/len(letters) < .9:
             raise ValueError('Speech must be Hindi Devanagari')
         if not 20 <= len(scene['visual']) <= 360:
             raise ValueError('Scene image description is missing or overlong')
     total = sum(len(s['text'].split()) for s in scenes)
-    if not 1100 <= total <= 1500:
-        raise ValueError('Story needs 1100-1500 Hindi words for 8-12 minutes')
+    if not 1000<=total<=1600:
+        raise ValueError('Story needs 1000-1600 Hindi words before measured 8-12 minute speech validation')
     if not 30 <= sum(s['speaker'] == 'narrator' for s in scenes) <= 40:
         raise ValueError('Story requires 30-40 narrator scenes and some dialogue')
     if story['lyrics'] != '\n'.join(s['text'] for s in scenes):
@@ -103,7 +108,7 @@ def bound_prose(value, spec):
 
 
 def planning_schema(schema):
-    """Relax only prose limits at inference; validate bounded output afterwards."""
+    """Relax only prose limits at inference; never relax spoken-text limits."""
     result=copy.deepcopy(schema)
     if schema==OUTLINE:
         for field,spec in result['properties'].items():
@@ -111,8 +116,17 @@ def planning_schema(schema):
                 spec['items'].pop('maxLength',None)
             else:
                 spec.pop('maxLength',None)
-    elif schema==CHAPTER:
-        result['properties']['scenes']['items']['properties']['visual'].pop('maxLength',None)
+    else:
+        def relax(node):
+            if not isinstance(node,dict):
+                return
+            for field,spec in node.get('properties',{}).items():
+                if field=='visual':
+                    spec.pop('maxLength',None)
+                else:
+                    relax(spec)
+            relax(node.get('items'))
+        relax(result)
     return result
 
 
@@ -124,10 +138,20 @@ def normalize_planning(data, schema):
                 result[field]=[bound_prose(value,spec['items']) for value in result[field]]
             else:
                 result[field]=bound_prose(result[field],spec)
-    elif schema==CHAPTER:
-        spec=schema['properties']['scenes']['items']['properties']['visual']
-        for scene in result['scenes']:
-            scene['visual']=bound_prose(scene['visual'],spec)
+    else:
+        def normalize(value,spec):
+            if isinstance(value,dict):
+                for field,child in spec.get('properties',{}).items():
+                    if field not in value:
+                        continue
+                    if field=='visual':
+                        value[field]=bound_prose(value[field],child)
+                    else:
+                        normalize(value[field],child)
+            elif isinstance(value,list) and 'items' in spec:
+                for child in value:
+                    normalize(child,spec['items'])
+        normalize(result,schema)
     return result
 
 
@@ -168,73 +192,14 @@ CHAPTER = object_schema({'scenes': {'type': 'array', 'minItems': 8, 'maxItems': 
 
 
 def write_story(root, run_id, history):
-    root = Path(root)
-    manifest = root/'story.json'
-    if manifest.exists():
-        return validate_story(json.loads(manifest.read_text()))
-    others = [h for h in history if h.get('run') != run_id]
-    recent = [{'title': h['title'], 'summary': h.get('summary', '')} for h in others[-20:]]
-    draft_path = root/'story-draft.json'
-    draft = json.loads(draft_path.read_text()) if draft_path.exists() else {}
-    seed = int(hashlib.sha256(run_id.encode()).hexdigest()[:7], 16)
-    for revision in range(draft.get('revision', 0), 3):
-        if 'outline' not in draft:
-            outline = ask(OUTLINE,
-                'Create a NEW complete 8-12 minute Hindi emotional motivational story. '
-                'Use everyday Indian family/work/study situations, credible struggle, a meaningful choice and an earned hopeful ending. '
-                'No instant millionaire miracles, sermons, copied plots or nursery rhymes. '
-                'One male narrator, at most one male and one female speaking character; no other dialogue speakers. '
-                'Hindi Devanagari title/description. English summary, six chronological chapter beats, '
-                'compact fixed character ages/clothes/faces and pastel 3D storybook world. '
-                'Characters may be adults/parents; match the existing cute colorful 3D illustration aesthetic. '
-                'Each chapter will contain eight scenes and approximately 200-240 Hindi words. '
-                'Avoid these previous stories: '+json.dumps(recent, ensure_ascii=False), seed+revision*10000, 2800)
-            draft = {'revision': revision, 'outline': outline, 'chapters': []}
-            save_json(draft_path, draft)
-        outline = draft['outline']
-        while len(draft['chapters']) < 6:
-            chapter = len(draft['chapters'])
-            previous = draft['chapters'][-1]['scenes'][-2:] if chapter else []
-            correction = ''
-            for attempt in range(3):
-                data = ask(CHAPTER,
-                    'Write chapter '+str(chapter+1)+' of this fixed story: '+json.dumps(outline, ensure_ascii=False)+
-                    '\nPrior ending: '+json.dumps(previous, ensure_ascii=False)+
-                    '\nReturn exactly eight consecutive scenes: six narrator scenes and two dialogue scenes (male or female). '
-                    'Each text must contain 24-30 space-separated Hindi Devanagari words; write full natural sentences. '
-                    'Do not include speaker names, stage directions or emotion tags in spoken text. '
-                    'Narrator narrates; dialogue uses only the established male/female characters. '
-                    'English visual describes the exact action, character and setting in that scene, under 220 characters. '
-                    'Do not repeat earlier scenes. Last chapter resolves the conflict through action. '+correction,
-                    seed+revision*10000+chapter*100+attempt*10, 4000)
-                counts = [len(s['text'].split()) for s in data['scenes']]
-                if all(22 <= n <= 34 for n in counts) and sum(s['speaker']=='narrator' for s in data['scenes']) == 6:
-                    break
-                correction = 'Prior attempt failed word/speaker counts '+str(counts)+'. Use six narrator scenes and two dialogue scenes; 24-30 words each.'
-            else:
-                raise ValueError('Hindi chapter failed word/speaker requirements; saved draft retained')
-            draft['chapters'].append(data)
-            save_json(draft_path, draft)
-        scenes = []
-        for chapter in draft['chapters']:
-            for row in chapter['scenes']:
-                scenes.append(dict(row, index=len(scenes)))
-        story = dict(content_type='hindi_story', writer_version=VERSION, run_id=run_id,
-            title=outline['title'], description=outline['description']+'\n\nयह एक मौलिक काल्पनिक कहानी है। आवाज़, चित्र और संगीत AI की सहायता से बनाए गए हैं।\n#HindiStory #MotivationalStory',
-            summary=outline['summary'], characters=outline['characters'], world=outline['world'],
-            scenes=scenes, lyrics='\n'.join(s['text'] for s in scenes),
-            tags=['Hindi motivational story','Hindi emotional story','प्रेरणादायक कहानी','Hindi kahani'])
-        try:
-            validate_story(story)
-            reason = novelty_reason(story, others)
-        except ValueError:
-            reason = 'story length or language validation'
-        if not reason:
-            save_json(manifest, story)
-            return story
-        draft = {'revision': revision+1}
-        save_json(draft_path, draft)
-    raise ValueError('Fresh story validation failed; no template or duplicate will be uploaded')
+    """Local sequential entry point uses the same repairable chapter writer."""
+    from story_plan import prepare_outline,write_chapter,assemble_story
+    root=Path(root)
+    root.mkdir(parents=True,exist_ok=True)
+    prepare_outline(root,run_id,history)
+    for index in range(6):
+        write_chapter(root,run_id,index)
+    return assemble_story(root,run_id,history)
 
 
 def scene_prompt(story, scene):

@@ -34,6 +34,11 @@ def chapter_fixture():
     return dict(scenes=scenes)
 
 
+def slot_response(schema):
+    scene=chapter_fixture()['scenes'][0]
+    return {key:dict(text=scene['text'],visual=scene['visual']) for key in schema['properties']}
+
+
 class PlanningLengthRegression(unittest.TestCase):
     def test_long_summary_and_all_planning_fields_normalize_before_strict_validation(self):
         raw=outline_fixture()
@@ -89,7 +94,7 @@ class IndependentChapterChecks(unittest.TestCase):
             with patch('story_plan.ask',return_value=outline_fixture()):
                 prepare_outline(root,'story-test',[])
             draft=(root/'story-draft.json').read_bytes()
-            with patch('story_plan.ask',side_effect=lambda *a,**k:chapter_fixture()) as model:
+            with patch('story_plan.ask',side_effect=lambda schema,*a,**k:slot_response(schema)) as model:
                 for index in (5,1,3,0,4):
                     write_chapter(root,'story-test',index)
                 self.assertEqual((root/'story-draft.json').read_bytes(),draft)
@@ -109,7 +114,7 @@ class IndependentChapterChecks(unittest.TestCase):
         from daily_story import main
         import sys
         def response(schema,*args,**kwargs):
-            return outline_fixture() if schema==OUTLINE else chapter_fixture()
+            return outline_fixture() if schema==OUTLINE else slot_response(schema)
         with tempfile.TemporaryDirectory() as temporary,contextlib.chdir(temporary),patch('story_plan.ask',side_effect=response):
             for stage,index in [('outline',None),('chapter',4),('chapter',0),('chapter',5),('chapter',1),('chapter',3),('chapter',2),('assemble',None)]:
                 argv=['daily_story.py','--run-id','story-test','--stage',stage]
@@ -129,20 +134,38 @@ class IndependentChapterChecks(unittest.TestCase):
                 write_chapter(root,'story-test',0)
             model.assert_not_called()
 
-    def test_bad_spoken_chapter_has_bounded_retries_and_safe_diagnostics(self):
+    def test_bad_scene_keeps_good_scenes_and_resumes_only_missing_slot(self):
+        from story_plan import REPAIR_REQUESTS
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
             save_json(root/'story-draft.json',dict(run_id='story-test',outline=outline_fixture()))
-            bad=chapter_fixture()
-            bad['scenes'][2]['text']='बहुत छोटा'
-            with patch('story_plan.ask',return_value=bad) as model:
+            requested=[]
+            def bad_response(schema,*args,**kwargs):
+                requested.append(set(schema['properties']))
+                response=slot_response(schema)
+                if 'scene_2' in response:
+                    response['scene_2']['text']='बहुत छोटा'
+                return response
+            with patch('story_plan.ask',side_effect=bad_response) as model:
                 with self.assertRaises(StoryValidationError) as error:
                     write_chapter(root,'story-test',0)
-                self.assertEqual(error.exception.code,'chapter_validation_failed')
-                self.assertEqual(model.call_count,4)
-                self.assertEqual(error.exception.details['bad_scenes'],[3])
+                self.assertEqual(error.exception.code,'chapter_scene_repair_incomplete')
+                self.assertEqual(model.call_count,REPAIR_REQUESTS)
+                self.assertEqual(error.exception.details['pending_scenes'],[3])
+            self.assertEqual(len(requested[0]),8)
+            self.assertTrue(all(keys=={'scene_2'} for keys in requested[1:]))
+            progress=json.loads((root/'chapters/progress-0.json').read_text())
+            preserved=copy.deepcopy(progress['accepted'])
+            self.assertEqual(len(preserved),7)
             self.assertFalse((root/'chapters/chapter-0.json').exists())
             self.assertNotIn('बहुत छोटा',(root/'chapters/validation-0.json').read_text())
+            with patch('story_plan.ask',side_effect=lambda schema,*a,**k:slot_response(schema)) as model:
+                write_chapter(root,'story-test',0)
+                model.assert_called_once()
+                self.assertEqual(set(model.call_args.args[0]['properties']),{'scene_2'})
+            complete=json.loads((root/'chapters/chapter-0.json').read_text())
+            for key,value in preserved.items():
+                self.assertEqual(complete['scenes'][int(key)],value)
 
 
 class WorkflowConcurrencyChecks(unittest.TestCase):
