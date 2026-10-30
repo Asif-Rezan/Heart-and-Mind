@@ -53,15 +53,15 @@ class ProductionChapterRegression(unittest.TestCase):
                     write_chapter(root,'story-test',i)
             self.assertEqual(successful.read_bytes(),original)
             self.assertEqual(calls,[{'scene_6','scene_7'},{'scene_6','scene_7'},
-                                    {'scene_6','scene_7'},{'scene_4'},{'scene_5'},{'scene_6','scene_7'}])
-            self.assertEqual(sum(map(len,calls)),10)
+                                    {'scene_6','scene_7'},{'scene_6','scene_7'}])
+            self.assertEqual(sum(map(len,calls)),8)
             for i,profile in enumerate(PROFILES):
                 rows=rows_for(profile)
                 roles=recovered_roles(rows)
                 result=json.loads((root/'chapters'/f'chapter-{i}.json').read_text())
                 self.assertIsNone(chapter_issues(result))
                 for position,row in enumerate(rows):
-                    if not scene_issues(row,roles[position]) and not (i==4 and position in (4,5)):
+                    if not scene_issues(row,roles[position]):
                         self.assertEqual(result['scenes'][position],row)
             story=assemble_story(root,'story-test',[])
             validate_story(story)
@@ -100,14 +100,31 @@ class ProductionChapterRegression(unittest.TestCase):
         self.assertEqual(scene_issues(rows_for(([15],['narrator']))[0]),[])
         self.assertIn('text',scene_issues(rows_for(([80],['narrator']))[0]))
 
-    def test_budget_repairs_only_selected_scene_and_never_truncates_existing_prose(self):
+    def test_complete_short_chapter_does_not_rewrite_valid_narration_for_a_local_quota(self):
         accepted={str(i):s for i,s in enumerate(rows_for(([18]*6+[8]*2,
                        ['narrator']*6+['male','female'])))}
         before=copy.deepcopy(accepted)
         selected=repair_indices(accepted)
-        self.assertTrue(0<len(selected)<8)
-        self.assertTrue(all(accepted[str(i)]['speaker']=='narrator' for i in selected))
+        self.assertEqual(selected,[])
+        self.assertIsNone(chapter_issues(dict(scenes=list(accepted.values()))))
         self.assertEqual(accepted,before)
+
+    def test_run4_complete_137_word_chapter_is_checkpointed_without_retry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            draft=dict(run_id='story-test',outline=outline_fixture())
+            save_json(root/'story-draft.json',draft)
+            rows=rows_for(([20,20,17,16,16,18,12,18],
+                          ['narrator','narrator','male','female','narrator','narrator','narrator','narrator']))
+            save_json(root/'chapters/progress-4.json',dict(run_id='story-test',
+                outline_hash=outline_identity(draft),roles=[r['speaker'] for r in rows],
+                accepted={str(i):row for i,row in enumerate(rows)},drafts={},requests=12))
+            with patch('story_plan.ask') as model:
+                write_chapter(root,'story-test',4)
+                model.assert_not_called()
+            result=json.loads((root/'chapters/chapter-4.json').read_text())
+            self.assertEqual(result['scenes'],rows)
+            self.assertIsNone(chapter_issues(result))
 
     def test_saved_short_narration_recovers_without_another_model_request(self):
         with tempfile.TemporaryDirectory() as temporary:

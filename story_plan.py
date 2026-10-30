@@ -52,11 +52,9 @@ def chapter_path(root, index):
     return Path(root)/'chapters'/f'chapter-{index}.json'
 
 
-CHAPTER_MIN_WORDS=168
-CHAPTER_MAX_WORDS=266
 DEFAULT_ROLES=('narrator','narrator','male','narrator','narrator','female','narrator','narrator')
 REPAIR_REQUESTS=6
-REPAIR_VERSION='scene-repair-v2'
+REPAIR_VERSION='scene-repair-v3-story-budget'
 
 
 def scene_issues(scene, expected_speaker=None):
@@ -80,9 +78,8 @@ def chapter_issues(data):
     bad=[i+1 for i,s in enumerate(scenes) if scene_issues(s)]
     narrator_count=sum(isinstance(s,dict) and s.get('speaker')=='narrator' for s in scenes)
     total=sum(words)
-    if bad or narrator_count!=6 or not CHAPTER_MIN_WORDS<=total<=CHAPTER_MAX_WORDS:
-        return dict(words=words,bad_scenes=bad,narrator_count=narrator_count,total_words=total,
-                    minimum_words=CHAPTER_MIN_WORDS,maximum_words=CHAPTER_MAX_WORDS)
+    if bad or narrator_count!=6:
+        return dict(words=words,bad_scenes=bad,narrator_count=narrator_count,total_words=total)
     return None
 
 
@@ -109,28 +106,10 @@ def recovered_roles(rows):
 
 
 def repair_indices(accepted):
-    missing=[i for i in range(8) if str(i) not in accepted]
-    if missing:
-        return missing
-    total=sum(len(accepted[str(i)]['text'].split()) for i in range(8))
-    if CHAPTER_MIN_WORDS<=total<=CHAPTER_MAX_WORDS:
-        return []
-    # Only rewrite the paragraphs needed to bring the chapter budget into range.
-    # Existing text is kept until a valid model-written replacement is accepted.
-    ascending=total<CHAPTER_MIN_WORDS
-    ordered=sorted((i for i in range(8) if accepted[str(i)]['speaker']=='narrator'),
-                   key=lambda i:len(accepted[str(i)]['text'].split()),reverse=not ascending)
-    selected=[]
-    for i in ordered:
-        words=len(accepted[str(i)]['text'].split())
-        gain=(30-words) if ascending else (words-26)
-        if gain<=0:
-            continue
-        selected.append(i)
-        total=total+gain if ascending else total-gain
-        if CHAPTER_MIN_WORDS<=total<=CHAPTER_MAX_WORDS:
-            break
-    return selected
+    # Chapter boundaries describe plot beats, not equal-length audio segments.
+    # Only repair invalid/missing prose here. The complete 48-scene story owns
+    # the word budget; actual synthesized audio owns the duration constraint.
+    return [i for i in range(8) if str(i) not in accepted]
 
 
 def write_chapter(root,run_id,index):
@@ -211,7 +190,8 @@ def write_chapter(root,run_id,index):
             'aim 26-30 space-separated words for narration, 12-24 for character dialogue. '
             'Use the assigned speaker role BEFORE writing: narrator tells events, male/female is direct dialogue '
             'by an established character. Each visual is English, about 120 characters. No speaker labels, stage directions, repeated filler or word padding. '
-            'Preserve the scene meaning and canonical names. Keep the entire chapter within 168-266 Hindi words. '
+            'Preserve the scene meaning and canonical names. Aim for about 200 Hindi words across the chapter, '
+            'allowing individual plot beats to vary naturally in length. '
             'Leave all unrequested scenes alone; do not retell earlier beats or resolve later chapters.',
             (seed+request_number*17)%(2**31-3),min(4000,500+400*len(pending)),
             checkpoint=root/'chapters'/f'raw-attempt-{request_number}-{index}.json')
