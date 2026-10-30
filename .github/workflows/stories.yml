@@ -19,7 +19,7 @@ concurrency:
   group: heart-and-mind-publish
   cancel-in-progress: false
 jobs:
-  plan:
+  outline:
     if: github.event_name == 'workflow_dispatch' || vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
@@ -54,7 +54,9 @@ jobs:
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED != 'false' && 'true' || 'false' }}
       run: python story_preflight.py
-    - run: pip install -r requirements.txt -r requirements-lyrics.txt
+    - run: pip install -r requirements.txt -r requirements-lyrics.txt -r requirements-test.txt
+    - name: Check story planning and workflow regressions before model generation
+      run: python -m unittest -q
     - name: Restore previous story checkpoints
       if: inputs.prepared_run != ''
       uses: actions/download-artifact@v4
@@ -64,14 +66,99 @@ jobs:
         run-id: ${{ inputs.prepared_run }}
         github-token: ${{ github.token }}
         path: output/
-    - name: Write and reserve a fresh Hindi emotional story
+    - name: Write bounded canonical story outline
       env:
         YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
         EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID }}
         DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         STORY_RUN_ID: ${{ steps.identity.outputs.run_id }}
-      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage plan --check-history
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage outline --check-history
+    - uses: actions/upload-artifact@v4
+      with:
+        name: story-outline-${{ github.run_id }}
+        path: output/
+        retention-days: 7
+      if: always()
+  chapters:
+    needs: outline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        chapter:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+    env:
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+      STORY_RUN_ID: ${{ needs.outline.outputs.run_id }}
+      STORY_PART: ${{ matrix.chapter }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: pip install -r requirements.txt -r requirements-lyrics.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-outline-${{ github.run_id }}
+        path: output/
+    - name: Write one chapter from the shared canonical outline
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage chapter --part "$STORY_PART"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: story-chapter-${{ github.run_id }}-${{ matrix.chapter }}
+        path: |-
+          output/*/chapters/*-${{ matrix.chapter }}.json
+          output/*/failure.json
+        retention-days: 7
+      if: always()
+  plan:
+    needs:
+    - outline
+    - chapters
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      run_id: ${{ needs.outline.outputs.run_id }}
+    env:
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID }}
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      STORY_RUN_ID: ${{ needs.outline.outputs.run_id }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: pip install -r requirements.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-outline-${{ github.run_id }}
+        path: output/
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: story-chapter-${{ github.run_id }}-*
+        merge-multiple: true
+        path: output/
+    - name: Validate all chapters together and reserve the original daily story
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage assemble --check-history
     - uses: actions/upload-artifact@v4
       with:
         name: story-input-${{ github.run_id }}
@@ -114,9 +201,7 @@ jobs:
         retention-days: 7
       if: always()
   music:
-    needs:
-    - plan
-    - voice
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     env:
@@ -130,6 +215,7 @@ jobs:
       HF_HUB_DISABLE_XET: '1'
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
       STORY_RUN_ID: ${{ needs.plan.outputs.run_id }}
+      STORY_PART: ${{ matrix.part }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -171,19 +257,29 @@ jobs:
         PY
     - uses: actions/download-artifact@v4
       with:
-        name: story-voice-${{ github.run_id }}
+        name: story-input-${{ github.run_id }}
         path: output/
-    - name: Generate instrumental ACE-Step score and duck it under narration
-      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage music
+    - name: Generate one independent 120-second instrumental score part
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage music-part --part "$STORY_PART"
     - uses: actions/upload-artifact@v4
       with:
-        name: story-music-${{ github.run_id }}
+        name: story-score-${{ github.run_id }}-${{ matrix.part }}
         path: |-
-          output/*/*.json
-          output/*/*.wav
-          output/*/score/
+          output/*/score/part-${{ matrix.part }}/
+          output/*/failure.json
         retention-days: 7
       if: always()
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        part:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
   images:
     needs: plan
     runs-on: ubuntu-24.04
@@ -200,9 +296,20 @@ jobs:
         - 5
         - 6
         - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 17
+      max-parallel: 18
     env:
       IMAGE_SHARD: ${{ matrix.shard }}
-      IMAGE_SHARDS: '8'
+      IMAGE_SHARDS: '18'
       CUDA_VISIBLE_DEVICES: ''
       OMP_NUM_THREADS: '4'
       HF_HUB_DISABLE_XET: '1'
@@ -244,11 +351,124 @@ jobs:
           output/*/image-manifest-*.json
         retention-days: 7
       if: always()
+  render:
+    needs:
+    - plan
+    - voice
+    - images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 18
+      matrix:
+        shard:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 17
+    env:
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+      STORY_RUN_ID: ${{ needs.plan.outputs.run_id }}
+      IMAGE_SHARD: ${{ matrix.shard }}
+      IMAGE_SHARDS: '18'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: |-
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+        pip install -r requirements.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-voice-${{ github.run_id }}
+        path: output/
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-images-${{ github.run_id }}-${{ matrix.shard }}
+        path: output/
+    - name: Render assigned scenes using measured speech boundaries
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage render-clips
+    - uses: actions/upload-artifact@v4
+      with:
+        name: story-clips-${{ github.run_id }}-${{ matrix.shard }}
+        path: |-
+          output/*/story-motion/*.mp4
+          output/*/story-motion/*.json
+          output/*/failure.json
+        retention-days: 7
+      if: always()
+  mix:
+    needs:
+    - plan
+    - voice
+    - music
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+      STORY_RUN_ID: ${{ needs.plan.outputs.run_id }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: |-
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+        pip install -r requirements.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-voice-${{ github.run_id }}
+        path: output/
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: story-score-${{ github.run_id }}-*
+        merge-multiple: true
+        path: output/
+    - name: Mix score under the complete measured Hindi narration
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage mix
+    - uses: actions/upload-artifact@v4
+      with:
+        name: story-mix-${{ github.run_id }}
+        path: |-
+          output/*/*.json
+          output/*/*.wav
+        retention-days: 7
+      if: always()
   publish:
     needs:
     - plan
-    - music
-    - images
+    - mix
+    - render
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -275,15 +495,20 @@ jobs:
         pip install -r requirements.txt
     - uses: actions/download-artifact@v4
       with:
-        name: story-music-${{ github.run_id }}
+        name: story-mix-${{ github.run_id }}
         path: output/
     - uses: actions/download-artifact@v4
       with:
         pattern: story-images-${{ github.run_id }}-*
         merge-multiple: true
         path: output/
-    - name: Render measured narration scenes into an 8-12 minute video
-      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage render
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: story-clips-${{ github.run_id }}-*
+        merge-multiple: true
+        path: output/
+    - name: Join pre-rendered scenes and measured audio without re-rendering
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage render --prepared-clips
     - uses: actions/upload-artifact@v4
       with:
         name: story-video-${{ github.run_id }}

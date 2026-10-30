@@ -1,4 +1,5 @@
 """Fresh Hindi emotional stories, persisted before expensive CPU generation."""
+import copy
 import hashlib
 import json
 import re
@@ -77,14 +78,76 @@ def validate_story(story):
     return story
 
 
-def ask(schema, prompt, seed, tokens=3000):
+class StoryValidationError(ValueError):
+    """Safe validation diagnostics without raw model or credential content."""
+    def __init__(self, code, details=None):
+        super().__init__(code)
+        self.code=code
+        self.details=details or {}
+
+
+def bound_prose(value, spec):
+    """Bound planning prose at sentence/word boundaries, never spoken script."""
+    value=' '.join(value.split())
+    maximum=spec['maxLength']
+    if len(value)<=maximum:
+        return value
+    prefix=value[:maximum]
+    stops=[m.end() for m in re.finditer(r'[.!?।](?=\s|$)',prefix)]
+    minimum=max(spec.get('minLength',0),maximum//2)
+    if stops and stops[-1]>=minimum:
+        return prefix[:stops[-1]]
+    if len(value)>maximum and not value[maximum].isspace():
+        prefix=prefix.rsplit(' ',1)[0] if ' ' in prefix else prefix
+    return prefix.rstrip(' ,;:')
+
+
+def planning_schema(schema):
+    """Relax only prose limits at inference; validate bounded output afterwards."""
+    result=copy.deepcopy(schema)
+    if schema==OUTLINE:
+        for field,spec in result['properties'].items():
+            if field=='chapters':
+                spec['items'].pop('maxLength',None)
+            else:
+                spec.pop('maxLength',None)
+    elif schema==CHAPTER:
+        result['properties']['scenes']['items']['properties']['visual'].pop('maxLength',None)
+    return result
+
+
+def normalize_planning(data, schema):
+    result=copy.deepcopy(data)
+    if schema==OUTLINE:
+        for field,spec in schema['properties'].items():
+            if field=='chapters':
+                result[field]=[bound_prose(value,spec['items']) for value in result[field]]
+            else:
+                result[field]=bound_prose(result[field],spec)
+    elif schema==CHAPTER:
+        spec=schema['properties']['scenes']['items']['properties']['visual']
+        for scene in result['scenes']:
+            scene['visual']=bound_prose(scene['visual'],spec)
+    return result
+
+
+def ask(schema, prompt, seed, tokens=3000, checkpoint=None):
     from lyrics_cpu import request_story, MODEL_ID
+    from jsonschema import Draft202012Validator
     response = request_story('chat/completions', dict(model=MODEL_ID,
         messages=[{'role': 'system', 'content': 'You write original Hindi emotional motivational fiction for a general audience. Return JSON only.'},
                   {'role': 'user', 'content': prompt}],
-        response_format={'type': 'json_schema', 'json_schema': {'schema': schema}},
+        response_format={'type': 'json_schema', 'json_schema': {'schema': planning_schema(schema)}},
         max_completion_tokens=tokens, seed=seed, temperature=.85))
-    return json.loads(response['choices'][0]['message']['content'])
+    raw=json.loads(response['choices'][0]['message']['content'])
+    if checkpoint:
+        save_json(checkpoint,raw)
+    result=normalize_planning(raw,schema)
+    if result!=raw:
+        fields=[field for field in result if result[field]!=raw[field]]
+        print(json.dumps({'check':'story planning lengths normalized','fields':fields}),flush=True)
+    Draft202012Validator(schema).validate(result)
+    return result
 
 
 def string(minimum, maximum):

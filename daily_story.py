@@ -22,7 +22,7 @@ def load_story(root):
     return validate_story(json.loads((root/'story.json').read_text()))
 
 
-def plan(root, run_id, check_history):
+def plan(root, run_id, check_history, mode="plan"):
     from storage import Store
     store = Store() if check_history else None
     history = store.load('stories/history.json', []) if store else []
@@ -34,7 +34,15 @@ def plan(root, run_id, check_history):
         if (root/'story.json').exists() and json.loads((root/'story.json').read_text()) != saved:
             raise ValueError('Local story differs from the reserved daily identity')
         save_json(root/'story.json', saved)
-    story = write_story(root, run_id, history)
+    if mode == 'outline':
+        from story_plan import prepare_outline
+        prepare_outline(root,run_id,history)
+        return
+    if mode == 'assemble':
+        from story_plan import assemble_story
+        story=assemble_story(root,run_id,history)
+    else:
+        story = write_story(root, run_id, history)
     if story['run_id'] != run_id:
         raise ValueError('Recovered manifest belongs to a different story run')
     others = [h for h in history if h.get('run') != run_id]
@@ -57,53 +65,86 @@ def music_parts(seconds):
     return [math.ceil(seconds/count)]*count
 
 
-def score(root, story, timing):
+def score_request(story, index):
+    if type(index) is not int or not 0<=index<6:
+        raise ValueError('Invalid background music part')
+    mood=('gentle reflective piano, soft strings' if index==0 else
+          'warm hopeful piano, rising strings' if index==5 else
+          'restrained emotional piano, subtle ambient strings')
+    return dict(_segment=True,instrumental=True,duration=120,lyrics='[Instrumental]',
+        prompt='Instrumental cinematic background score for an Indian emotional motivational story, '+mood+
+        ', no vocals, no singing, no speech, sparse arrangement, quiet accompaniment under dialogue.')
+
+
+def generate_score_part(root,story,index):
     from story_music_cpu import generate_segment
-    from story_media import run_ffmpeg, digest
+    from pipeline import duration
+    work=Path(root)/'score'/f'part-{index}'
+    request=score_request(story,index)
+    work.mkdir(parents=True,exist_ok=True)
+    manifest=dict(story_hash=text_hash(story['lyrics']),run_id=story['run_id'],request=request,index=index)
+    manifest_path=work/'request.json'
+    if manifest_path.exists() and json.loads(manifest_path.read_text())!=manifest:
+        raise ValueError('Saved music part belongs to different story inputs')
+    save_json(manifest_path,manifest)
+    state_path=work/'state.json'
+    state=json.loads(state_path.read_text()) if state_path.exists() else {}
+    save=lambda:save_json(state_path,state)
+    target=work/'bgm.wav'
+    generate_segment(request,target,state,save)
+    if duration(target)<119.95:
+        raise RuntimeError('Background score too short; never pad or loop music')
+
+
+def mix_score(root,story,timing):
+    from story_media import run_ffmpeg,digest
     from pipeline import duration
     from story_video import validate_timing
-    validate_timing(story, timing)
-    work = root/'score'
+    validate_timing(story,timing)
+    root=Path(root)
+    if abs(duration(root/'narration.wav')-timing['duration'])>.05:
+        raise ValueError('Narration audio differs from its measured timeline')
+    work=root/'score'
     work.mkdir(exist_ok=True)
-    state_path = work/'state.json'
-    state = json.loads(state_path.read_text()) if state_path.exists() else {}
-    save = lambda: save_json(state_path, state)
-    paths = []
-    for i, seconds in enumerate(music_parts(timing['duration'])):
-        mood = 'gentle reflective piano, soft strings' if i == 0 else ('warm hopeful piano, rising strings' if i == len(music_parts(timing['duration']))-1 else 'restrained emotional piano, subtle ambient strings')
-        request = dict(_segment=True, instrumental=True, duration=seconds, lyrics='[Instrumental]',
-            prompt='Instrumental cinematic background score for an Indian emotional motivational story, '+mood+
-            ', no vocals, no singing, no speech, sparse arrangement, quiet accompaniment under dialogue.')
-        path = work/f'bgm-{i:03d}.wav'
-        request_path = work/f'bgm-{i:03d}.json'
-        if request_path.exists() and json.loads(request_path.read_text()) != request:
-            raise ValueError('Saved music request differs; use a new run ID')
-        save_json(request_path, request)
-        generate_segment(request, path, state.setdefault(str(i), {}), save)
-        if duration(path) < seconds-.05:
+    paths=[]
+    for i in range(6):
+        part=work/f'part-{i}'
+        path=part/'bgm.wav'
+        expected=dict(story_hash=text_hash(story['lyrics']),run_id=story['run_id'],request=score_request(story,i),index=i)
+        if not (part/'request.json').is_file() or json.loads((part/'request.json').read_text())!=expected:
+            raise ValueError('Missing or mismatched background music checkpoint')
+        if duration(path)<119.95:
             raise RuntimeError('Background score too short; never pad or loop music')
-        normalized = work/f'normalized-{i:03d}.wav'
-        run_ffmpeg(['-i',str(path),'-t',str(seconds),'-ar','24000','-ac','1',str(normalized)])
+        normalized=work/f'normalized-{i}.wav'
+        run_ffmpeg(['-i',str(path),'-t','120','-ar','24000','-ac','1',str(normalized)])
         paths.append(normalized)
-    listing = work/'parts.txt'
+    listing=work/'parts.txt'
     listing.write_text(''.join(f"file '{p.name}'\n" for p in paths))
     run_ffmpeg(['-f','concat','-safe','1','-i',str(listing),'-c','copy',str(root/'background.wav')])
-    if duration(root/'background.wav') < timing['duration']-.05:
+    if duration(root/'background.wav')<timing['duration']-.05:
         raise RuntimeError('Complete background score is shorter than speech')
-    seconds = timing['duration']
-    # Quiet bed plus sidechain ducking makes speech the foreground. Limit peaks.
-    graph = (f'[0:a]asplit=2[voice][control];[1:a]volume=0.10,afade=t=in:d=1,'
+    seconds=timing['duration']
+    # All six parts may be generated before speech. Only excess instrumental
+    # accompaniment is trimmed; the complete measured narration is preserved.
+    graph=(f'[0:a]asplit=2[voice][control];[1:a]volume=0.10,afade=t=in:d=1,'
         f'afade=t=out:st={max(0,seconds-2)}:d=2[bed];'
         '[bed][control]sidechaincompress=threshold=0.025:ratio=6:attack=20:release=300[ducked];'
         '[voice][ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[out]')
-    temp = root/'song.tmp.wav'
+    temp=root/'song.tmp.wav'
     run_ffmpeg(['-i',str(root/'narration.wav'),'-i',str(root/'background.wav'),
         '-filter_complex',graph,'-map','[out]','-ar','24000','-t',str(seconds),str(temp)])
-    if abs(duration(temp)-seconds) > .05:
+    if abs(duration(temp)-seconds)>.05:
         raise ValueError('Mixed story duration differs from speech')
     temp.replace(root/'song.wav')
     save_json(root/'mix.json',dict(narration=digest(root/'narration.wav'),
         background=digest(root/'background.wav'),duration=seconds,instrumental=True))
+
+
+def score(root,story,timing):
+    # Local compatibility command. Production runs the six parts in separate jobs.
+    for i in range(6):
+        generate_score_part(root,story,i)
+    mix_score(root,story,timing)
 
 
 def publish_story(root, story, run_id):
@@ -190,16 +231,24 @@ def cleanup_previous(store, history):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id', required=True)
-    parser.add_argument('--stage',choices=['plan','voice','music','images','render','publish','recover'],required=True)
+    parser.add_argument('--stage',choices=['plan','outline','chapter','assemble','voice','music','music-part','mix','images','render-clips','render','publish','recover'],required=True)
     parser.add_argument('--check-history',action='store_true')
+    parser.add_argument('--part',type=int)
+    parser.add_argument('--prepared-clips',action='store_true')
     args = parser.parse_args()
     root = root_for(args.run_id)
     try:
-        if args.stage == 'plan':
-            plan(root,args.run_id,args.check_history)
+        if args.stage in ('plan','outline','assemble'):
+            plan(root,args.run_id,args.check_history,mode=args.stage)
+            (root/'failure.json').unlink(missing_ok=True)
             return
         if args.stage == 'recover':
             recover(root, args.run_id)
+            return
+        if args.stage == 'chapter':
+            from story_plan import write_chapter
+            write_chapter(root,args.run_id,args.part)
+            (root/'failure.json').unlink(missing_ok=True)
             return
         story = load_story(root)
         if story['run_id'] != args.run_id:
@@ -210,19 +259,31 @@ def main():
         elif args.stage == 'images':
             from story_video import generate_images
             generate_images(root,story)
+        elif args.stage == 'music-part':
+            generate_score_part(root,story,args.part)
+        elif args.stage == 'mix':
+            mix_score(root,story,json.loads((root/'timing.json').read_text()))
+        elif args.stage == 'render-clips':
+            from story_video import render_clips
+            render_clips(root,story,json.loads((root/'timing.json').read_text()),
+                shard=int(os.getenv('IMAGE_SHARD','0')),shards=int(os.getenv('IMAGE_SHARDS','1')))
         elif args.stage == 'music':
             score(root,story,json.loads((root/'timing.json').read_text()))
         elif args.stage == 'render':
             from story_video import render
-            render(root,story,json.loads((root/'timing.json').read_text()))
+            render(root,story,json.loads((root/'timing.json').read_text()),prepared_clips=args.prepared_clips)
         elif args.stage == 'publish':
             publish_story(root,story,args.run_id)
     except Exception as error:
         # Do not print API response bodies or credentials into public Actions logs.
         from pipeline import pipeline_failure_message
-        save_json(root/'failure.json',dict(stage=args.stage,error_type=type(error).__name__,
-            message=pipeline_failure_message(error)))
-        print(pipeline_failure_message(error), flush=True)
+        from story_writer import StoryValidationError
+        details=getattr(error,'details',{}) if isinstance(error,StoryValidationError) else {}
+        code=getattr(error,'code','pipeline_error') if isinstance(error,StoryValidationError) else 'pipeline_error'
+        diagnostic=dict(stage=args.stage,error_type=type(error).__name__,code=code,details=details,
+            message=pipeline_failure_message(error))
+        save_json(root/'failure.json',diagnostic)
+        print(json.dumps(diagnostic),flush=True)
         raise SystemExit(1)
 
 

@@ -1,0 +1,2 @@
+# YAML dependency graph checks for the production workflow.
+PyYAML==6.0.3
