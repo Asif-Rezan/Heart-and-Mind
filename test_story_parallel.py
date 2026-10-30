@@ -144,7 +144,7 @@ class IndependentChapterChecks(unittest.TestCase):
                 requested.append(set(schema['properties']))
                 response=slot_response(schema)
                 if 'scene_2' in response:
-                    response['scene_2']['text']='बहुत छोटा'
+                    response['scene_2']['text']='Invalid English narration'
                 return response
             with patch('story_plan.ask',side_effect=bad_response) as model:
                 with self.assertRaises(StoryValidationError) as error:
@@ -158,7 +158,7 @@ class IndependentChapterChecks(unittest.TestCase):
             preserved=copy.deepcopy(progress['accepted'])
             self.assertEqual(len(preserved),7)
             self.assertFalse((root/'chapters/chapter-0.json').exists())
-            self.assertNotIn('बहुत छोटा',(root/'chapters/validation-0.json').read_text())
+            self.assertNotIn('Invalid English narration',(root/'chapters/validation-0.json').read_text())
             with patch('story_plan.ask',side_effect=lambda schema,*a,**k:slot_response(schema)) as model:
                 write_chapter(root,'story-test',0)
                 model.assert_called_once()

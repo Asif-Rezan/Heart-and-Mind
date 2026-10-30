@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 from story_writer import (ask, OUTLINE, CHAPTER, VERSION, VOICES, save_json,
-                          validate_story, novelty_reason, text_hash, StoryValidationError, object_schema, string, spoken_word_limits)
+                          validate_story, novelty_reason, text_hash, StoryValidationError, object_schema, string, speech_issues, normalize_planning)
 
 CHAPTERS=6
 
@@ -66,13 +66,7 @@ def scene_issues(scene, expected_speaker=None):
     issues=[]
     if expected_speaker is not None and scene['speaker']!=expected_speaker:
         issues.append('speaker')
-    words=len(scene['text'].split())
-    minimum,maximum=spoken_word_limits(scene['speaker'])
-    if not minimum<=words<=maximum:
-        issues.append('words')
-    letters=[c for c in scene['text'] if c.isalpha()]
-    if not letters or sum('\u0900'<=c<='\u097f' for c in letters)/len(letters)<.9:
-        issues.append('hindi')
+    issues.extend(speech_issues(scene['text']))
     if not 20<=len(scene['visual'])<=360:
         issues.append('visual')
     return issues
@@ -95,7 +89,7 @@ def chapter_issues(data):
 def scene_schema(indices):
     # Speakers/scene positions are author-controlled before writing. The model
     # only supplies prose for required named slots, so it cannot miscount roles.
-    return object_schema({f'scene_{i}':object_schema({'text':string(16,400),'visual':string(20,360)})
+    return object_schema({f'scene_{i}':object_schema({'text':string(1,400),'visual':string(20,360)})
                           for i in indices})
 
 
@@ -174,6 +168,24 @@ def write_chapter(root,run_id,index):
     accepted={key:value for key,value in progress['accepted'].items() if key in {str(i) for i in range(8)}
               and not scene_issues(value,roles[int(key)])}
     progress['accepted']=accepted
+    for raw_path in sorted((root/'chapters').glob(f'raw-attempt-*-{index}.json'),
+                           key=lambda path:int(path.name.split('-')[-2])):
+        raw=json.loads(raw_path.read_text())
+        if not isinstance(raw,dict):
+            continue
+        for i in range(8):
+            if str(i) in accepted or f'scene_{i}' not in raw:
+                continue
+            value=raw[f'scene_{i}']
+            if not isinstance(value,dict) or not all(isinstance(value.get(k),str) for k in ('text','visual')):
+                continue
+            candidate=dict(value,speaker=roles[i])
+            candidate=normalize_planning({'scene':candidate},
+                object_schema({'scene':object_schema({'speaker':{'type':'string'},
+                    'text':string(1,400),'visual':string(20,360)})}))['scene']
+            if not scene_issues(candidate,roles[i]):
+                accepted[str(i)]=candidate
+                progress['drafts'][str(i)]=candidate
     save_json(progress_path,progress)
     outline=draft['outline']
     seed=int(hashlib.sha256((run_id+':chapter:'+str(index)).encode()).hexdigest()[:7],16)

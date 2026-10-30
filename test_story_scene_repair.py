@@ -53,7 +53,7 @@ class ProductionChapterRegression(unittest.TestCase):
                     write_chapter(root,'story-test',i)
             self.assertEqual(successful.read_bytes(),original)
             self.assertEqual(calls,[{'scene_6','scene_7'},{'scene_6','scene_7'},
-                                    {'scene_4','scene_5','scene_6','scene_7'},{'scene_6','scene_7'}])
+                                    {'scene_6','scene_7'},{'scene_4'},{'scene_5'},{'scene_6','scene_7'}])
             self.assertEqual(sum(map(len,calls)),10)
             for i,profile in enumerate(PROFILES):
                 rows=rows_for(profile)
@@ -61,7 +61,7 @@ class ProductionChapterRegression(unittest.TestCase):
                 result=json.loads((root/'chapters'/f'chapter-{i}.json').read_text())
                 self.assertIsNone(chapter_issues(result))
                 for position,row in enumerate(rows):
-                    if not scene_issues(row,roles[position]):
+                    if not scene_issues(row,roles[position]) and not (i==4 and position in (4,5)):
                         self.assertEqual(result['scenes'][position],row)
             story=assemble_story(root,'story-test',[])
             validate_story(story)
@@ -97,7 +97,8 @@ class ProductionChapterRegression(unittest.TestCase):
         narration=rows_for(([33],['narrator']))[0]
         self.assertEqual(scene_issues(narration),[])
         self.assertIn('speaker',scene_issues(short,'narrator'))
-        self.assertIn('words',scene_issues(rows_for(([45],['narrator']))[0]))
+        self.assertEqual(scene_issues(rows_for(([15],['narrator']))[0]),[])
+        self.assertIn('text',scene_issues(rows_for(([80],['narrator']))[0]))
 
     def test_budget_repairs_only_selected_scene_and_never_truncates_existing_prose(self):
         accepted={str(i):s for i,s in enumerate(rows_for(([18]*6+[8]*2,
@@ -107,6 +108,30 @@ class ProductionChapterRegression(unittest.TestCase):
         self.assertTrue(0<len(selected)<8)
         self.assertTrue(all(accepted[str(i)]['speaker']=='narrator' for i in selected))
         self.assertEqual(accepted,before)
+
+    def test_saved_short_narration_recovers_without_another_model_request(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            draft=dict(run_id='story-test',outline=outline_fixture())
+            save_json(root/'story-draft.json',draft)
+            rows=rows_for(([28]*7+[15],DEFAULT_ROLES))
+            save_json(root/'chapters/progress-0.json',dict(run_id='story-test',
+                outline_hash=outline_identity(draft),roles=list(DEFAULT_ROLES),
+                accepted={str(i):rows[i] for i in range(7)},drafts={},requests=6))
+            save_json(root/'chapters/raw-attempt-6-0.json',dict(scene_7={
+                key:value for key,value in rows[7].items() if key!='speaker'}))
+            with patch('story_plan.ask') as model:
+                write_chapter(root,'story-test',0)
+                model.assert_not_called()
+            result=json.loads((root/'chapters/chapter-0.json').read_text())
+            self.assertEqual(result['scenes'],rows)
+
+    def test_voice_chunks_preserve_all_words_and_punctuation(self):
+        from story_voice import speech_chunks
+        text=('यह कहानी हमें उम्मीद और साहस देती है। '*20).strip()
+        chunks=speech_chunks(text)
+        self.assertEqual(' '.join(chunks),text)
+        self.assertTrue(all(len(chunk)<=200 and len(chunk.split())<=30 for chunk in chunks))
 
     def test_cross_outline_partial_checkpoint_cannot_be_reused(self):
         with tempfile.TemporaryDirectory() as temporary:

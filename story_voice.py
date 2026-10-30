@@ -6,7 +6,30 @@ from pathlib import Path
 from story_writer import VOICES, save_json, validate_story
 
 SAMPLE_RATE = 24000
-VOICE_VERSION = 'kokoro-0.9.4-hindi-v1'
+VOICE_VERSION = 'kokoro-0.9.4-hindi-v2-bounded-chunks'
+
+
+def speech_chunks(text,max_words=30,max_characters=200):
+    """Break only at word boundaries; preserve every spoken word/punctuation."""
+    words=text.split()
+    chunks=[]
+    start=0
+    while start<len(words):
+        end=start
+        chars=0
+        while end<len(words) and end-start<max_words:
+            extra=len(words[end])+(1 if end>start else 0)
+            if end>start and chars+extra>max_characters:
+                break
+            chars+=extra
+            end+=1
+        if end<len(words):
+            stops=[i+1 for i in range(start,end) if words[i].endswith(('।','.','!','?'))]
+            if stops and stops[-1]>start+(end-start)//2:
+                end=stops[-1]
+        chunks.append(' '.join(words[start:end]))
+        start=end
+    return chunks
 
 
 def voice_identity(story, speed):
@@ -40,7 +63,7 @@ def generate_voice(root, story):
             path = work/f"voice-{scene['index']:03d}.wav"
             if not path.exists():
                 chunks = [audio.detach().cpu().numpy() for _, _, audio in pipeline(
-                    scene['text'], voice=VOICES[scene['speaker']], speed=speed, split_pattern=r'\n+')]
+                    '\n'.join(speech_chunks(scene['text'])), voice=VOICES[scene['speaker']], speed=speed, split_pattern=r'\n+')]
                 if not chunks or not all(np.isfinite(c).all() and len(c) > 0 for c in chunks):
                     raise RuntimeError('Kokoro returned invalid or empty Hindi speech')
                 samples = np.concatenate(chunks)

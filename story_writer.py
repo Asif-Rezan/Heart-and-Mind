@@ -49,8 +49,14 @@ def novelty_reason(story, history):
     return None
 
 
-def spoken_word_limits(speaker):
-    return (18,38) if speaker=='narrator' else (8,38)
+def speech_issues(text):
+    """Speech validity is about content, not an exact per-scene word count."""
+    if not isinstance(text,str) or not text.strip() or len(text)>400:
+        return ['text']
+    letters=[c for c in text if c.isalpha()]
+    if not letters or sum('\u0900'<=c<='\u097f' for c in letters)/len(letters)<.9:
+        return ['hindi']
+    return []
 
 
 def validate_story(story):
@@ -65,9 +71,8 @@ def validate_story(story):
         if scene['index'] != i or scene['speaker'] not in VOICES:
             raise ValueError('Invalid scene identity or speaker')
         words = scene['text'].split()
-        minimum,maximum=spoken_word_limits(scene['speaker'])
-        if not minimum<=len(words)<=maximum:
-            raise ValueError('Spoken scene length is outside its narration/dialogue range')
+        if speech_issues(scene['text']):
+            raise ValueError('Spoken scene must be nonempty bounded Devanagari Hindi text')
         letters = [c for c in scene['text'] if c.isalpha()]
         if not letters or sum('\u0900' <= c <= '\u097f' for c in letters)/len(letters) < .9:
             raise ValueError('Speech must be Hindi Devanagari')
