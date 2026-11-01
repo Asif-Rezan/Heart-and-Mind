@@ -206,8 +206,6 @@ def publish_story(root, story, run_id, defer_drive_cleanup=False):
             raise ValueError('Video bytes changed during publication recovery')
         state['video_hash'] = fingerprint
         save()
-        if (root/'video-style.json').exists():
-            store.upload(root/'video-style.json', f'stories/runs/{run_id}/video-style.json')
         for name in ('story.json','timing.json','narration.wav','background.wav','song.wav',
                      'mix.json','video.mp4','thumbnail.jpg','render-state.json'):
             print(json.dumps({'check': 'publication', 'operation': 'backup', 'asset': name}), flush=True)

@@ -47,23 +47,12 @@ class ParallelBudgetTests(unittest.TestCase):
                 self.assertTrue((root/f'scene-{index:03d}-source.png').exists())
                 self.assertEqual(index%17,kwargs['shard'])
                 owners.append(index)
-        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=draw) as generator,patch('story_puppet_video.render_clips',side_effect=render):
+        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=draw) as generator,patch('story_video.render_clips',side_effect=render):
             root=Path(folder);save_json(root/'timing.json',timeline(300))
             for shard in range(17):
                 with patch.dict(os.environ,{'IMAGE_SHARD':str(shard),'IMAGE_SHARDS':'17'}):
                     generate_images(root,story,render_ready=True)
             self.assertEqual(sorted(owners),list(range(75)))
             self.assertEqual(len(set(owners)),75)
-            generator.assert_not_called()
-            self.assertEqual(len(list(root.glob('scene-*-puppet.json'))),75)
+            self.assertEqual(generator.call_count,75+17+1)  # Frames, references, dedicated thumbnail.
             self.assertTrue((root/'thumbnail-source.png').exists())
-
-
-def setUpModule():
-    global _puppet_style_patch
-    _puppet_style_patch=patch.dict(os.environ,{'STORY_VIDEO_STYLE':'puppet'})
-    _puppet_style_patch.start()
-
-
-def tearDownModule():
-    _puppet_style_patch.stop()
