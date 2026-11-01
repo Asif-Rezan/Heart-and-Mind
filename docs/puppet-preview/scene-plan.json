@@ -1,0 +1,39 @@
+{
+  "version": "heart-mind-puppet-v1",
+  "index": 0,
+  "story_scene": 0,
+  "visual": "Ram offers a letter to Sita together in their shop, happy smiles.",
+  "setting": "shop",
+  "action": "offer",
+  "emotion": "happy",
+  "prop": "letter",
+  "cast": [
+    {
+      "name": "Ram",
+      "description": "Ram, young Indian man, short black hair, blue kurta",
+      "shirt": "#467dbb",
+      "skin": "#d49a74",
+      "hair": "#30283a",
+      "long_hair": false,
+      "gray": false,
+      "glasses": false
+    },
+    {
+      "name": "Sita",
+      "description": "Sita, Indian woman, green sari and long black hair",
+      "shirt": "#4a9c87",
+      "skin": "#e3b28d",
+      "hair": "#30283a",
+      "long_hair": true,
+      "gray": false,
+      "glasses": false
+    }
+  ],
+  "visible": [
+    0,
+    1
+  ],
+  "night": false,
+  "start": null,
+  "end": null
+}

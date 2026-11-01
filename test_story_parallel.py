@@ -193,25 +193,24 @@ class WorkflowConcurrencyChecks(unittest.TestCase):
         self.assertIn('images',jobs['publish']['needs'])
         self.assertTrue(any('--prepared-clips' in step.get('run','') for step in jobs['publish']['steps']))
 
-    def test_all_48_images_are_generated_once_across_18_workers_and_reused(self):
-        from PIL import Image
+    def test_all_48_puppet_plans_are_prepared_once_across_workers_and_reused(self):
         from story_video import generate_images
         story=example_story()
-        def generate(prompt,path,**kwargs):
-            Image.new('RGB',(32,24),'gold').save(path)
-        with tempfile.TemporaryDirectory() as temporary,patch('story_image_cpu.generate',side_effect=generate) as model:
+        with tempfile.TemporaryDirectory() as temporary,patch('story_image_cpu.generate') as model:
             root=Path(temporary)
             counts=[]
             for shard in range(18):
                 with patch.dict(os.environ,{'IMAGE_SHARD':str(shard),'IMAGE_SHARDS':'18'}):
                     generate_images(root,story)
                 counts.append(len(json.loads((root/f'image-manifest-{shard:02d}.json').read_text())))
-            self.assertEqual(model.call_count,48)
             self.assertEqual(counts,[3]*12+[2]*6)
+            before={p.name:p.stat().st_mtime_ns for p in root.glob('scene-*-source.png')}
             for shard in range(18):
                 with patch.dict(os.environ,{'IMAGE_SHARD':str(shard),'IMAGE_SHARDS':'18'}):
                     generate_images(root,story)
-            self.assertEqual(model.call_count,48)
+            self.assertEqual(before,{p.name:p.stat().st_mtime_ns for p in root.glob('scene-*-source.png')})
+            self.assertEqual(len(list(root.glob('scene-*-puppet.json'))),48)
+            model.assert_not_called()
 
 
 @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'),'FFmpeg media smoke checks')
@@ -256,6 +255,8 @@ class ParallelMediaChecks(unittest.TestCase):
             save_json(root/'story.json',story);save_json(root/'timing.json',timing)
             for i,color in enumerate(('blue','gold')):
                 Image.new('RGB',(128,72),color).save(root/f'scene-{i:03d}-source.png')
+            from story_video import generate_images
+            generate_images(root,story)
             subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=440:sample_rate=24000:duration=480',str(root/'song.wav')],check=True)
             render_clips(root,story,timing,width=128,height=72,shard=1,shards=18)
             render_clips(root,story,timing,width=128,height=72,shard=0,shards=18)
@@ -269,3 +270,13 @@ class ParallelMediaChecks(unittest.TestCase):
 
 if __name__=='__main__':
     unittest.main()
+
+
+def setUpModule():
+    global _puppet_style_patch
+    _puppet_style_patch=patch.dict(os.environ,{'STORY_VIDEO_STYLE':'puppet'})
+    _puppet_style_patch.start()
+
+
+def tearDownModule():
+    _puppet_style_patch.stop()

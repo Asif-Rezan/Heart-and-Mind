@@ -73,30 +73,27 @@ class ShortStoryContract(unittest.TestCase):
         self.assertEqual(visual_timeline(story,timing)[index]['story_scene'],30)
         self.assertNotEqual(index,0)
 
-    def test_images_share_reference_and_use_time_aligned_story_prompts_and_cache(self):
+    def test_puppets_share_cast_and_follow_timeline_and_cache(self):
         story=short_story()
-        def generate(prompt,path,**kwargs):
-            Image.new('RGB',(64,36),'gold').save(path)
-        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=generate) as model:
+        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate') as model:
             root=Path(folder);save_json(root/'timing.json',timeline())
             with patch.dict(os.environ,{'IMAGE_SHARD':'0','IMAGE_SHARDS':'18'}):
                 generate_images(root,story)
-                self.assertEqual(model.call_count,7)  # Reference, five timeline frames, separate thumbnail.
-                for call in model.call_args_list[1:]:
-                    self.assertEqual(call.kwargs['reference_path'],root/'cast-reference-00.png')
                 manifest=json.loads((root/'image-manifest-00.json').read_text())
-                self.assertIn(story['visuals']['0'],manifest['0']['prompt'])
+                self.assertIn(story['visuals']['0'],manifest['0']['visual'])
                 self.assertEqual(manifest['18']['start'],72)
                 self.assertEqual(manifest['18']['story_scene'],11)
+                self.assertEqual(manifest['0']['cast'],manifest['18']['cast'])
                 thumb=json.loads((root/'thumbnail-manifest.json').read_text())
-                self.assertIn(story['thumbnail_prompt'],thumb['prompt'])
                 self.assertEqual(thumb['story_scene'],30)
-                self.assertNotEqual(thumb['seed'],manifest['0']['seed'])
+                before=(root/'scene-000-source.png').stat().st_mtime_ns
                 generate_images(root,story)
-                self.assertEqual(model.call_count,7)
+                self.assertEqual(before,(root/'scene-000-source.png').stat().st_mtime_ns)
                 story['visuals']['0']='Ram in his blue kurta folds a letter inside his village shop.'
                 generate_images(root,story)
-                self.assertEqual(model.call_count,8)
+                self.assertEqual(json.loads((root/'scene-000-puppet.json').read_text())['prop'],'letter')
+                self.assertNotEqual(before,(root/'scene-000-source.png').stat().st_mtime_ns)
+                model.assert_not_called()
 
     def test_voice_rejects_pipeline_text_echo_before_saving_audio(self):
         text='उसने खिड़की के पास बैठकर अपनी माँ को पहली चिट्ठी लिखी।'
@@ -157,23 +154,40 @@ class ShortMediaSmoke(unittest.TestCase):
         from pipeline import duration
         from story_media import digest
         story=short_story();timing=timeline(240)
+        for i,scene in enumerate(timing['scenes']):
+            scene['start']=i*4 if i<47 else 188
+            scene['end']=(i+1)*4 if i<47 else 240
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
             save_json(root/'story.json',story);save_json(root/'timing.json',timing)
             slots=visual_timeline(story,timing)
-            for slot in slots:
-                i=slot['index'];color=(220,20,20) if i%2==0 else (20,20,220)
-                Image.new('RGB',(128,72),color).save(root/f'scene-{i:03d}-source.png')
-            Image.new('RGB',(128,72),(20,220,20)).save(root/'thumbnail-source.png')
+            for scene in story['scenes']:scene['text']=''
+            for i in range(48):
+                story['visuals'][str(i)]=('Ram walks in a sunny garden.' if i%2==0 else 'Ram writes a letter in a home kitchen.')
+            generate_images(root,story)
             subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=200:sample_rate=24000:duration=240',str(root/'song.wav')],check=True)
             for shard in range(3):
                 render_clips(root,story,timing,width=128,height=72,shard=shard,shards=3)
             render(root,story,timing,width=128,height=72,prepared_clips=True)
             self.assertAlmostEqual(duration(root/'video.mp4'),240,places=1)
-            for at,channel in ((3.8,0),(4.2,2),(8.2,0)):
+            samples=[]
+            for at in (3.8,4.2,8.2):
                 target=root/f'frame-{at}.png'
                 subprocess.run(['ffmpeg','-v','error','-y','-ss',str(at),'-i',str(root/'video.mp4'),'-frames:v','1',str(target)],check=True)
-                with Image.open(target) as frame:
-                    pixel=frame.getpixel((64,36));self.assertGreater(pixel[channel],180)
+                with Image.open(target) as frame:samples.append(frame.getpixel((5,45)))
+            self.assertNotEqual(samples[0],samples[1])
+            self.assertEqual(samples[0],samples[2])
             with Image.open(root/'thumbnail.jpg') as thumb, Image.open(root/'thumbnail-source.png') as source:
-                self.assertTrue(all(abs(a-b)<4 for a,b in zip(thumb.getpixel((640,360)),source.getpixel((64,36)))))
+                from PIL import ImageOps,ImageChops,ImageStat
+                difference=ImageChops.difference(thumb.convert('RGB'),ImageOps.fit(source.convert('RGB'),(1280,720)))
+                self.assertLess(max(ImageStat.Stat(difference).mean),4)
+
+
+def setUpModule():
+    global _puppet_style_patch
+    _puppet_style_patch=patch.dict(os.environ,{'STORY_VIDEO_STYLE':'puppet'})
+    _puppet_style_patch.start()
+
+
+def tearDownModule():
+    _puppet_style_patch.stop()
