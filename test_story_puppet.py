@@ -90,6 +90,13 @@ class PuppetAnimation(unittest.TestCase):
         # Static environment stays fixed while the articulated rig moves.
         self.assertIsNone(ImageChops.difference(f1.crop((0,0,100,100)),f2.crop((0,0,100,100))).getbbox())
 
+    def test_specific_story_location_wins_over_village_and_movement(self):
+        story=short_story()
+        for location,visual in [('shop','Ram walks into his village shop.'),('school','Ram walks to the village school.'),('garden','Ram walks in the village garden.')]:
+            story['visuals']['0']=visual
+            story['scenes'][0]['text']=''
+            self.assertEqual(scene_plan(story,dict(index=0))['setting'],location)
+
     @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'),'FFmpeg required')
     def test_real_encoded_frames_move_and_match_duration(self):
         from pipeline import duration

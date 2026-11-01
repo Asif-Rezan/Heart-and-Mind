@@ -44,9 +44,12 @@ def scene_plan(story, slot):
     text=(visual+' '+scene.get('text','')).lower()
     world=story.get('world','').lower()
     setting='home'
-    for kind,words in [('street','street|road|village|walk|bus|सड़क'),('garden','garden|park|tree|field|खेत'),
-                       ('school','school|classroom|study|exam|schoolroom|स्कूल'),('shop','shop|market|store|दुकान'),
-                       ('office','office|workshop|factory|काम'),('home','home|kitchen|bedroom|house|घर')]:
+    # Specific locations win over broad words such as "village" or "walk".
+    for kind,words in [('school','school|classroom|study|exam|schoolroom|स्कूल'),
+                       ('shop','shop|market|store|दुकान'),('office','office|workshop|factory'),
+                       ('home','home|kitchen|bedroom|house|घर'),
+                       ('garden','garden|park|tree|field|खेत'),
+                       ('street','street|road|village|walk|bus|सड़क')]:
         if contains(text,words): setting=kind; break
     else:
         if contains(world,'village|garden|field'): setting='garden'
