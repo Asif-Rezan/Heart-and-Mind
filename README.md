@@ -32,6 +32,12 @@ git switch -c restore/pre-puppet-animation checkpoint/pre-puppet-animation-2026-
 
 To restore production later, revert the animation change commit through a new commit/PR; do not force-reset shared history. The new implementation and README are committed together on `codex/python-puppet-animation` and applied to `main`; the new version is tagged [`release/daily-visual-rotation-2026-11-01`](https://github.com/Asif-Rezan/Heart-and-Mind/tree/release/daily-visual-rotation-2026-11-01). No generation/publication is triggered by this change.
 
+## One-minute Actions demo
+
+Run **One-minute Python 2D puppet story demo** (`puppet-demo.yml`) manually from Actions. It creates an exactly 60-second / 1500-frame 1280×720 preview with six scenes, the production Hindi Kokoro narrator, an original quiet synthesized pad and a storyboard. Download `puppet-story-demo-60s`; its verification JSON records duration, frame count, video hash and workflow run ID. This demo has no Google credentials and does not upload to YouTube or Drive. Its fixed 60-second narration uses a bounded tempo fit for preview purposes; the daily production narration rules are unchanged.
+
+Local graphics-only smoke check: `python demo_story_puppet.py --silent --output /tmp/puppet-demo`. Run without `--silent` with the CPU voice dependencies to include speech/music.
+
 ## Current story, voice and artwork contract
 
 - **Engagement structure:** first two short beats open on an immediate dilemma or unanswered question, without a greeting/intro or ending spoiler. Later chapters develop causal choices, new information and earned stakes. An earlier detail pays off at the resolution. Only after that payoff, the final one or two beats invite a specific reflective comment and optionally a brief follow. One full-script editorial review creates a **fixed correction plan** against the canonical cast/summary. Corrections run in batches of at most two scenes, with two attempts per pending batch. Every accepted edit is checkpointed; later model opinions cannot reopen completed work. New text must be Hindi, change the selected line, avoid repeated substantial sentences and preserve the 520–720-word budget. A closing viewer-comment CTA is checked directly even when the model calls it present. Incomplete edits stop with `editorial_edit_incomplete` and pending indices; impossible empty progression plans stop early with `editorial_plan_incomplete`. Completion records validated edits, not an audience quality score. These checks cannot guarantee engagement or retention.

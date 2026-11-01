@@ -1,0 +1,46 @@
+name: One-minute Python 2D puppet story demo
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  demo:
+    name: Render 60-second puppet demo with Hindi narration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - name: Install CPU animation, narration and encoding tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+        pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+        pip install -r requirements.txt -r requirements-voice-cpu.txt
+    - name: Animate six story scenes and verify exactly sixty seconds
+      run: python -u demo_story_puppet.py
+    - uses: actions/upload-artifact@v4
+      with:
+        name: puppet-story-demo-60s
+        path: |
+          output/puppet-demo-60s/puppet-story-60s.mp4
+          output/puppet-demo-60s/storyboard.jpg
+          output/puppet-demo-60s/story.json
+          output/puppet-demo-60s/scene-plans.json
+          output/puppet-demo-60s/verification.json
+        if-no-files-found: error
+        retention-days: 14
+    - name: Write preview result
+      run: |
+        echo '### One-minute 2D puppet story demo' >> "$GITHUB_STEP_SUMMARY"
+        echo 'Download **puppet-story-demo-60s** for the verified 1280x720 MP4, Hindi narration, original quiet music and scene plans. This workflow does not publish to YouTube.' >> "$GITHUB_STEP_SUMMARY"
