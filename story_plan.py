@@ -6,6 +6,7 @@ from pathlib import Path
 from story_writer import (ask, OUTLINE, CHAPTER, VERSION, VOICES, save_json,
                           validate_story, novelty_reason, text_hash, StoryValidationError, object_schema, string, speech_issues, normalize_planning)
 
+from story_engagement import chapter_direction
 from story_format import FORMAT, MIN_WORDS, MAX_WORDS
 
 CHAPTERS=6
@@ -39,6 +40,10 @@ def prepare_outline(root, run_id, history):
             'Plan exactly SIX chronological chapter beats (about 120 characters each): beginning, struggle, '
             'setback, turning point, constructive action, resolution. Each beat must specify concrete actions '
             'and a distinct start/end so separate writers can continue the same plot without contradictions. '
+            'Begin with a concrete high-stakes question/action in the first ten seconds, no greeting or intro. '
+            'Seed one detail whose significance is paid off at the end. Escalate stakes through choices, '
+            'not artificial disasters. Reserve the final two scenes for one story-specific reflective comment '
+            'question and a brief optional follow invitation, AFTER the emotional resolution. '
             'Each chapter will have eight scenes, 11-15 Hindi words per scene, about 95-110 words per chapter. Pastel cute 3D storybook world. '
             'Avoid previous titles and plots: '+json.dumps(recent,ensure_ascii=False),
             seed,2800,checkpoint=root/'outline-response.json')
@@ -186,6 +191,7 @@ def write_chapter(root,run_id,index):
             'Write or repair ONLY the requested scene slots for chapter '+str(index+1)+'. '
             'Canonical outline: '+json.dumps(outline,ensure_ascii=False)+
             '\nThis chapter beat: '+outline['chapters'][index]+
+            '\nEngagement direction: '+chapter_direction(index)+
             '\nFixed scene context: '+json.dumps(context,ensure_ascii=False)+
             '\nRequested slots/roles: '+json.dumps(targets,ensure_ascii=False)+
             '\nReturn exactly the required scene_N JSON keys. Each text is natural Hindi Devanagari, '+
@@ -338,6 +344,8 @@ def assemble_story(root,run_id,history):
         tags=['Hindi motivational story','Hindi emotional story','प्रेरणादायक कहानी','Hindi kahani'])
     if draft.get('format')==FORMAT:
         story['format']=FORMAT
+        from story_engagement import polish_engagement
+        polish_engagement(root,story)
         repair_repetition(root, story)
         from story_packaging import prepare_packaging
         prepare_packaging(root,story)

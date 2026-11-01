@@ -69,12 +69,29 @@ def music_parts(seconds):
 def score_request(story, index):
     if type(index) is not int or not 0<=index<6:
         raise ValueError('Invalid background music part')
-    mood=('gentle reflective piano, soft strings' if index==0 else
-          'warm hopeful piano, rising strings' if index==5 else
-          'restrained emotional piano, subtle ambient strings')
+    if is_short(story):
+        if index>=3:
+            raise ValueError('Short stories use exactly three music parts')
+        moods=(
+            'opening curiosity and intimate anticipation, delicate felt-piano motif, airy plucked strings, subtle pulse',
+            'growing emotional stakes and a reflective turning point, developing the same piano motif, warm cello, soft restrained rhythmic pulse',
+            'earned relief and warm hopeful emotional payoff, resolved piano motif, gently lifting strings, calm reassuring ending'
+        )
+        mood=moods[index]
+        context=' Story emotional context: '+story['summary'][:500]+'. '
+    else:
+        mood=('gentle reflective piano, soft strings' if index==0 else
+              'warm hopeful piano, rising strings' if index==5 else
+              'restrained emotional piano, subtle ambient strings')
+        return dict(_segment=True,instrumental=True,duration=120,lyrics='[Instrumental]',
+            prompt='Instrumental cinematic background score for an Indian emotional motivational story, '+mood+
+            ', no vocals, no singing, no speech, sparse arrangement, quiet accompaniment under dialogue.')
     return dict(_segment=True,instrumental=True,duration=120,lyrics='[Instrumental]',
         prompt='Instrumental cinematic background score for an Indian emotional motivational story, '+mood+
-        ', no vocals, no singing, no speech, sparse arrangement, quiet accompaniment under dialogue.')
+        ', cohesive D major / B minor palette, 78 BPM, one memorable understated four-note motif, '
+        'expressive dynamic development, organic acoustic textures, gentle transitions, no abrupt drops, '
+        'no loud percussion, no busy lead melody, no vocals, no singing, no speech, '
+        'sparse arrangement with space for a clear spoken narrator.'+context)
 
 
 def generate_score_part(root,story,index):
@@ -117,7 +134,9 @@ def mix_score(root,story,timing):
         if duration(path)<119.95:
             raise RuntimeError('Background score too short; never pad or loop music')
         normalized=work/f'normalized-{i}.wav'
-        run_ffmpeg(['-i',str(path),'-t','120','-ar','24000','-ac','1',str(normalized)])
+        part_seconds=timing['duration']/3 if is_short(story) else 120
+        filters=['-af',f'loudnorm=I=-23:LRA=7:TP=-3,afade=t=in:d=0.6,afade=t=out:st={part_seconds-.6}:d=0.6'] if is_short(story) else []
+        run_ffmpeg(['-i',str(path),'-t',str(part_seconds),*filters,'-ar','24000','-ac','1',str(normalized)])
         paths.append(normalized)
     listing=work/'parts.txt'
     listing.write_text(''.join(f"file '{p.name}'\n" for p in paths))
@@ -127,9 +146,12 @@ def mix_score(root,story,timing):
     seconds=timing['duration']
     # Score parts may be generated before speech. Only excess instrumental
     # accompaniment is trimmed; the complete measured narration is preserved.
-    graph=(f'[0:a]asplit=2[voice][control];[1:a]volume=0.10,afade=t=in:d=1,'
+    voice_filter='loudnorm=I=-16:LRA=9:TP=-1.5,' if is_short(story) else ''
+    bed_volume='0.50' if is_short(story) else '0.10'
+    compressor='threshold=0.10:ratio=3:attack=40:release=450' if is_short(story) else 'threshold=0.025:ratio=6:attack=20:release=300'
+    graph=(f'[0:a]{voice_filter}asplit=2[voice][control];[1:a]volume={bed_volume},afade=t=in:d=1,'
         f'afade=t=out:st={max(0,seconds-2)}:d=2[bed];'
-        '[bed][control]sidechaincompress=threshold=0.025:ratio=6:attack=20:release=300[ducked];'
+        f'[bed][control]sidechaincompress={compressor}[ducked];'
         '[voice][ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[out]')
     temp=root/'song.tmp.wav'
     run_ffmpeg(['-i',str(root/'narration.wav'),'-i',str(root/'background.wav'),
@@ -138,7 +160,9 @@ def mix_score(root,story,timing):
         raise ValueError('Mixed story duration differs from speech')
     temp.replace(root/'song.wav')
     save_json(root/'mix.json',dict(narration=digest(root/'narration.wav'),
-        background=digest(root/'background.wav'),duration=seconds,instrumental=True))
+        background=digest(root/'background.wav'),duration=seconds,instrumental=True,
+        section_seconds=seconds/3 if is_short(story) else 120,
+        mix_profile='normalized-story-arc-v2' if is_short(story) else 'legacy'))
 
 
 def score(root,story,timing):
