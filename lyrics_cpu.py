@@ -146,5 +146,6 @@ def request_story(endpoint, payload):
             continue
         print(json.dumps({'check': 'Qwen lyrics JSON', 'passed': True,
             'seconds': round(time.monotonic() - started, 1),
+            'prompt_tokens': result.get('usage', {}).get('prompt_tokens',prompt_tokens),
             'completion_tokens': result.get('usage', {}).get('completion_tokens')}), flush=True)
         return result

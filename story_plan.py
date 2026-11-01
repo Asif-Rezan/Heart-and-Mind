@@ -396,31 +396,100 @@ def assemble_story(root,run_id,history):
     return story
 
 
+def scene_context(story, indices, neighbors=1):
+    """Only the final spoken beats relevant to this request, without 48 visuals."""
+    wanted={j for i in indices for j in range(max(0,i-neighbors),min(len(story['scenes']),i+neighbors+1))}
+    return [dict(index=i,text=story['scenes'][i]['text']) for i in sorted(wanted)]
+
+
 def repair_repetition(root, story):
-    from story_writer import repeated_scenes
-    for attempt in range(3):
-        indices = repeated_scenes(story['scenes'])
-        if not indices:
-            return
-        for start in range(0, len(indices), 8):
-            slots = indices[start:start+8]
-            response = ask(scene_schema(slots),
-                'Edit ONLY repeated lines in the requested scenes. Tell each event ONCE, no recap or echo of dialogue. '
-                'Write 11-15 Hindi words per scene; preserve the plot and chronological action. '
-                'Update each English visual to represent exactly that text with the same named people, clothing, props and location. '
-                'Full story: '+json.dumps(story,ensure_ascii=False)+
-                '\nRequested scenes: '+json.dumps(slots),
-                int(text_hash(story['run_id']+str(attempt)+str(start))[:7],16),
-                min(4000,500+400*len(slots)),
-                checkpoint=Path(root)/'repetition-responses'/f'{attempt}-{start}.json')
+    """Reject echoes, save each accepted repair, and resume only unresolved slots."""
+    from story_writer import repeated_scenes, normalized
+    from story_engagement import has_closing_cta
+    from difflib import SequenceMatcher
+    import re
+    root=Path(root)
+    identity=hashlib.sha256(json.dumps(dict(run_id=story['run_id'],scenes=story['scenes']),
+        sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+    path=root/'repetition-state.json'
+    saved=json.loads(path.read_text()) if path.exists() else {}
+    if saved and identity not in (saved.get('identity'),saved.get('output_identity')):
+        raise StoryValidationError('repetition_checkpoint_identity_mismatch')
+    if saved:
+        story['scenes']=saved['scenes']
+        story['lyrics']='\n'.join(s['text'] for s in story['scenes'])
+    else:
+        saved=dict(identity=identity,output_identity=identity,scenes=story['scenes'],requests=0,rejections={})
+    pending=repeated_scenes(story['scenes'])
+    if not pending:
+        return
+    save_json(path,saved)
+    # Fixed, bounded batches keep prompts small on CPU. A retry gets explicit
+    # rejection feedback rather than silently accepting the original echo.
+    for start in range(0,len(pending),2):
+        batch=pending[start:start+2]
+        for attempt in range(2):
+            current=set(repeated_scenes(story['scenes']))
+            slots=[i for i in batch if i in current]
+            if not slots:
+                break
+            forbidden={}
             for i in slots:
-                candidate=dict(response[f'scene_{i}'],speaker='narrator',index=i)
-                if scene_issues(candidate,'narrator'):
-                    raise StoryValidationError('invalid_repetition_repair',dict(scene=i))
-                story['scenes'][i]=candidate
-            story['lyrics']='\n'.join(s['text'] for s in story['scenes'])
-    if repeated_scenes(story['scenes']):
-        raise StoryValidationError('repeated_story_lines')
+                lines=[]
+                for sentence in re.split(r'[।.!?\n]+',story['scenes'][i]['text']):
+                    line=normalized(sentence)
+                    if len(line.split())<3:continue
+                    for prior in story['scenes'][:i]:
+                        for old in re.split(r'[।.!?\n]+',prior['text']):
+                            old_line=normalized(old)
+                            if line==old_line or (min(len(line.split()),len(old_line.split()))>=10 and
+                                SequenceMatcher(None,line,old_line,autojunk=False).ratio()>=.92):
+                                lines.append(old)
+                forbidden[str(i)]=lines
+            saved['requests']+=1
+            save_json(path,saved)
+            response=ask(scene_schema(slots),
+                'REWRITE the requested repeated narration, do not copy or return its current words. '
+                'Each later scene must ADVANCE its own chronological beat, not recap an earlier event. '
+                'Keep one narrator, established people and canonical events. Write natural Hindi Devanagari, '
+                'roughly the same word count as the original; preserve the complete 520-720 word budget. '
+                'English visual must match the new action with fixed appearance. A closing viewer-comment '
+                'invitation must remain if editing the final scene. Returning the same line is REJECTED. '
+                'Canonical summary: '+story['summary']+' Cast: '+story['characters']+
+                '\nFinal neighboring beats: '+json.dumps(scene_context(story,slots),ensure_ascii=False)+
+                '\nRequested scenes and current visuals: '+json.dumps([story['scenes'][i] for i in slots],ensure_ascii=False)+
+                '\nAlready narrated lines you MUST NOT repeat: '+json.dumps(forbidden,ensure_ascii=False)+
+                '\nPrevious rejection feedback: '+json.dumps({str(i):saved['rejections'].get(str(i)) for i in slots}),
+                int(identity[:7],16)+saved['requests']*17,500+200*len(slots),
+                checkpoint=root/'repetition-responses'/f"rewrite-{saved['requests']}.json")
+            for i in slots:
+                value=response.get(f'scene_{i}',{})
+                candidate=dict(value,speaker='narrator',index=i)
+                reason=None
+                if scene_issues(candidate,'narrator'):reason='invalid_hindi_or_visual'
+                elif normalized(candidate['text'])==normalized(story['scenes'][i]['text']):reason='unchanged_echo'
+                else:
+                    proposed=[dict(s) for s in story['scenes']];proposed[i]=candidate
+                    repeats=set(repeated_scenes(proposed))
+                    total=sum(len(s['text'].split()) for s in proposed)
+                    if i in repeats or not repeats.issubset(current):reason='still_repeated_or_new_echo'
+                    elif not MIN_WORDS<=total<=MAX_WORDS:reason='story_word_budget'
+                    elif i==len(proposed)-1 and has_closing_cta(story['scenes']) and not has_closing_cta(proposed):reason='closing_cta_removed'
+                if reason:
+                    saved['rejections'][str(i)]=reason
+                else:
+                    story['scenes'][i]=candidate
+                    story['lyrics']='\n'.join(s['text'] for s in story['scenes'])
+                    current=set(repeated_scenes(story['scenes']))
+                    saved['scenes']=story['scenes']
+                    saved['output_identity']=hashlib.sha256(json.dumps(dict(run_id=story['run_id'],scenes=story['scenes']),sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+                    saved['rejections'].pop(str(i),None)
+                    print(json.dumps(dict(phase='repetition repair saved',scene=i,pending_scenes=sorted(current))),flush=True)
+                save_json(path,saved)
+    pending=repeated_scenes(story['scenes'])
+    if pending:
+        raise StoryValidationError('repeated_story_lines',dict(pending_scenes=pending,
+            requests=saved['requests'],rejections=saved['rejections']))
 
 
 def prepare_visuals(root, story):
@@ -446,7 +515,8 @@ def prepare_visuals(root, story):
             'One action per frame, main person and prop clear, same colorful 3D storybook style. '
             'Keep each prompt under about 60 English words, put action and defining appearance first. '
             'Canonical cast: '+story['characters']+' World: '+story['world']+
-            '\nFull chronological story: '+json.dumps(story['scenes'],ensure_ascii=False)+
+            '\nCanonical plot: '+story['summary']+
+            '\nFinal chronological beats for this batch: '+json.dumps(scene_context(story,slots),ensure_ascii=False)+
             '\nRequested indices: '+json.dumps(slots),
             int(identity[:7],16)+start,3500,
             checkpoint=Path(root)/'visual-responses'/f'{start}.json')
@@ -466,7 +536,7 @@ def prepare_visuals(root, story):
             'Put character appearance and the main visual action first; at most 60 words. '
             'No unrelated poster, invented event, or generic sunrise. Canonical cast: '+story['characters']+' World: '+story['world']+' '
             'Title: '+story['title']+' Summary: '+story['summary']+
-            '\nScenes: '+json.dumps(story['scenes'],ensure_ascii=False),
+            '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False),
             int(identity[:7],16),500,checkpoint=Path(root)/'thumbnail-selection.json')
         saved['thumbnail_scene']=response['scene']
         saved['thumbnail_prompt']=response['thumbnail_prompt']

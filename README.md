@@ -62,6 +62,16 @@ Chapter 6 of run `41291878710` returned English narration for all eight `text` f
 
 Run `python -m unittest -q` and `actionlint` before rollout. Short-format coverage includes duration endpoints, cross-scene/within-scene echoes, missing/duplicated synthesis text, time-to-story mappings, shared cast/reference consistency, visual-plan checkpoint reuse and thumbnail selection. Real FFmpeg smoke checks render measured puppet clips, join a four-minute episode, check scene cuts and its story thumbnail, and verify motion between decoded frames. Both renderer selections, background reference/cache reuse, daily rotation across month/year boundaries and saved-style resume rules have regression coverage. These controlled checks do not establish production AI image quality or human listening quality.
 
+## Faster planning and repetition recovery (2026-11-01)
+
+[Story run 41293514297](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41293514297) completed all six chapters but failed assembly with `repeated_story_lines` after 53m 11s in the generation step. Its three repair responses returned the exact same scene 36–38 narration, which the previous repair loop accepted until the final validation failed. No narration, music, rendering or upload ran.
+
+Repetition repair now rejects unchanged/near-duplicate/newly duplicated prose immediately, feeds back the rejected reason and already narrated lines, and checkpoints each accepted scene. Batches contain at most two scenes, with at most two attempts per unresolved batch per explicit recovery. Saved accepted repairs are reused, while an unresolved result reports pending indices and rejection reasons. Hindi, full-story word-budget and closing-CTA checks remain enforced.
+
+CPU requests now carry the canonical plot/cast plus relevant final neighboring beats. Editorial edits and visual batches no longer resend all 48 visual descriptions; the full-script audit and thumbnail selector retain all spoken beats without redundant visuals. Using the actual failed script, the first repetition request fell from **16,386 to 2,643 characters (84% smaller)**; the first visual request fell from **11,540 to 2,717 (76% smaller)**. These are measured prompt sizes, not a promised wall-clock speedup. Request logs now include prompt character/token counts alongside inference time.
+
+The **Recover and time saved story planning only** workflow accepts the exact `run_id` and previous `prepared_run`, restores its `story-input` checkpoints, resumes assembly and writes measured seconds to `planning-preview.json`. It requires a saved outline, uses no Google credentials, and does not generate audio, render or publish. Its new `story-input-RUN_ID` artifact can subsequently be resumed by the normal story workflow, which performs the usual private-history/channel checks.
+
 ## Earlier implementation and recovery history
 
 The following records describe previous releases and incidents, not the current short-format specification.

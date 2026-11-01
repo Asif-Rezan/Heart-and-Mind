@@ -54,6 +54,7 @@ def polish_engagement(root,story):
     """Freeze one editorial plan; checkpoint validated edits without moving goals."""
     from story_writer import StoryValidationError, repeated_scenes, normalized
     from story_format import MIN_WORDS, MAX_WORDS
+    from story_plan import scene_context
     root=Path(root)
     identity=hashlib.sha256(json.dumps(story['scenes'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
     path=root/'engagement-review.json'
@@ -77,7 +78,7 @@ def polish_engagement(root,story):
                 'canonical outline. Do not invent new characters, change relationships or impose new plot goals. '
                 'Keep instructions concise. Do not mark a criterion false for stylistic preference alone. '
                 'Canonical summary: '+story['summary']+' Cast: '+story['characters']+
-                '\nFinal script: '+json.dumps(story['scenes'],ensure_ascii=False),
+                '\nFinal script: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False),
                 int(identity[:7],16),1300,checkpoint=root/'engagement-audit-0.json')
         tasks=editorial_tasks(review,story['scenes'])
         saved=dict(version=EDITOR_VERSION,identity=identity,scenes=story['scenes'],review=review,
@@ -101,7 +102,8 @@ def polish_engagement(root,story):
                 'Update each English visual to represent the edited text. For scene 47 the spoken text MUST '
                 'invite a story-specific viewer comment after the payoff, using आप and टिप्पणी/बताइए. '
                 'Canonical summary: '+story['summary']+' Cast: '+story['characters']+
-                '\nFull script: '+json.dumps(story['scenes'],ensure_ascii=False)+
+                '\nFinal neighboring beats: '+json.dumps(scene_context(story,remaining),ensure_ascii=False)+
+                '\nRequested current visuals: '+json.dumps({i:story['scenes'][i]['visual'] for i in remaining},ensure_ascii=False)+
                 '\nFrozen corrections: '+json.dumps({i:saved['tasks'][str(i)] for i in remaining},ensure_ascii=False),
                 (int(identity[:7],16)+saved['requests']+100)%(2**31-3),1600,
                 checkpoint=root/f"engagement-edit-{saved['requests']}.json")

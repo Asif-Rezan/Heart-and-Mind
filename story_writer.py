@@ -135,6 +135,8 @@ class StoryValidationError(ValueError):
             'chapter_model_response_invalid':'The text model returned invalid structured output after bounded retries. Resume only pending scenes.',
             'chapter_scene_repair_incomplete':'Chapter has incomplete scene content. Valid scenes are retained; inspect the pending scene indices.',
             'editorial_edit_incomplete':'Some fixed editorial corrections remain invalid. Accepted edits are saved for recovery.',
+            'repeated_story_lines':'Repeated narration remains after bounded repairs. Inspect pending scene indices and rejection reasons; accepted edits are saved.',
+            'repetition_checkpoint_identity_mismatch':'Saved repetition repairs belong to different source prose. Restore matching chapter/editor checkpoints.',
             'editorial_plan_incomplete':'The editor did not supply actionable corrections for a failed criterion.',
         }
         self.public_message=messages.get(code,'Story validation failed. Inspect the error code and safe checkpoint details.')
@@ -228,7 +230,7 @@ def ask(schema, prompt, seed, tokens=3000, checkpoint=None):
     def heartbeat():
         while not stop.wait(60):
             print(json.dumps(dict(phase='story model request running',request=label,elapsed_seconds=round(time.monotonic()-started))),flush=True)
-    print(json.dumps(dict(phase='story model request started',request=label)),flush=True)
+    print(json.dumps(dict(phase='story model request started',request=label,prompt_characters=len(prompt),max_completion_tokens=tokens)),flush=True)
     reporter=threading.Thread(target=heartbeat,daemon=True)
     reporter.start()
     try:

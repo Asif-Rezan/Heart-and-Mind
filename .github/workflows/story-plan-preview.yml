@@ -1,0 +1,70 @@
+name: Recover and time saved story planning only
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Exact saved story run ID
+        required: true
+        type: string
+      prepared_run:
+        description: Previous STORY workflow run ID containing story-input checkpoints
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      STORY_RUN_ID: ${{ inputs.run_id }}
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: pip install -r requirements.txt -r requirements-lyrics.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-input-${{ inputs.prepared_run }}
+        run-id: ${{ inputs.prepared_run }}
+        github-token: ${{ github.token }}
+        path: output/
+    - name: Resume saved prose and measure compact planning
+      run: |
+        python - <<'PY'
+        import os, re, time
+        from pathlib import Path
+        from story_writer import save_json
+        from daily_story import plan
+        run_id=os.environ['STORY_RUN_ID']
+        if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}',run_id):
+            raise SystemExit('Invalid story run ID')
+        root=Path('output')/run_id
+        if not (root/'story-draft.json').is_file():
+            raise SystemExit('Matching saved story outline is required; no new story generation')
+        started=time.monotonic()
+        story=plan(root,run_id,False,mode='assemble')
+        result=dict(run_id=run_id,seconds=round(time.monotonic()-started,1),
+                    scenes=len(story['scenes']),words=len(story['lyrics'].split()),
+                    verified=True,publication=False)
+        save_json(root/'planning-preview.json',result)
+        (root/'failure.json').unlink(missing_ok=True)
+        with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
+            summary.write('### Saved story planning verified\n'+str(result)+'\n')
+        PY
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: story-input-${{ github.run_id }}
+        path: output/
+        if-no-files-found: error
+        retention-days: 7
