@@ -1,0 +1,98 @@
+name: Publish saved Hindi story video
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Original workflow run containing the completed video and source artifacts
+        required: true
+        type: string
+      run_id:
+        description: Original story run ID (reuse exactly)
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: heart-and-mind-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      STORY_RUN_ID: ${{ inputs.run_id }}
+      SOURCE_RUN: ${{ inputs.source_run }}
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID }}
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      UPLOAD_MODE: public
+      VIDEO_LANGUAGE: hi
+      AUDIO_LANGUAGE: hi
+      VIDEO_CATEGORY_ID: '27'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Validate original run identifiers
+        run: |
+          [[ "$STORY_RUN_ID" =~ ^story-[a-zA-Z0-9_-]{1,74}$ ]] || exit 1
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]] || exit 1
+      - name: Install publication tools
+        timeout-minutes: 10
+        run: |
+          if ! command -v ffprobe >/dev/null; then
+            sudo timeout 180 apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+            sudo timeout 300 apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y ffmpeg
+          fi
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: story-mix-${{ inputs.source_run }}
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+          path: output/
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: story-images-${{ inputs.source_run }}-*
+          merge-multiple: true
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+          path: output/
+      - uses: actions/download-artifact@v4
+        with:
+          name: story-video-${{ inputs.source_run }}
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+          path: output/
+      - name: Publish saved video with original identity and duplicate-upload guards
+        run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage publish --defer-drive-cleanup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: story-publication-${{ github.run_id }}
+          path: output/*/*.json
+          retention-days: 7
+  cleanup:
+    name: Drive cleanup
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      STORY_RUN_ID: ${{ inputs.run_id }}
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID }}
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python -u story_cleanup.py --run-id "$STORY_RUN_ID"

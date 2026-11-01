@@ -24,6 +24,27 @@ def pipeline_failure_message(error):
             '. Inspect checkpoint and configuration.')
 
 
+
+def safe_api_details(error):
+    """Expose only known API status/reason codes, never URLs or response prose."""
+    status = getattr(getattr(error, 'resp', None), 'status', None)
+    if not isinstance(status, int):
+        return {}
+    allowed = {'quotaExceeded', 'dailyLimitExceeded', 'rateLimitExceeded',
+        'userRateLimitExceeded', 'storageQuotaExceeded', 'insufficientPermissions',
+        'forbidden', 'authError', 'notFound', 'backendError', 'internalError',
+        'uploadLimitExceeded', 'invalidTitle', 'invalidDescription', 'invalidTags',
+        'invalidCategoryId', 'videoNotFound', 'youtubeSignupRequired'}
+    reasons = set()
+    try:
+        payload = json.loads(error.content)
+        for item in payload.get('error', {}).get('errors', []):
+            if item.get('reason') in allowed:
+                reasons.add(item['reason'])
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return {'http_status': status, 'reasons': sorted(reasons)}
+
 def song_duplicate_reason(song, history, run_id=None):
     digest = hashlib.sha256(normalize_lyrics(song['lyrics']).encode()).hexdigest()
     entries = [entry for entry in history if run_id is None or entry.get('run') != run_id]

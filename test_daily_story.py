@@ -98,7 +98,8 @@ class StoryPublicationChecks(unittest.TestCase):
         from story_publication import publish
         client,state=Mock(),{}
         client.videos.return_value.insert.return_value.next_chunk.return_value=(None,{'id':'story-video'})
-        def readback():
+        def readback(**kwargs):
+            self.assertEqual(kwargs, {"num_retries": 5})
             video=copy.deepcopy(state['upload_body'])
             video.update(id='story-video',contentDetails={'definition':'hd'},processingDetails={'processingStatus':'succeeded'})
             video['snippet']['channelId']='channel'

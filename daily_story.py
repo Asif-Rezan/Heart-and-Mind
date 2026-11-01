@@ -155,7 +155,9 @@ def publish_story(root, story, run_id, defer_drive_cleanup=False):
     from story_media import digest
     from story_upload_settings import load_settings
     load_settings(profile='story')
+    print(json.dumps({'check': 'publication', 'operation': 'connect_drive'}), flush=True)
     store = Store()
+    print(json.dumps({'check': 'publication', 'operation': 'verify_youtube_channel'}), flush=True)
     client = youtube_client()
     key = f'stories/runs/{run_id}/publication.json'
     state = store.load(key, {})
@@ -180,7 +182,9 @@ def publish_story(root, story, run_id, defer_drive_cleanup=False):
         save()
         for name in ('story.json','timing.json','narration.wav','background.wav','song.wav',
                      'mix.json','video.mp4','thumbnail.jpg','render-state.json'):
+            print(json.dumps({'check': 'publication', 'operation': 'backup', 'asset': name}), flush=True)
             store.upload(root/name, f'stories/runs/{run_id}/{name}')
+    print(json.dumps({'check': 'publication', 'operation': 'publish_youtube'}), flush=True)
     publish(client, root, story, state, save)
     history = store.load('stories/history.json', [])
     for entry in history:
@@ -278,10 +282,11 @@ def main():
             publish_story(root,story,args.run_id,defer_drive_cleanup=args.defer_drive_cleanup)
     except Exception as error:
         # Do not print API response bodies or credentials into public Actions logs.
-        from pipeline import pipeline_failure_message
+        from pipeline import pipeline_failure_message, safe_api_details
         from story_writer import StoryValidationError
         details=getattr(error,'details',{}) if isinstance(error,StoryValidationError) else {}
         code=getattr(error,'code','pipeline_error') if isinstance(error,StoryValidationError) else 'pipeline_error'
+        details = {**details, **safe_api_details(error)}
         diagnostic=dict(stage=args.stage,error_type=type(error).__name__,code=code,details=details,
             message=pipeline_failure_message(error))
         save_json(root/'failure.json',diagnostic)

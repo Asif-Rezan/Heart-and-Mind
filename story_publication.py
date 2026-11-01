@@ -39,12 +39,12 @@ def publish(client, root, song, state, save, upload_thumbnail=True, metadata_kin
     deadline = time.monotonic() + 2400
     if upload_thumbnail and not state.get('thumbnail_uploaded'):
         client.thumbnails().set(videoId=state['video_id'],
-            media_body=MediaFileUpload(str(root/'thumbnail.jpg'))).execute()
+            media_body=MediaFileUpload(str(root/'thumbnail.jpg'))).execute(num_retries=5)
         state['thumbnail_uploaded'] = True
         save()
     while time.monotonic() < deadline:
         items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
-                                    id=state['video_id']).execute().get('items', [])
+                                    id=state['video_id']).execute(num_retries=5).get('items', [])
         if not items:
             raise RuntimeError('Uploaded video unavailable')
         video = items[0]
@@ -54,7 +54,7 @@ def publish(client, root, song, state, save, upload_thumbnail=True, metadata_kin
         if video.get('status',{}).get('containsSyntheticMedia') is not True:
             ensure_synthetic_disclosure(client, video, state, save)
             video = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
-                id=state['video_id']).execute()['items'][0]
+                id=state['video_id']).execute(num_retries=5)['items'][0]
         from story_upload_settings import ensure_uploaded_tags
         if ensure_uploaded_tags(client, video, state, save):
             continue  # Read back the repaired metadata on the same upload.

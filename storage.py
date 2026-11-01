@@ -35,7 +35,7 @@ class Store:
         from googleapiclient.discovery import build
         self.client = build('drive', 'v3', credentials=Credentials.from_authorized_user_info(
             json.loads(required('DRIVE_TOKEN_JSON'))), cache_discovery=False)
-        user = self.client.about().get(fields='user(emailAddress)').execute()['user']
+        user = drive_retry(lambda: self.client.about().get(fields='user(emailAddress)').execute())['user']
         if user['emailAddress'].lower() != 'asifrezanit@gmail.com':
             raise RuntimeError('Wrong Drive account')
         self.folder = os.getenv('DRIVE_FOLDER_ID')

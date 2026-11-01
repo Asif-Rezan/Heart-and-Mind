@@ -59,3 +59,18 @@ class PipelineTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SafeApiDiagnostics(unittest.TestCase):
+    def test_status_and_allowlisted_reason_without_sensitive_body(self):
+        error = RuntimeError('secret-token')
+        error.resp = type('Response', (), {'status': 403})()
+        error.content = b'{"error":{"message":"secret-token","errors":[{"reason":"quotaExceeded"},{"reason":"secret-token"}]}}'
+        self.assertEqual(pipeline.safe_api_details(error), {'http_status':403,'reasons':['quotaExceeded']})
+
+    def test_invalid_api_body_is_not_logged(self):
+        error = RuntimeError('secret-token')
+        error.resp = type('Response', (), {'status':502})()
+        error.content = b'secret-token'
+        self.assertEqual(pipeline.safe_api_details(error), {'http_status':502,'reasons':[]})
+        self.assertEqual(pipeline.safe_api_details(RuntimeError('secret-token')), {})
