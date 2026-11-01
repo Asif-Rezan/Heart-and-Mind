@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from difflib import SequenceMatcher
 
-from story_format import FORMAT, MIN_WORDS, MAX_WORDS, is_short
+from story_format import FORMAT, MIN_WORDS, MAX_WORDS, is_short, scene_count, word_bounds
 
 VERSION = 'hindi-emotional-story-v1'
 SCENE_COUNT = 48
@@ -86,8 +86,9 @@ def validate_story(story):
     if not 1 <= len(story['title']) <= 100 or not 1 <= len(story['description']) <= 4400:
         raise ValueError('Invalid story metadata length')
     scenes = story['scenes']
-    if len(scenes) != SCENE_COUNT:
-        raise ValueError('A complete 48-scene story is required')
+    expected=scene_count(story)
+    if len(scenes) != expected:
+        raise ValueError(f'A complete {expected}-scene story is required')
     for i, scene in enumerate(scenes):
         if scene['index'] != i or scene['speaker'] not in VOICES:
             raise ValueError('Invalid scene identity or speaker')
@@ -100,7 +101,7 @@ def validate_story(story):
         if not 20 <= len(scene['visual']) <= 360:
             raise ValueError('Scene image description is missing or overlong')
     total = sum(len(s['text'].split()) for s in scenes)
-    minimum, maximum = (MIN_WORDS, MAX_WORDS) if is_short(story) else (1000, 1600)
+    minimum, maximum = word_bounds(story)
     if not minimum<=total<=maximum:
         raise StoryValidationError('story_word_budget',dict(
             total_words=total,minimum_words=minimum,maximum_words=maximum))
@@ -108,10 +109,10 @@ def validate_story(story):
         if any(s['speaker'] != 'narrator' for s in scenes):
             raise ValueError('Short stories require one narrator')
         visuals=story.get('visuals',{})
-        if (set(visuals)!={str(i) for i in range(SCENE_COUNT)} or
+        if (set(visuals)!={str(i) for i in range(expected)} or
                 any(not isinstance(v,str) or not 30<=len(v)<=360 for v in visuals.values()) or
                 not isinstance(story.get('thumbnail_prompt'),str) or not 80<=len(story['thumbnail_prompt'])<=360 or
-                type(story.get('thumbnail_scene')) is not int or not 0<=story['thumbnail_scene']<SCENE_COUNT):
+                type(story.get('thumbnail_scene')) is not int or not 0<=story['thumbnail_scene']<expected):
             raise ValueError('Short story requires a complete story-grounded visual plan and thumbnail scene')
         repeated = repeated_scenes(scenes)
         if repeated:
@@ -172,7 +173,7 @@ def planning_schema(schema):
             if not isinstance(node,dict):
                 return
             for field,spec in node.get('properties',{}).items():
-                if field in ('visual','instruction'):
+                if field in ('visual','instruction','thumbnail_prompt'):
                     spec.pop('maxLength',None)
                 else:
                     relax(spec)
@@ -195,7 +196,7 @@ def normalize_planning(data, schema):
                 for field,child in spec.get('properties',{}).items():
                     if field not in value:
                         continue
-                    if field in ('visual','instruction'):
+                    if field in ('visual','instruction','thumbnail_prompt'):
                         value[field]=bound_prose(value[field],child)
                     else:
                         normalize(value[field],child)

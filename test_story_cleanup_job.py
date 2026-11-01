@@ -61,7 +61,7 @@ class VisibleCleanupTests(unittest.TestCase):
         self.assertEqual(jobs['cleanup']['name'],'Drive cleanup')
         self.assertIn('publish',jobs['cleanup']['needs'])
         self.assertIn('plan',jobs['cleanup']['needs'])
-        self.assertEqual(jobs['cleanup']['if'],"vars.PUBLISH_ENABLED != 'false'")
+        self.assertEqual(jobs['cleanup']['if'],"vars.PUBLISH_ENABLED != 'false' && !inputs.sample_mode")
         publish=[s['run'] for s in jobs['publish']['steps'] if s.get('name')=='Back up and publish on the existing Heart and Mind channel'][0]
         self.assertIn('--defer-drive-cleanup',publish)
         self.assertTrue(any('python -u story_cleanup.py' in s.get('run','') for s in jobs['cleanup']['steps']))

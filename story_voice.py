@@ -6,7 +6,7 @@ from pathlib import Path
 from story_writer import VOICES, save_json, validate_story
 
 SAMPLE_RATE = 24000
-from story_format import duration_bounds, is_short
+from story_format import duration_bounds, is_short, is_sample, scenes_per_chapter
 
 VOICE_VERSION = 'hindi-native-voice-v4-pause-profile'
 from story_voice_model import voice_profile, load_pipeline
@@ -75,14 +75,14 @@ def prepare_speech(samples):
 
 def scene_pause(story,index):
     if index==len(story['scenes'])-1:return 0
-    if (index+1)%8==0:return .28
+    if (index+1)%scenes_per_chapter(story)==0:return .28
     return .12 if story['scenes'][index]['text'].rstrip().endswith(('?','？','!')) else .08
 
 
 def next_native_speed(story,speed,seconds):
     minimum,maximum=duration_bounds(story)
     if minimum<=seconds<=maximum:return speed
-    target=(minimum+10 if seconds<minimum else maximum-10) if is_short(story) else 600
+    target=60 if is_sample(story) else (minimum+10 if seconds<minimum else maximum-10) if is_short(story) else 600
     lower,upper=(.90,1.08) if is_short(story) else (.80,1.15)
     return round(max(lower,min(upper,speed*seconds/target)),3)
 

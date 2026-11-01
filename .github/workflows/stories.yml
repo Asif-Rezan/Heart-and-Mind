@@ -1,4 +1,5 @@
 name: Daily Heart and Mind Hindi motivational story
+run-name: ${{ inputs.sample_mode && 'One-minute production-pipeline sample' || 'Daily Hindi story generation' }}
 'on':
   workflow_dispatch:
     inputs:
@@ -6,12 +7,19 @@ name: Daily Heart and Mind Hindi motivational story
         description: Stable story ID; reuse to resume. Empty uses the Dhaka date.
         required: false
         type: string
+      sample_mode:
+        description: Run the SAME generation pipeline with a one-minute preview budget; never publish
+        required: false
+        type: boolean
+        default: false
       prepared_run:
         description: Previous STORY workflow run number to resume (not a kids run)
         required: false
         type: string
   schedule:
   - cron: 0 21 * * *
+env:
+  STORY_FORMAT: ${{ inputs.sample_mode && 'pipeline-sample-60s-v1' || 'short-story-v2' }}
 permissions:
   contents: read
   actions: read
@@ -56,6 +64,8 @@ jobs:
       run: python story_preflight.py
     - run: pip install -r requirements.txt -r requirements-lyrics.txt -r requirements-test.txt
     - name: Check story planning and workflow regressions before model generation
+      env:
+        STORY_FORMAT: short-story-v2
       run: python -m unittest -q
     - name: Restore previous story checkpoints
       if: inputs.prepared_run != ''
@@ -73,8 +83,13 @@ jobs:
         DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         STORY_RUN_ID: ${{ steps.identity.outputs.run_id }}
-      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage outline --check-history
-    - name: Require the four-to-six-minute format for new generation
+      run: |
+        if [[ "$STORY_FORMAT" == 'pipeline-sample-60s-v1' ]]; then
+          python -u daily_story.py --run-id "$STORY_RUN_ID" --stage outline
+        else
+          python -u daily_story.py --run-id "$STORY_RUN_ID" --stage outline --check-history
+        fi
+    - name: Require the selected story format before generation
       env:
         STORY_RUN_ID: ${{ steps.identity.outputs.run_id }}
       run: |
@@ -84,7 +99,7 @@ jobs:
         from story_format import FORMAT
         root=Path('output')/os.environ['STORY_RUN_ID']
         path=root/'story.json' if (root/'story.json').exists() else root/'story-draft.json'
-        if json.loads(path.read_text()).get('format') != FORMAT:
+        if json.loads(path.read_text()).get('format') != os.environ['STORY_FORMAT']:
             raise SystemExit('Use a new story run ID for the 4-6 minute format. Old videos use saved-publication recovery.')
         PYCODE
     - uses: actions/upload-artifact@v4
@@ -175,7 +190,12 @@ jobs:
         merge-multiple: true
         path: output/
     - name: Validate all chapters together and reserve the original daily story
-      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage assemble --check-history
+      run: |
+        if [[ "$STORY_FORMAT" == 'pipeline-sample-60s-v1' ]]; then
+          python -u daily_story.py --run-id "$STORY_RUN_ID" --stage assemble
+        else
+          python -u daily_story.py --run-id "$STORY_RUN_ID" --stage assemble --check-history
+        fi
     - uses: actions/upload-artifact@v4
       with:
         name: story-input-${{ github.run_id }}
@@ -211,7 +231,7 @@ jobs:
       with:
         name: story-input-${{ github.run_id }}
         path: output/
-    - name: Speak the complete Hindi script and measure 4-6 minute timeline
+    - name: Speak the complete Hindi script and measure its format timeline
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage voice
     - uses: actions/upload-artifact@v4
       with:
@@ -278,7 +298,7 @@ jobs:
       with:
         name: story-input-${{ github.run_id }}
         path: output/
-    - name: Generate one independent 120-second instrumental score part
+    - name: Generate one independent instrumental score part (sample 30s; release 120s)
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage music-part --part "$STORY_PART"
     - uses: actions/upload-artifact@v4
       with:
@@ -470,7 +490,7 @@ jobs:
           output/*/*.json
         retention-days: 7
     - name: Back up and publish on the existing Heart and Mind channel
-      if: vars.PUBLISH_ENABLED != 'false'
+      if: vars.PUBLISH_ENABLED != 'false' && !inputs.sample_mode
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage publish --defer-drive-cleanup
     - uses: actions/upload-artifact@v4
       with:
@@ -483,7 +503,7 @@ jobs:
     needs:
     - plan
     - publish
-    if: vars.PUBLISH_ENABLED != 'false'
+    if: vars.PUBLISH_ENABLED != 'false' && !inputs.sample_mode
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:

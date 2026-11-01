@@ -44,16 +44,18 @@ def editorial_tasks(review, scenes):
     if not review['hook']:
         tasks.setdefault(0,chapter_direction(0))
     if not review['payoff']:
-        tasks.setdefault(45,'Show the earned emotional consequence resolving the original dilemma. Preserve canonical events and names; no sermon.')
+        tasks.setdefault(max(0,len(scenes)-3),'Show the earned emotional consequence resolving the original dilemma. Preserve canonical events and names; no sermon.')
     if not review['cta'] or not has_closing_cta(scenes):
-        tasks[47]='After the resolved story, ask ONE specific reflective question inviting viewers to comment (आप / टिप्पणी / बताइए). Keep it brief; no pressure or reward. Visual stays in the story world.'
+        tasks[len(scenes)-1]='After the resolved story, ask ONE specific reflective question inviting viewers to comment (आप / टिप्पणी / बताइए). Keep it brief; no pressure or reward. Visual stays in the story world.'
     return tasks
 
 
 def polish_engagement(root,story):
     """Freeze one editorial plan; checkpoint validated edits without moving goals."""
     from story_writer import StoryValidationError, repeated_scenes, normalized
-    from story_format import MIN_WORDS, MAX_WORDS
+    from story_format import word_bounds
+    minimum,maximum=word_bounds(story)
+    last=len(story['scenes'])-1
     from story_plan import scene_context
     root=Path(root)
     identity=hashlib.sha256(json.dumps(story['scenes'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
@@ -70,7 +72,7 @@ def polish_engagement(root,story):
         if not review:
             schema=object_schema({**{key:{'type':'boolean'} for key in CRITERIA},
                 'repairs':{'type':'array','maxItems':6,'items':object_schema({
-                    'scene':{'type':'integer','minimum':0,'maximum':47},'instruction':string(10,240)})}})
+                    'scene':{'type':'integer','minimum':0,'maximum':last},'instruction':string(10,240)})}})
             review=ask(schema,
                 'Make ONE actionable editorial plan for this Hindi story. Assess hook in the first two scenes, '
                 'causal progression, earned payoff and a brief reflective comment CTA only after the ending. '
@@ -95,11 +97,11 @@ def polish_engagement(root,story):
             save_json(path,saved)
             schema=object_schema({f'scene_{i}':object_schema({'text':string(20,400),'visual':string(20,360)}) for i in remaining})
             response=ask(schema,
-                f'Execute ONLY the frozen editorial corrections below. The complete story has {len(story["lyrics"].split())} words and must stay within {MIN_WORDS}-{MAX_WORDS}. '
+                f'Execute ONLY the frozen editorial corrections below. The complete story has {len(story["lyrics"].split())} words and must stay within {minimum}-{maximum}. '
                 'Aim 11-18 Hindi words per edit, but retain enough detail to preserve the full-story budget. '
                 'one narrator; no repeated line, no new character, no changed relationship or canonical event. '
                 'Preserve accepted scenes; do not reopen the review or invent additional requirements. '
-                'Update each English visual to represent the edited text. For scene 47 the spoken text MUST '
+                f'Update each English visual to represent the edited text. For scene {last} the spoken text MUST '
                 'invite a story-specific viewer comment after the payoff, using आप and टिप्पणी/बताइए. '
                 'Canonical summary: '+story['summary']+' Cast: '+story['characters']+
                 '\nFinal neighboring beats: '+json.dumps(scene_context(story,remaining),ensure_ascii=False)+
@@ -109,12 +111,12 @@ def polish_engagement(root,story):
                 checkpoint=root/f"engagement-edit-{saved['requests']}.json")
             for i in remaining:
                 value=response[f'scene_{i}']
-                if normalized(value['text'])==normalized(story['scenes'][i]['text']) or speech_issues(value['text']) or (i==47 and not has_closing_cta([value])):
+                if normalized(value['text'])==normalized(story['scenes'][i]['text']) or speech_issues(value['text']) or (i==last and not has_closing_cta([value])):
                     continue
                 proposed=[dict(s) for s in story['scenes']]
                 proposed[i]=dict(value,index=i,speaker='narrator')
                 total=sum(len(s['text'].split()) for s in proposed)
-                if not MIN_WORDS<=total<=MAX_WORDS or i in repeated_scenes(proposed):
+                if not minimum<=total<=maximum or i in repeated_scenes(proposed):
                     continue
                 story['scenes']=proposed
                 story['lyrics']='\n'.join(s['text'] for s in proposed)

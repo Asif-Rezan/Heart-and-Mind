@@ -7,7 +7,7 @@ import math
 import os
 from pathlib import Path
 import re
-from story_format import duration_bounds, is_short
+from story_format import duration_bounds, is_short, is_sample, score_part_seconds
 from story_writer import save_json, validate_story, write_story, novelty_reason, text_hash
 
 
@@ -86,7 +86,7 @@ def score_request(story, index):
         return dict(_segment=True,instrumental=True,duration=120,lyrics='[Instrumental]',
             prompt='Instrumental cinematic background score for an Indian emotional motivational story, '+mood+
             ', no vocals, no singing, no speech, sparse arrangement, quiet accompaniment under dialogue.')
-    return dict(_segment=True,instrumental=True,duration=120,lyrics='[Instrumental]',
+    return dict(_segment=True,instrumental=True,duration=score_part_seconds(story),lyrics='[Instrumental]',
         prompt='Instrumental cinematic background score for an Indian emotional motivational story, '+mood+
         ', cohesive D major / B minor palette, 78 BPM, one memorable understated four-note motif, '
         'expressive dynamic development, organic acoustic textures, gentle transitions, no abrupt drops, '
@@ -110,7 +110,7 @@ def generate_score_part(root,story,index):
     save=lambda:save_json(state_path,state)
     target=work/'bgm.wav'
     generate_segment(request,target,state,save)
-    if duration(target)<119.95:
+    if duration(target)<request['duration']-.05:
         raise RuntimeError('Background score too short; never pad or loop music')
 
 
@@ -131,7 +131,7 @@ def mix_score(root,story,timing):
         expected=dict(story_hash=text_hash(story['lyrics']),run_id=story['run_id'],request=score_request(story,i),index=i)
         if not (part/'request.json').is_file() or json.loads((part/'request.json').read_text())!=expected:
             raise ValueError('Missing or mismatched background music checkpoint')
-        if duration(path)<119.95:
+        if duration(path)<expected['request']['duration']-.05:
             raise RuntimeError('Background score too short; never pad or loop music')
         normalized=work/f'normalized-{i}.wav'
         part_seconds=timing['duration']/3 if is_short(story) else 120
@@ -173,6 +173,8 @@ def score(root,story,timing):
 
 
 def publish_story(root, story, run_id, defer_drive_cleanup=False):
+    if is_sample(story):
+        raise ValueError('Pipeline sample stories are preview-only and cannot be published')
     from story_publication import publish, youtube_client
     from pipeline import duration
     from storage import Store

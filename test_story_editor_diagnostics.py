@@ -24,6 +24,19 @@ class EditorialMetadataRegression(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text()),raw)
             model.assert_called_once()
 
+    def test_overlong_thumbnail_from_failed_recovery_is_bounded_without_retry(self):
+        schema=object_schema({'scene':{'type':'integer','minimum':0,'maximum':47},'thumbnail_prompt':string(80,360)})
+        raw=dict(scene=31,thumbnail_prompt='Arjun in his yellow shirt holds the actual story notebook beside his father in a blue kurta, warm expressive faces. '*6)
+        def inference(endpoint,payload):
+            Draft202012Validator(payload['response_format']['json_schema']['schema']).validate(raw)
+            return {'choices':[{'message':{'content':json.dumps(raw)}}]}
+        with tempfile.TemporaryDirectory() as folder,patch('lyrics_cpu.request_story',side_effect=inference) as model:
+            result=ask(schema,'Select actual story thumbnail',123,checkpoint=Path(folder)/'thumbnail-selection.json')
+            self.assertEqual(result['scene'],31)
+            self.assertTrue(80<=len(result['thumbnail_prompt'])<=360)
+            self.assertTrue(raw['thumbnail_prompt'].startswith(result['thumbnail_prompt']))
+            model.assert_called_once()
+
     def test_hindi_planning_from_failed_production_shape_is_rejected_before_chapters(self):
         outline=outline_fixture()
         outline['characters']='माँ राजेश्वरी और उसके परिवार की कहानी। '*5

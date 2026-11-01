@@ -7,13 +7,13 @@ from story_writer import (ask, OUTLINE, CHAPTER, VERSION, VOICES, save_json,
                           validate_story, novelty_reason, text_hash, StoryValidationError, object_schema, string, speech_issues, normalize_planning)
 
 from story_engagement import chapter_direction
-from story_format import FORMAT, MIN_WORDS, MAX_WORDS
+from story_format import FORMAT, MIN_WORDS, MAX_WORDS, SAMPLE_FORMAT, is_short, is_sample, scenes_per_chapter, word_bounds
 
 CHAPTERS=6
 
 
 def outline_identity(draft):
-    payload=dict(outline=draft['outline'],format=FORMAT) if draft.get('format')==FORMAT else draft['outline']
+    payload=dict(outline=draft['outline'],format=draft['format']) if is_short(draft) else draft['outline']
     return hashlib.sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
 
@@ -31,8 +31,14 @@ def prepare_outline(root, run_id, history):
     if 'outline' not in draft:
         recent=[dict(title=h['title'],summary=h.get('summary','')) for h in history if h.get('run')!=run_id][-20:]
         seed=int(hashlib.sha256(run_id.encode()).hexdigest()[:7],16)
+        import os
+        requested_format=os.getenv('STORY_FORMAT',FORMAT)
+        if requested_format not in (FORMAT,SAMPLE_FORMAT):raise ValueError('Unsupported story format')
+        sample=requested_format==SAMPLE_FORMAT
+        duration_text='one-minute' if sample else '4-6 minute'
+        chapter_text=('Each chapter has TWO scenes, about 22-26 Hindi words total per chapter; 120-165 words in the whole story. ' if sample else 'Each chapter will have eight scenes with complete spoken Hindi sentences, aim about 110-120 words per chapter without padding. ')
         outline=ask(OUTLINE,
-            'Create an ORIGINAL 4-6 minute Hindi emotional motivational story for Heart and Mind. '
+            f'Create an ORIGINAL {duration_text} Hindi emotional motivational story for Heart and Mind. '
             'Credible everyday Indian family, work or study conflict; meaningful choice; earned hopeful ending. '
             'No instant riches, copied plots, sermons or nursery rhymes. One male narrator tells the entire story, including any quoted dialogue. All characters retain fixed names, relationships and appearance. '
             'Hindi Devanagari title/description. English planning prose: summary about 350 characters, '
@@ -44,10 +50,10 @@ def prepare_outline(root, run_id, history):
             'Seed one detail whose significance is paid off at the end. Escalate stakes through choices, '
             'not artificial disasters. Reserve the final two scenes for one story-specific reflective comment '
             'question and a brief optional follow invitation, AFTER the emotional resolution. '
-            'Each chapter will have eight scenes with complete spoken Hindi sentences, aim about 110-120 words per chapter without padding. Pastel cute 3D storybook world. '
+            +chapter_text+'Pastel cute 3D storybook world. '
             'Avoid previous titles and plots: '+json.dumps(recent,ensure_ascii=False),
             seed,2800,checkpoint=root/'outline-response.json')
-        draft=dict(run_id=run_id,version=VERSION,format=FORMAT,outline=outline,chapters=[])
+        draft=dict(run_id=run_id,version=VERSION,format=requested_format,outline=outline,chapters=[])
     else:
         draft['run_id']=run_id
     save_json(path,draft)
@@ -77,15 +83,15 @@ def scene_issues(scene, expected_speaker=None):
     return issues
 
 
-def chapter_issues(data):
+def chapter_issues(data,expected_count=8):
     scenes=data.get('scenes',[]) if isinstance(data,dict) else []
-    if not isinstance(scenes,list) or len(scenes)!=8:
+    if not isinstance(scenes,list) or len(scenes)!=expected_count:
         return dict(scene_count=len(scenes) if isinstance(scenes,list) else 0)
     words=[len(s.get('text','').split()) if isinstance(s,dict) else 0 for s in scenes]
     bad=[i+1 for i,s in enumerate(scenes) if scene_issues(s)]
     narrator_count=sum(isinstance(s,dict) and s.get('speaker')=='narrator' for s in scenes)
     total=sum(words)
-    if bad or narrator_count not in (6,8):
+    if bad or narrator_count not in ((6,8) if expected_count==8 else (expected_count,)):
         return dict(words=words,bad_scenes=bad,narrator_count=narrator_count,total_words=total)
     return None
 
@@ -112,11 +118,11 @@ def recovered_roles(rows):
     return [rows[i]['speaker'] if i in chosen else 'narrator' for i in range(8)]
 
 
-def repair_indices(accepted):
+def repair_indices(accepted,count=8):
     # Chapter boundaries describe plot beats, not equal-length audio segments.
     # Only repair invalid/missing prose here. The complete 48-scene story owns
     # the word budget; actual synthesized audio owns the duration constraint.
-    return [i for i in range(8) if str(i) not in accepted]
+    return [i for i in range(count) if str(i) not in accepted]
 
 
 def write_chapter(root,run_id,index):
@@ -130,9 +136,10 @@ def write_chapter(root,run_id,index):
     draft=json.loads((root/'story-draft.json').read_text())
     if draft.get('run_id',run_id)!=run_id:
         raise StoryValidationError('draft_identity_mismatch')
+    count=scenes_per_chapter(draft)
     identity=outline_identity(draft)
     saved=json.loads(path.read_text()) if path.exists() else {}
-    if saved.get('outline_hash')==identity and not chapter_issues(saved):
+    if saved.get('outline_hash')==identity and not chapter_issues(saved,count):
         return
     progress_path=root/'chapters'/f'progress-{index}.json'
     progress=json.loads(progress_path.read_text()) if progress_path.exists() else {}
@@ -142,16 +149,16 @@ def write_chapter(root,run_id,index):
         raw_path=root/'chapters'/f'raw-{index}.json'
         raw=json.loads(raw_path.read_text()) if raw_path.exists() else {}
         rows=raw.get('scenes',[]) if isinstance(raw,dict) else []
-        if not isinstance(rows,list) or len(rows)!=8:
+        if not isinstance(rows,list) or len(rows)!=count:
             rows=[]
-        roles=['narrator']*8 if draft.get('format')==FORMAT else recovered_roles(rows)
+        roles=['narrator']*count if is_short(draft) else recovered_roles(rows)
         accepted={str(i):copy.deepcopy(s) for i,s in enumerate(rows) if not scene_issues(s,roles[i])}
         progress=dict(version=REPAIR_VERSION,run_id=run_id,outline_hash=identity,index=index,
                       roles=roles,accepted=accepted,drafts={str(i):s for i,s in enumerate(rows)},requests=0)
     roles=progress.get('roles',[])
-    if len(roles)!=8 or roles.count('narrator')!=(8 if draft.get('format')==FORMAT else 6) or any(role not in VOICES for role in roles):
+    if len(roles)!=count or roles.count('narrator')!=(count if is_short(draft) else 6) or any(role not in VOICES for role in roles):
         raise StoryValidationError('invalid_chapter_role_plan',dict(chapter=index+1))
-    accepted={key:value for key,value in progress['accepted'].items() if key in {str(i) for i in range(8)}
+    accepted={key:value for key,value in progress['accepted'].items() if key in {str(i) for i in range(count)}
               and not scene_issues(value,roles[int(key)])}
     progress['accepted']=accepted
     for raw_path in sorted((root/'chapters').glob(f'raw-attempt-*-{index}.json'),
@@ -159,7 +166,7 @@ def write_chapter(root,run_id,index):
         raw=json.loads(raw_path.read_text())
         if not isinstance(raw,dict):
             continue
-        for i in range(8):
+        for i in range(count):
             if str(i) in accepted or f'scene_{i}' not in raw:
                 continue
             value=raw[f'scene_{i}']
@@ -177,14 +184,14 @@ def write_chapter(root,run_id,index):
     seed=int(hashlib.sha256((run_id+':chapter:'+str(index)).encode()).hexdigest()[:7],16)
     language_attempts={}  # Fresh bounded budget per explicit recovery; accepted prose persists.
     for attempt in range(REPAIR_REQUESTS):
-        pending=repair_indices(accepted)
+        pending=repair_indices(accepted,count)
         if not pending:
             break
         request_number=progress['requests']
         progress['requests']+=1
         save_json(progress_path,progress)  # Resume with new seeds after interruption.
         context=[dict(scene=i+1,speaker=roles[i],**{k:v for k,v in progress.get('drafts',{}).get(str(i),{}).items()
-                                                 if k in ('text','visual')}) for i in range(8)]
+                                                 if k in ('text','visual')}) for i in range(count)]
         targets={f'scene_{i}':dict(position=i+1,speaker=roles[i],
                     instruction='narration in third person' if roles[i]=='narrator' else 'direct character dialogue')
                  for i in pending}
@@ -218,7 +225,7 @@ def write_chapter(root,run_id,index):
             '\nFixed scene context: '+json.dumps(context,ensure_ascii=False)+
             '\nRequested slots/roles: '+json.dumps(targets,ensure_ascii=False)+
             '\nReturn exactly the required scene_N JSON keys. Each text is natural Hindi Devanagari, '+
-            ('aim about 110-120 words total per chapter, with fluid complete sentences, usually 14-16 words per beat. No filler or forced word padding. ' if draft.get('format')==FORMAT else 'aim 26-30 words for narration, 12-24 for dialogue. ')+
+            ('write TWO scenes, aim 11-13 Hindi words per scene, about 22-26 words in this entire chapter. ' if is_sample(draft) else 'aim about 110-120 words total per chapter, with fluid complete sentences, usually 14-16 words per beat. No filler or forced word padding. ' if is_short(draft) else 'aim 26-30 words for narration, 12-24 for dialogue. ')+
             'Use the assigned speaker role BEFORE writing: narrator tells events, male/female is direct dialogue '
             'by an established character. Each visual is English, about 120 characters: name the canonical person, exact visible action, story prop and current location from THIS text. No abstract mood-only pictures or unrelated scenery. Repeat the exact established clothing and age when visible. No speaker labels, stage directions, repeated filler or word padding. '
             'Preserve the scene meaning and canonical names. Do not narrate a line and then repeat it as dialogue. '
@@ -250,17 +257,17 @@ def write_chapter(root,run_id,index):
             else:
                 rejected[str(i+1)]=dict(issues=issues,words=len(candidate.get('text','').split()))
             save_json(progress_path,progress)
-        remaining=repair_indices(accepted)
+        remaining=repair_indices(accepted,count)
         diagnostics=dict(chapter=index+1,request=request_number+1,accepted_scenes=len(accepted),
                          pending_scenes=[i+1 for i in remaining],rejected=rejected)
         save_json(root/'chapters'/f'validation-{index}.json',diagnostics)
         print(json.dumps(dict(phase='Hindi scene repair',**diagnostics)),flush=True)
-    data=dict(scenes=[accepted[str(i)] for i in range(8)]) if len(accepted)==8 else {}
-    issues=chapter_issues(data)
+    data=dict(scenes=[accepted[str(i)] for i in range(count)]) if len(accepted)==count else {}
+    issues=chapter_issues(data,count)
     if issues:
-        code='chapter_language_repair_incomplete' if any(speech_issues(progress['drafts'].get(str(i),{}).get('text'))==['hindi'] for i in repair_indices(accepted)) else 'chapter_scene_repair_incomplete'
+        code='chapter_language_repair_incomplete' if any(speech_issues(progress['drafts'].get(str(i),{}).get('text'))==['hindi'] for i in repair_indices(accepted,count)) else 'chapter_scene_repair_incomplete'
         raise StoryValidationError(code,dict(chapter=index+1,
-            accepted_scenes=len(accepted),pending_scenes=[i+1 for i in repair_indices(accepted)],**issues))
+            accepted_scenes=len(accepted),pending_scenes=[i+1 for i in repair_indices(accepted,count)],**issues))
     save_json(path,dict(data,outline_hash=identity,index=index,repair_version=REPAIR_VERSION))
     print(json.dumps({'phase':'Hindi chapter ready','chapter':index+1,'chapters':CHAPTERS}),flush=True)
 
@@ -270,8 +277,9 @@ def repair_story_budget(root, run_id, draft, chapters):
     from jsonschema import ValidationError
     from lyrics_cpu import StoryGenerationError
 
-    minimum, maximum = (MIN_WORDS, MAX_WORDS) if draft.get('format')==FORMAT else (1000,1600)
-    target_words = 14 if draft.get('format')==FORMAT else 27
+    minimum, maximum = word_bounds(draft)
+    count=scenes_per_chapter(draft)
+    target_words = 12 if is_sample(draft) else 14 if is_short(draft) else 27
 
     def distance(total):
         return max(minimum-total, total-maximum, 0)
@@ -334,9 +342,9 @@ def repair_story_budget(root, run_id, draft, chapters):
             proposed=total-len(scenes[i]['text'].split())+len(candidate['text'].split())
             if distance(proposed)>=distance(total):
                 continue
-            chapters[i//8]['scenes'][i%8]=candidate
+            chapters[i//count]['scenes'][i%count]=candidate
             # Persist first: interruption must never lose a successful repair.
-            save_json(chapter_path(root,i//8),chapters[i//8])
+            save_json(chapter_path(root,i//count),chapters[i//count])
             scenes[i]=candidate
             total=proposed
         diagnostic.update(total_words=total,pending=bool(distance(total)))
@@ -365,7 +373,7 @@ def assemble_story(root,run_id,history):
         if not path.exists():
             raise StoryValidationError('missing_chapter',dict(chapter=i+1))
         data=json.loads(path.read_text())
-        if data.get('outline_hash')!=identity or chapter_issues(data):
+        if data.get('outline_hash')!=identity or chapter_issues(data,scenes_per_chapter(draft)):
             raise StoryValidationError('invalid_chapter_checkpoint',dict(chapter=i+1))
         chapters.append(data)
     repair_story_budget(root,run_id,draft,chapters)
@@ -379,8 +387,8 @@ def assemble_story(root,run_id,history):
         summary=outline['summary'],characters=outline['characters'],world=outline['world'],scenes=scenes,
         lyrics='\n'.join(s['text'] for s in scenes),
         tags=['Hindi motivational story','Hindi emotional story','प्रेरणादायक कहानी','Hindi kahani'])
-    if draft.get('format')==FORMAT:
-        story['format']=FORMAT
+    if is_short(draft):
+        story['format']=draft['format']
         from story_engagement import polish_engagement
         polish_engagement(root,story)
         repair_repetition(root, story)
@@ -420,6 +428,7 @@ def repair_repetition(root, story):
         story['lyrics']='\n'.join(s['text'] for s in story['scenes'])
     else:
         saved=dict(identity=identity,output_identity=identity,scenes=story['scenes'],requests=0,rejections={})
+    minimum,maximum=word_bounds(story)
     pending=repeated_scenes(story['scenes'])
     if not pending:
         return
@@ -452,7 +461,7 @@ def repair_repetition(root, story):
                 'REWRITE the requested repeated narration, do not copy or return its current words. '
                 'Each later scene must ADVANCE its own chronological beat, not recap an earlier event. '
                 'Keep one narrator, established people and canonical events. Write natural Hindi Devanagari, '
-                'roughly the same word count as the original; preserve the complete 520-720 word budget. '
+                f'roughly the same word count as the original; preserve the complete {minimum}-{maximum} word budget. '
                 'English visual must match the new action with fixed appearance. A closing viewer-comment '
                 'invitation must remain if editing the final scene. Returning the same line is REJECTED. '
                 'Canonical summary: '+story['summary']+' Cast: '+story['characters']+
@@ -473,7 +482,7 @@ def repair_repetition(root, story):
                     repeats=set(repeated_scenes(proposed))
                     total=sum(len(s['text'].split()) for s in proposed)
                     if i in repeats or not repeats.issubset(current):reason='still_repeated_or_new_echo'
-                    elif not MIN_WORDS<=total<=MAX_WORDS:reason='story_word_budget'
+                    elif not minimum<=total<=maximum:reason='story_word_budget'
                     elif i==len(proposed)-1 and has_closing_cta(story['scenes']) and not has_closing_cta(proposed):reason='closing_cta_removed'
                 if reason:
                     saved['rejections'][str(i)]=reason
@@ -524,7 +533,7 @@ def prepare_visuals(root, story):
             saved['scenes'][str(i)]=response[f'scene_{i}']
         save_json(path,saved)
     if 'thumbnail_scene' not in saved or 'thumbnail_prompt' not in saved:
-        response=ask(object_schema({'scene':{'type':'integer','minimum':0,'maximum':47},
+        response=ask(object_schema({'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
                                     'thumbnail_prompt':string(80,360)}),
             'Choose the single scene that most truthfully represents this story main conflict or meaningful choice. '
             'Also write a SEPARATE English image-generation prompt designed for a YouTube thumbnail at small mobile size. '
