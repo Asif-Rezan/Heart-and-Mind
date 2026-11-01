@@ -133,6 +133,21 @@ class EngagementTests(unittest.TestCase):
             self.assertLessEqual(len(story['lyrics'].split()),720)
             self.assertTrue(json.loads((root/'engagement-review.json').read_text())['approved'])
 
+    def test_cli_mix_failure_reports_exact_duration_difference(self):
+        import sys
+        from daily_story import main
+        from story_writer import StoryValidationError
+        error=StoryValidationError('mixed_story_duration_mismatch',dict(
+            expected_seconds=296.471958,actual_seconds=293.571958,difference_seconds=-2.9))
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);save_json(root/'timing.json',timeline(296.471958))
+            with patch.object(sys,'argv',['daily_story.py','--run-id','story-test','--stage','mix']), patch('daily_story.root_for',return_value=root), patch('daily_story.load_story',return_value=dict(short_story(),run_id='story-test')), patch('daily_story.mix_score',side_effect=error),self.assertRaises(SystemExit):
+                main()
+            report=json.loads((root/'failure.json').read_text())
+            self.assertEqual(report['code'],'mixed_story_duration_mismatch')
+            self.assertEqual(report['details']['difference_seconds'],-2.9)
+            self.assertIn('complete narration',report['message'])
+
     def test_score_has_intro_tension_and_final_payoff_with_shared_musical_direction(self):
         story=short_story()
         requests=[score_request(story,i) for i in range(3)]
@@ -150,6 +165,40 @@ class EngagementTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'),'FFmpeg required')
 class ShortMusicSmoke(unittest.TestCase):
+    def test_fractional_duration_mix_preserves_final_voice_tone_and_all_samples(self):
+        import numpy as np
+        import wave
+        from pipeline import duration
+        from story_media import digest
+        story=short_story();rate=24000;frames=7115327
+        seconds=frames/rate;timing=timeline(seconds)
+        # Match the failed run's fractional 296.471958-second speech timeline.
+        t=np.arange(frames)/rate
+        samples=.02*np.sin(2*np.pi*440*t)
+        samples[-rate:]=.15*np.sin(2*np.pi*997*t[-rate:])
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            with wave.open(str(root/'narration.wav'),'wb') as wav:
+                wav.setparams((1,2,rate,0,'NONE','not compressed'))
+                wav.writeframes((samples*32767).astype('<i2').tobytes())
+            original=digest(root/'narration.wav')
+            for i in range(3):
+                part=root/'score'/f'part-{i}';part.mkdir(parents=True)
+                subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i',
+                    'sine=frequency=150:sample_rate=24000:duration=120',str(part/'bgm.wav')],check=True)
+                save_json(part/'request.json',dict(story_hash=text_hash(story['lyrics']),run_id=story['run_id'],request=score_request(story,i),index=i))
+            mix_score(root,story,timing)
+            self.assertEqual(original,digest(root/'narration.wav'))
+            with wave.open(str(root/'song.wav'),'rb') as wav:
+                self.assertEqual(wav.getnframes(),frames)
+                data=np.frombuffer(wav.readframes(frames),dtype='<i2').astype(float)/32768
+            tail=data[-rate//2:]
+            spectrum=np.abs(np.fft.rfft(tail))
+            frequency=np.fft.rfftfreq(len(tail),1/rate)[spectrum.argmax()]
+            self.assertAlmostEqual(frequency,997,delta=2)
+            self.assertGreater(np.sqrt(np.mean(tail**2)),.01)
+            self.assertLessEqual(np.max(np.abs(data)),.951)
+
     def test_three_sections_cover_entire_four_minute_arc_at_consistent_level(self):
         import numpy as np
         import wave

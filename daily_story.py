@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import re
 from story_format import duration_bounds, is_short, is_sample, score_part_seconds
-from story_writer import save_json, validate_story, write_story, novelty_reason, text_hash
+from story_writer import save_json, validate_story, write_story, novelty_reason, text_hash, StoryValidationError
 
 
 def root_for(run_id):
@@ -127,8 +127,9 @@ def mix_score(root,story,timing):
     from story_video import validate_timing
     validate_timing(story,timing)
     root=Path(root)
-    if abs(duration(root/'narration.wav')-timing['duration'])>.05:
-        raise ValueError('Narration audio differs from its measured timeline')
+    narration_seconds=duration(root/'narration.wav')
+    if abs(narration_seconds-timing['duration'])>.05:
+        raise StoryValidationError('narration_duration_mismatch',dict(expected_seconds=timing['duration'],actual_seconds=narration_seconds))
     work=root/'score'
     work.mkdir(exist_ok=True)
     paths=[]
@@ -153,23 +154,35 @@ def mix_score(root,story,timing):
     seconds=timing['duration']
     # Score parts may be generated before speech. Only excess instrumental
     # accompaniment is trimmed; the complete measured narration is preserved.
-    voice_filter='loudnorm=I=-16:LRA=9:TP=-1.5,' if is_short(story) else ''
+    # Materialize loudnorm before splitting: its buffered, high-rate output can
+    # lose the final seconds when shared directly with sidechaincompress.
+    narration=root/'narration.wav'
+    if is_short(story):
+        narration=work/'narration-normalized.wav'
+        run_ffmpeg(['-i',str(root/'narration.wav'),'-af','loudnorm=I=-16:LRA=9:TP=-1.5',
+                    '-ar','24000','-ac','1',str(narration)])
+        normalized_seconds=duration(narration)
+        if abs(normalized_seconds-seconds)>.05:
+            raise StoryValidationError('normalized_narration_duration_mismatch',
+                dict(expected_seconds=seconds,actual_seconds=normalized_seconds))
     bed_volume='0.50' if is_short(story) else '0.10'
     compressor='threshold=0.10:ratio=3:attack=40:release=450' if is_short(story) else 'threshold=0.025:ratio=6:attack=20:release=300'
-    graph=(f'[0:a]{voice_filter}asplit=2[voice][control];[1:a]volume={bed_volume},afade=t=in:d=1,'
+    graph=(f'[0:a]asplit=2[voice][control];[1:a]volume={bed_volume},afade=t=in:d=1,'
         f'afade=t=out:st={max(0,seconds-2)}:d=2[bed];'
         f'[bed][control]sidechaincompress={compressor}[ducked];'
-        '[voice][ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[out]')
+        '[voice][ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95:latency=1[out]')
     temp=root/'song.tmp.wav'
-    run_ffmpeg(['-i',str(root/'narration.wav'),'-i',str(root/'background.wav'),
+    run_ffmpeg(['-i',str(narration),'-i',str(root/'background.wav'),
         '-filter_complex',graph,'-map','[out]','-ar','24000','-t',str(seconds),str(temp)])
-    if abs(duration(temp)-seconds)>.05:
-        raise ValueError('Mixed story duration differs from speech')
+    mixed_seconds=duration(temp)
+    if abs(mixed_seconds-seconds)>.05:
+        raise StoryValidationError('mixed_story_duration_mismatch',
+            dict(expected_seconds=seconds,actual_seconds=mixed_seconds,difference_seconds=round(mixed_seconds-seconds,6)))
     temp.replace(root/'song.wav')
     save_json(root/'mix.json',dict(narration=digest(root/'narration.wav'),
         background=digest(root/'background.wav'),duration=seconds,instrumental=True,
         section_seconds=seconds/3 if is_short(story) else 120,
-        mix_profile='normalized-story-arc-v2' if is_short(story) else 'legacy'))
+        mix_profile='normalized-story-arc-v3-staged-voice' if is_short(story) else 'legacy'))
 
 
 def score(root,story,timing):

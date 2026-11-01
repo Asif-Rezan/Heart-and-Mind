@@ -131,6 +131,9 @@ class StoryValidationError(ValueError):
         self.code=code
         self.details=details or {}
         messages={
+            'narration_duration_mismatch':'Saved narration does not match its measured timeline. Restore matching voice assets.',
+            'normalized_narration_duration_mismatch':'Voice normalization changed the narration duration. The original narration is preserved; inspect expected and actual seconds.',
+            'mixed_story_duration_mismatch':'The audio mix does not preserve the complete narration. Publication is blocked; inspect expected and actual seconds.',
             'chapter_language_repair_incomplete':'Narration is not Hindi Devanagari after bounded text-only corrections. Valid scenes are saved; resume the listed scenes.',
             'chapter_model_runtime_failure':'The text model runtime failed. Check runner/model configuration; valid scene checkpoints are retained.',
             'chapter_model_response_invalid':'The text model returned invalid structured output after bounded retries. Resume only pending scenes.',
