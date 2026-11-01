@@ -257,3 +257,23 @@ Manual workflow dispatch can select `vocal_gender=male` or `female` for a new so
 The production style is `heart-mind-textfree-cinematic-v2`. Cast and camera instructions lead the short prompts so SSD-1B does not lose them behind scenery or typography instructions. Romance uses tender eye contact; heartbreak shows the couple apart rather than an unrelated older male stock portrait; healing uses hopeful expression. The thumbnail and video background remain distinct scenes with different song-derived seeds. Safety checks remain enabled.
 
 Run the **Demo thumbnail and background preview** workflow with `source_run` empty to generate new review-only images using the actual production model. This workflow does not synthesize a song, upload a YouTube video or change published thumbnails. Recomposition from an old `source_run` does not regenerate its existing pixels; use a fresh preview to assess this style. Better CTR is a design aim, not a measured result; use real impressions/click-through data and compare comparable releases.
+
+### YouTube 403 insufficientPermissions during publication
+
+Story uploads also update AI disclosure and reconcile metadata on the existing
+video. `youtube.upload` plus `youtube.readonly` permits uploading/reading but does
+not authorize `videos.update`. Account setup now requests `youtube.force-ssl` as
+well. Reauthorize the existing Heart and Mind channel using:
+
+```sh
+python setup_accounts.py youtube --client client_secrets.json --channel-id UCDTjTh7ORO2J_5OrR0dESTQ
+```
+
+Approve the added scope in Google's consent flow and replace the repository's
+`YOUTUBE_TOKEN_JSON` with the newly granted credentials (the setup script writes
+it through authenticated GitHub CLI). Merely adding a scope string to an old
+secret or rerunning the job does not expand the grant. Never paste tokens in logs
+or chat. After authorization, run **Recover existing Hindi story publication**
+with the original run ID to finish the existing upload, avoiding regeneration or
+a duplicate upload. Known upload/read-only grants are rejected by preflight
+before model generation.

@@ -9,7 +9,24 @@ HEART_CHANNEL_ID = "UCDTjTh7ORO2J_5OrR0dESTQ"
 def youtube_client():
     if required("EXPECTED_CHANNEL_ID") != HEART_CHANNEL_ID:
         raise RuntimeError("Story publishing is restricted to Heart and Mind")
+    validate_youtube_scopes()
     return original_youtube_client()
+
+
+def validate_youtube_scopes():
+    """Catch upload/read-only credentials before another expensive story run."""
+    import json
+    token = json.loads(required('YOUTUBE_TOKEN_JSON'))
+    scopes = token.get('scopes')
+    if isinstance(scopes, str):
+        scopes = scopes.split()
+    edit_scopes = {'https://www.googleapis.com/auth/youtube.force-ssl',
+                   'https://www.googleapis.com/auth/youtube',
+                   'https://www.googleapis.com/auth/youtubepartner'}
+    if scopes is not None and not edit_scopes.intersection(scopes):
+        raise ValueError('YouTube authorization lacks video update permission. Reauthorize '
+            'Heart and Mind with setup_accounts.py youtube, approve youtube.force-ssl, '
+            'and replace YOUTUBE_TOKEN_JSON; rerunning cannot expand an existing grant.')
 
 
 def publish(client, root, song, state, save, upload_thumbnail=True, metadata_kind="video"):

@@ -16,3 +16,6 @@ def validate(environment=None):
 
 if __name__=='__main__':
     validate()
+    if os.environ.get('PUBLISH_ENABLED', 'true') != 'false':
+        from story_publication import validate_youtube_scopes
+        validate_youtube_scopes()

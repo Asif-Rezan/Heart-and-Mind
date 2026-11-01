@@ -193,3 +193,25 @@ class InstrumentalScoreChecks(unittest.TestCase):
 
 if __name__=='__main__':
     unittest.main()
+
+
+class YouTubeScopeChecks(unittest.TestCase):
+    def test_upload_and_readonly_token_rejected_before_api_call(self):
+        from story_publication import validate_youtube_scopes
+        token = json.dumps({'scopes':['https://www.googleapis.com/auth/youtube.upload',
+            'https://www.googleapis.com/auth/youtube.readonly'], 'refresh_token':'secret-token'})
+        with patch('story_publication.required',return_value=token):
+            with self.assertRaisesRegex(ValueError,'Reauthorize') as result:
+                validate_youtube_scopes()
+        self.assertNotIn('secret-token',str(result.exception))
+
+    def test_video_update_scope_accepted(self):
+        from story_publication import validate_youtube_scopes
+        for scopes in (['https://www.googleapis.com/auth/youtube.force-ssl'],
+                       'https://www.googleapis.com/auth/youtube'):
+            with patch('story_publication.required',return_value=json.dumps({'scopes':scopes})):
+                validate_youtube_scopes()
+
+    def test_setup_requests_video_update_scope(self):
+        from setup_accounts import SCOPES
+        self.assertIn('https://www.googleapis.com/auth/youtube.force-ssl',SCOPES['youtube'])
