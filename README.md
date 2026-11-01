@@ -332,3 +332,6 @@ or chat. After authorization, run **Recover existing Hindi story publication**
 with the original run ID to finish the existing upload, avoiding regeneration or
 a duplicate upload. Known upload/read-only grants are rejected by preflight
 before model generation.
+
+
+Closing-comment recovery (2026-11-01): production run 41315187695 passed outline and chapters but its frozen editorial plan failed on scene 47. Both model attempts returned the same descriptive closing, without a viewer comment invitation. Closing edits now use a bounded Hindi decoder pattern with an explicit viewer question and comment invitation, counted inside the scene word limit. The native runtime preserves this narrowly recognized pattern; schema validation still rejects omitted invitations. Accepted edits remain checkpointed, so dispatch on updated main with the same story ID and prepared_run=41315187695. A local replay of the downloaded production checkpoint passed prose assembly with one schema-valid replacement (717 words); this replay used a supplied replacement, not live model inference. Regression coverage includes the exact rejected line, word caps, decoder pattern retention, and checkpoint recovery. Native grammar compilation is checked when the production runtime is installed.

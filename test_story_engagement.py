@@ -100,6 +100,39 @@ class EngagementTests(unittest.TestCase):
                 self.assertEqual(fresh['scenes'][0]['text'],valid['text'])
                 model.assert_called_once()
 
+    def test_failed_production_closing_resumes_at_full_word_budget(self):
+        from story_engagement import EDITOR_VERSION
+        from jsonschema import Draft202012Validator,ValidationError
+        import hashlib
+        story=short_story()
+        story['scenes'][-1]['text']='क्या आपने कभी देखा है कि एक साथ बच्चे नए लक्ष्यों के लिए खुलते हैं?'
+        total=sum(len(s['text'].split()) for s in story['scenes'])
+        story['scenes'][0]['text']+=' '+' '.join(['सुबह']*(720-total))
+        story['lyrics']='\n'.join(s['text'] for s in story['scenes'])
+        original=copy.deepcopy(story['scenes'])
+        identity=hashlib.sha256(json.dumps(story['scenes'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        rejected=dict(text='बच्चे साथ में उठकर नए लक्ष्यों की ओर देखते हैं, नोटबुक उनके हाथ में हैं।',
+            visual='Children, in school uniforms, gather on porch with notebooks')
+        def edit(schema,prompt,*args,**kwargs):
+            self.assertEqual(set(schema['properties']),{'scene_47'})
+            with self.assertRaises(ValidationError):
+                Draft202012Validator(schema).validate({'scene_47':rejected})
+            value=dict(text='आप इन बच्चों की जगह होते तो क्या करते? टिप्पणी में बताइए।',visual=rejected['visual'])
+            Draft202012Validator(schema).validate({'scene_47':value})
+            return {'scene_47':value}
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            save_json(root/'engagement-review.json',dict(version=EDITOR_VERSION,identity=identity,
+                scenes=story['scenes'],review={},tasks={'0':'Previously accepted hook','47':'Ask a story-specific reflective comment question.'},
+                complete=['0'],requests=5,approved=False,rejected_candidates={'47':rejected},
+                rejections={'47':dict(reason='closing_cta_missing',maximum_scene_words=15)}))
+            with patch('story_engagement.ask',side_effect=edit) as model:
+                polish_engagement(root,story)
+            model.assert_called_once()
+            self.assertEqual(story['scenes'][:-1],original[:-1])
+            self.assertLessEqual(len(story['lyrics'].split()),720)
+            self.assertTrue(json.loads((root/'engagement-review.json').read_text())['approved'])
+
     def test_score_has_intro_tension_and_final_payoff_with_shared_musical_direction(self):
         story=short_story()
         requests=[score_request(story,i) for i in range(3)]

@@ -17,6 +17,21 @@ def is_hindi_word_pattern(pattern):
     return bool(match and 0 <= int(match[1]) <= int(match[2]) < MAX_GRAMMAR_WORDS)
 
 
+def hindi_cta_pattern(minimum, maximum):
+    """Reserve four fixed words for an explicit closing comment invitation."""
+    minimum = max(5, minimum)
+    if not minimum <= maximum <= MAX_GRAMMAR_WORDS:
+        raise ValueError('Insufficient closing CTA word budget')
+    return rf'^आप [ऀ-ॿ]+([,!?]? [ऀ-ॿ]+){{{minimum-5},{maximum-5}}}\? टिप्पणी में बताइए।$'
+
+
+def is_hindi_cta_pattern(pattern):
+    if not isinstance(pattern, str):
+        return False
+    match = re.fullmatch(r'\^आप \[ऀ-ॿ\]\+\(\[,!\?\]\? \[ऀ-ॿ\]\+\)\{(\d+),(\d+)\}\\\? टिप्पणी में बताइए।\$', pattern)
+    return bool(match and 0 <= int(match[1]) <= int(match[2]) <= MAX_GRAMMAR_WORDS-5)
+
+
 def edit_word_limits(story, indices):
     """Allocate shared headroom once, so a whole accepted batch stays in budget."""
     from story_format import word_bounds

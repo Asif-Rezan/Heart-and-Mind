@@ -54,7 +54,7 @@ def polish_engagement(root,story):
     """Freeze one editorial plan; checkpoint validated edits without moving goals."""
     from story_writer import StoryValidationError, repeated_scenes, normalized
     from story_format import word_bounds
-    from story_constraints import edit_word_limits, constrain_edits
+    from story_constraints import edit_word_limits, constrain_edits, hindi_cta_pattern
     minimum,maximum=word_bounds(story)
     last=len(story['scenes'])-1
     from story_plan import scene_context
@@ -103,6 +103,9 @@ def polish_engagement(root,story):
             save_json(path,saved)
             limits=edit_word_limits(story,remaining)
             schema=constrain_edits(object_schema({f'scene_{i}':object_schema({'text':string(20,400),'visual':string(20,360)}) for i in remaining}),limits)
+            if last in remaining:
+                schema['properties'][f'scene_{last}']['properties']['text']['pattern'] = hindi_cta_pattern(
+                    limits[last]['minimum_words'], limits[last]['maximum_words'])
             response=ask(schema,
                 f'Execute ONLY the frozen editorial corrections below. The complete story has {len(story["lyrics"].split())} words and must stay within {minimum}-{maximum}. '
                 'Replace the existing beat, never append extra exposition. Use the SAME number of Hindi words or fewer '
@@ -110,7 +113,8 @@ def polish_engagement(root,story):
                 'one narrator; no repeated line, no new character, no changed relationship or canonical event. '
                 'Preserve accepted scenes; do not reopen the review or invent additional requirements. '
                 f'Update each English visual to represent the edited text. For scene {last} the spoken text MUST '
-                'invite a story-specific viewer comment after the payoff, using आप and टिप्पणी/बताइए. '
+                'start with आप, ask a story-specific question, and end exactly with ? टिप्पणी में बताइए। '
+                'The fixed opening and closing count toward the per-scene word cap. '
                 'Canonical summary: '+story['summary']+' Cast: '+story['characters']+
                 '\nFinal neighboring beats: '+json.dumps(scene_context(story,remaining),ensure_ascii=False)+
                 '\nRequested current visuals: '+json.dumps({i:story['scenes'][i]['visual'] for i in remaining},ensure_ascii=False)+

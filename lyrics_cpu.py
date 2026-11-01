@@ -7,7 +7,7 @@ from pathlib import Path
 import time
 
 from jsonschema import Draft202012Validator, ValidationError
-from story_constraints import is_hindi_word_pattern
+from story_constraints import is_hindi_word_pattern, is_hindi_cta_pattern
 
 MODEL_ID = 'Qwen/Qwen3-4B-Instruct-2507'
 GGUF_REPO = 'unsloth/Qwen3-4B-Instruct-2507-GGUF'
@@ -93,7 +93,7 @@ def request_story(endpoint, payload):
                 # A simple ASCII subset enforces English planning during decoding,
                 # avoiding the large Unicode negated ranges in the original pattern.
                 node['pattern'] = r'^[ -~]*[A-Za-z][ -~]*$'
-            elif not is_hindi_word_pattern(node.get('pattern')):
+            elif not (is_hindi_word_pattern(node.get('pattern')) or is_hindi_cta_pattern(node.get('pattern'))):
                 node.pop('pattern', None)
             for value in node.values():
                 remove_string_bounds(value)
@@ -155,6 +155,8 @@ def request_story(endpoint, payload):
                     'Only title, description and spoken text use Hindi. Keep the English planning concise.')
             if issue == 'pattern' and is_hindi_word_pattern(failed_pattern):
                 correction += ' Spoken Hindi must follow the exact word range in its schema: single spaces, Devanagari words, no quotations or ASCII numbers. Do not append exposition.'
+            if issue == 'pattern' and is_hindi_cta_pattern(failed_pattern):
+                correction += ' The closing line must start with आप, ask a story-specific Hindi question, and end exactly with ? टिप्पणी में बताइए। within the word limit.'
             if issue == 'incomplete_output':
                 correction += ' Shorten prose and lyric lines so the entire JSON fits the output budget.'
             messages.append({'role': 'user', 'content': correction +

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch,Mock
 import yaml
-from story_constraints import hindi_word_pattern,is_hindi_word_pattern,edit_word_limits
+from story_constraints import hindi_word_pattern,is_hindi_word_pattern,edit_word_limits,hindi_cta_pattern,is_hindi_cta_pattern
 from story_restore import restore_artifacts
 from story_writer import save_json,object_schema,string
 import test_lyrics_cpu
@@ -23,6 +23,41 @@ class HindiWordBounds(unittest.TestCase):
             self.assertIsNone(re.fullmatch(pattern,text))
         self.assertFalse(is_hindi_word_pattern(hindi_word_pattern(4,8).replace('{3,7}','{3,1000}')))
         with self.assertRaises(ValueError):hindi_word_pattern(4,1000)
+
+    def test_closing_grammar_requires_viewer_question_and_comment_within_budget(self):
+        pattern=hindi_cta_pattern(4,15)
+        self.assertTrue(is_hindi_cta_pattern(pattern))
+        valid='आप इन बच्चों की जगह होते तो क्या करते? टिप्पणी में बताइए।'
+        self.assertTrue(re.fullmatch(pattern,valid))
+        # Exact duplicate returned on both attempts by production job 124876475704.
+        rejected='बच्चे साथ में उठकर नए लक्ष्यों की ओर देखते हैं, नोटबुक उनके हाथ में हैं।'
+        for text in (rejected,'आप इन बच्चों की जगह होते तो क्या करते?',valid+' अभी',valid.replace('क्या करते','क्या करते और फिर आगे क्या करते और किससे मदद लेते')):
+            self.assertIsNone(re.fullmatch(pattern,text))
+        self.assertFalse(is_hindi_cta_pattern(pattern.replace('{0,10}','{0,1000}')))
+        with self.assertRaises(ValueError):hindi_cta_pattern(4,4)
+
+    def test_native_decoder_retains_closing_requirement_on_every_retry(self):
+        helper=test_lyrics_cpu.QwenTests();payload=helper.payload()
+        pattern=hindi_cta_pattern(4,15)
+        payload['response_format']['json_schema']['schema']=object_schema({'text':dict(string(20,400),pattern=pattern)})
+        bad=helper.result(json.dumps({'text':'बच्चे साथ में उठकर नए लक्ष्यों की ओर देखते हैं, नोटबुक उनके हाथ में हैं।'}))
+        good=helper.result(json.dumps({'text':'आप इन बच्चों की जगह होते तो क्या करते? टिप्पणी में बताइए।'}))
+        model=helper.model(create_chat_completion=Mock(side_effect=[bad,good]))
+        with patch.object(lyrics_cpu,'load_model',return_value=model):
+            lyrics_cpu.request_story('chat/completions',payload)
+        for call in model.create_chat_completion.call_args_list:
+            self.assertEqual(call.kwargs['response_format']['schema']['properties']['text']['pattern'],pattern)
+        self.assertIn('end exactly with',model.create_chat_completion.call_args.kwargs['messages'][-1]['content'])
+
+    def test_closing_schema_compiles_with_installed_native_cpu_runtime(self):
+        try:
+            from llama_cpp import LlamaGrammar
+        except ImportError:
+            self.skipTest('Native runtime is checked in the production outline job')
+        schema=object_schema({'scene_47':object_schema({
+            'text':dict(type='string',pattern=hindi_cta_pattern(4,15)),
+            'visual':{'type':'string'}})})
+        self.assertIsNotNone(LlamaGrammar.from_json_schema(json.dumps(schema),verbose=False))
 
     def test_shared_growth_is_allocated_once_for_the_whole_edit_batch(self):
         story=sample_story()
