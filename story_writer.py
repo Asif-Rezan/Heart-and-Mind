@@ -80,7 +80,8 @@ def validate_story(story):
             raise ValueError('Scene image description is missing or overlong')
     total = sum(len(s['text'].split()) for s in scenes)
     if not 1000<=total<=1600:
-        raise ValueError('Story needs 1000-1600 Hindi words before measured 8-12 minute speech validation')
+        raise StoryValidationError('story_word_budget',dict(
+            total_words=total,minimum_words=1000,maximum_words=1600))
     if not 30 <= sum(s['speaker'] == 'narrator' for s in scenes) <= 40:
         raise ValueError('Story requires 30-40 narrator scenes and some dialogue')
     if story['lyrics'] != '\n'.join(s['text'] for s in scenes):

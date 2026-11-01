@@ -114,3 +114,26 @@ class StoryBudgetRepairChecks(unittest.TestCase):
         self.assertTrue(any('requirements-lyrics.txt' in step.get('run','') for step in job['steps']))
         self.assertEqual(job['steps'][-1]['if'],'always()')
         self.assertGreaterEqual(job['timeout-minutes'],90)
+
+    def test_run7_actual_word_profile_recovers_from_780_words(self):
+        # Counts only from production; no private story prose is stored here.
+        profiles=[[23,16,13,17,12,10,16,16],[20,19,7,16,15,12,15,16],
+                  [23,17,17,22,18,13,18,21],[26,24,10,18,17,18,20,24],
+                  [12,13,16,16,15,6,12,14],[14,16,14,18,17,19,14,15]]
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            self.prepare(root,20)
+            for i,counts in enumerate(profiles):
+                path=root/'chapters'/f'chapter-{i}.json'
+                chapter=json.loads(path.read_text())
+                for scene,count in zip(chapter['scenes'],counts):
+                    scene['text']=' '.join(['कहानी']*count)+'।'
+                save_json(path,chapter)
+            with patch('story_plan.repair_story_budget'),self.assertRaises(StoryValidationError) as caught:
+                assemble_story(root,'story-test',[])
+            self.assertEqual(caught.exception.code,'story_word_budget')
+            self.assertEqual(caught.exception.details['total_words'],780)
+            with patch('story_plan.ask',side_effect=self.response) as model:
+                story=assemble_story(root,'story-test',[])
+            self.assertLessEqual(model.call_count,3)
+            self.assertTrue(1000<=len(story['lyrics'].split())<=1600)
