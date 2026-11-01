@@ -153,8 +153,8 @@ class IndependentChapterChecks(unittest.TestCase):
             with patch('story_plan.ask',side_effect=bad_response) as model:
                 with self.assertRaises(StoryValidationError) as error:
                     write_chapter(root,'story-test',0)
-                self.assertEqual(error.exception.code,'chapter_scene_repair_incomplete')
-                self.assertEqual(model.call_count,REPAIR_REQUESTS)
+                self.assertEqual(error.exception.code,'chapter_language_repair_incomplete')
+                self.assertEqual(model.call_count,3)
                 self.assertEqual(error.exception.details['pending_scenes'],[3])
             self.assertEqual(len(requested[0]),8)
             self.assertTrue(all(keys=={'scene_2'} for keys in requested[1:]))

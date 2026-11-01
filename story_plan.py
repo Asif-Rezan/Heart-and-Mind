@@ -93,7 +93,7 @@ def chapter_issues(data):
 def scene_schema(indices):
     # Speakers/scene positions are author-controlled before writing. The model
     # only supplies prose for required named slots, so it cannot miscount roles.
-    return object_schema({f'scene_{i}':object_schema({'text':string(1,400),'visual':string(20,360)})
+    return object_schema({f'scene_{i}':object_schema({'text':dict(string(1,400),description='Spoken narration in Hindi Devanagari only; never English.'),'visual':string(20,360)})
                           for i in indices})
 
 
@@ -168,13 +168,14 @@ def write_chapter(root,run_id,index):
             candidate=dict(value,speaker=roles[i])
             candidate=normalize_planning({'scene':candidate},
                 object_schema({'scene':object_schema({'speaker':{'type':'string'},
-                    'text':string(1,400),'visual':string(20,360)})}))['scene']
+                    'text':dict(string(1,400),description='Spoken narration in Hindi Devanagari only; never English.'),'visual':string(20,360)})}))['scene']
+            progress['drafts'][str(i)]=candidate
             if not scene_issues(candidate,roles[i]):
                 accepted[str(i)]=candidate
-                progress['drafts'][str(i)]=candidate
     save_json(progress_path,progress)
     outline=draft['outline']
     seed=int(hashlib.sha256((run_id+':chapter:'+str(index)).encode()).hexdigest()[:7],16)
+    language_attempts={}  # Fresh bounded budget per explicit recovery; accepted prose persists.
     for attempt in range(REPAIR_REQUESTS):
         pending=repair_indices(accepted)
         if not pending:
@@ -187,7 +188,29 @@ def write_chapter(root,run_id,index):
         targets={f'scene_{i}':dict(position=i+1,speaker=roles[i],
                     instruction='narration in third person' if roles[i]=='narrator' else 'direct character dialogue')
                  for i in pending}
-        response=ask(scene_schema(pending),
+        translation=[i for i in pending if speech_issues(progress.get('drafts',{}).get(str(i),{}).get('text'))==['hindi']
+                     and not scene_issues(dict(progress['drafts'][str(i)],text='यह कहानी आगे बढ़ती है।'),roles[i])]
+        if translation:
+            pending=translation[:4]
+            attempts=language_attempts
+            progress['language_attempts']=attempts
+            exhausted=[i+1 for i in pending if attempts.get(str(i),0)>=2]
+            if exhausted:
+                raise StoryValidationError('chapter_language_repair_incomplete',dict(chapter=index+1,
+                    pending_scenes=exhausted,expected_language='Hindi Devanagari',attempt_limit=2))
+            for i in pending:attempts[str(i)]=attempts.get(str(i),0)+1
+            save_json(progress_path,progress)
+            schema=object_schema({f'scene_{i}':object_schema({'text':dict(string(1,400),
+                description='Hindi Devanagari spoken narration only, never English or Romanized Hindi.')}) for i in pending})
+            prompt=('The previous text was rejected because it was ENGLISH, not Hindi. '
+                'Translate ONLY the selected text fields into natural spoken Hindi Devanagari. '
+                'Preserve the same meaning, actions, chronology and canonical names; do not invent events. '
+                'Do not return visual fields or rewrite accepted scenes. Aim 11-18 Hindi words per text. '
+                'Example: Arjun opens the door -> अर्जुन दरवाजा खोलता है। '
+                'Source texts: '+json.dumps({f'scene_{i}':progress['drafts'][str(i)]['text'] for i in pending},ensure_ascii=False))
+        else:
+            schema=scene_schema(pending)
+            prompt=(
             'Write or repair ONLY the requested scene slots for chapter '+str(index+1)+'. '
             'Canonical outline: '+json.dumps(outline,ensure_ascii=False)+
             '\nThis chapter beat: '+outline['chapters'][index]+
@@ -200,14 +223,27 @@ def write_chapter(root,run_id,index):
             'by an established character. Each visual is English, about 120 characters: name the canonical person, exact visible action, story prop and current location from THIS text. No abstract mood-only pictures or unrelated scenery. Repeat the exact established clothing and age when visible. No speaker labels, stage directions, repeated filler or word padding. '
             'Preserve the scene meaning and canonical names. Do not narrate a line and then repeat it as dialogue. '
             'allowing individual plot beats to vary naturally in length. '
-            'Leave all unrequested scenes alone; do not retell earlier beats or resolve later chapters.',
-            (seed+request_number*17)%(2**31-3),min(4000,500+400*len(pending)),
-            checkpoint=root/'chapters'/f'raw-attempt-{request_number}-{index}.json')
+            'Leave all unrequested scenes alone; do not retell earlier beats or resolve later chapters.')
+        from lyrics_cpu import StoryGenerationError
+        from jsonschema import ValidationError
+        try:
+            response=ask(schema,prompt,(seed+request_number*17)%(2**31-3),min(4000,500+400*len(pending)),
+                checkpoint=root/'chapters'/f'raw-attempt-{request_number}-{index}.json')
+        except (StoryGenerationError,ValidationError,json.JSONDecodeError) as error:
+            if isinstance(error,StoryGenerationError) and error.code!='story_model_response_invalid':
+                raise StoryValidationError('chapter_model_runtime_failure',dict(chapter=index+1,model_code=error.code)) from None
+            print(json.dumps(dict(phase='chapter model response retry',chapter=index+1,request=request_number+1,
+                                  error_type=type(error).__name__,pending_scenes=[i+1 for i in pending])),flush=True)
+            if attempt==REPAIR_REQUESTS-1:
+                raise StoryValidationError('chapter_model_response_invalid',dict(chapter=index+1,
+                    error_type=type(error).__name__,pending_scenes=[i+1 for i in pending])) from None
+            continue
         rejected={}
         for i in pending:
             value=response.get(f'scene_{i}',{})
-            candidate=dict(value,speaker=roles[i])
+            candidate=dict(progress['drafts'][str(i)],text=value.get('text')) if translation else dict(value,speaker=roles[i])
             issues=scene_issues(candidate,roles[i])
+            progress['drafts'][str(i)]=candidate
             if not issues:
                 accepted[str(i)]=candidate
                 progress['drafts'][str(i)]=candidate
@@ -222,7 +258,8 @@ def write_chapter(root,run_id,index):
     data=dict(scenes=[accepted[str(i)] for i in range(8)]) if len(accepted)==8 else {}
     issues=chapter_issues(data)
     if issues:
-        raise StoryValidationError('chapter_scene_repair_incomplete',dict(chapter=index+1,
+        code='chapter_language_repair_incomplete' if any(speech_issues(progress['drafts'].get(str(i),{}).get('text'))==['hindi'] for i in repair_indices(accepted)) else 'chapter_scene_repair_incomplete'
+        raise StoryValidationError(code,dict(chapter=index+1,
             accepted_scenes=len(accepted),pending_scenes=[i+1 for i in repair_indices(accepted)],**issues))
     save_json(path,dict(data,outline_hash=identity,index=index,repair_version=REPAIR_VERSION))
     print(json.dumps({'phase':'Hindi chapter ready','chapter':index+1,'chapters':CHAPTERS}),flush=True)

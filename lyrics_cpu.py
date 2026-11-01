@@ -19,6 +19,9 @@ _model = None
 
 class StoryGenerationError(RuntimeError):
     """Only static, privacy-safe messages may be emitted in public job logs."""
+    def __init__(self,message,code='story_model_runtime_failure'):
+        super().__init__(message)
+        self.code=code
 
 
 def verify_model(path):
@@ -130,7 +133,7 @@ def request_story(endpoint, payload):
                 'constraint': issue, 'field': field, 'bound': bound,
                 'completion_tokens': result.get('usage', {}).get('completion_tokens')}), flush=True)
             if attempt == 2:
-                raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts') from None
+                raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts',code='story_model_response_invalid') from None
             correction = f'The previous response failed {issue} for field {field}.'
             if bound is not None:
                 correction += f' The required {issue} is {bound}.'
@@ -138,7 +141,7 @@ def request_story(endpoint, payload):
                 correction += ' Shorten prose and lyric lines so the entire JSON fits the output budget.'
             messages.append({'role': 'user', 'content': correction +
                 ' Regenerate the complete JSON matching the supplied schema. Follow every field length limit. '
-                'Only sung lyrics must be Hindi Devanagari; thumbnail_text and image prompts must follow '
+                'Every spoken text or lyrics field must be Hindi Devanagari; thumbnail_text and image prompts must follow '
                 'their own ASCII/English rules. Do not add fields or commentary.'})
             continue
         print(json.dumps({'check': 'Qwen lyrics JSON', 'passed': True,

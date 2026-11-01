@@ -315,7 +315,7 @@ def main():
         code=getattr(error,'code','pipeline_error') if isinstance(error,StoryValidationError) else 'pipeline_error'
         details = {**details, **safe_api_details(error)}
         diagnostic=dict(stage=args.stage,error_type=type(error).__name__,code=code,details=details,
-            message=pipeline_failure_message(error))
+            message=getattr(error,'public_message',pipeline_failure_message(error)))
         save_json(root/'failure.json',diagnostic)
         print(json.dumps(diagnostic),flush=True)
         raise SystemExit(1)

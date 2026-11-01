@@ -129,6 +129,15 @@ class StoryValidationError(ValueError):
         super().__init__(code)
         self.code=code
         self.details=details or {}
+        messages={
+            'chapter_language_repair_incomplete':'Narration is not Hindi Devanagari after bounded text-only corrections. Valid scenes are saved; resume the listed scenes.',
+            'chapter_model_runtime_failure':'The text model runtime failed. Check runner/model configuration; valid scene checkpoints are retained.',
+            'chapter_model_response_invalid':'The text model returned invalid structured output after bounded retries. Resume only pending scenes.',
+            'chapter_scene_repair_incomplete':'Chapter has incomplete scene content. Valid scenes are retained; inspect the pending scene indices.',
+            'editorial_edit_incomplete':'Some fixed editorial corrections remain invalid. Accepted edits are saved for recovery.',
+            'editorial_plan_incomplete':'The editor did not supply actionable corrections for a failed criterion.',
+        }
+        self.public_message=messages.get(code,'Story validation failed. Inspect the error code and safe checkpoint details.')
 
 
 def bound_prose(value, spec):
@@ -195,6 +204,21 @@ def normalize_planning(data, schema):
     return result
 
 
+def language_contract(schema):
+    def has_text(node):
+        if not isinstance(node,dict):return False
+        if 'text' in node.get('properties',{}):return True
+        return any(has_text(value) for value in node.get('properties',{}).values()) or has_text(node.get('items'))
+    if has_text(schema):
+        return ('Every JSON key named text is SPOKEN narration: write it ONLY in Hindi Devanagari, '
+                'never English or Romanized Hindi. An English outline is reference material, not the output language. '
+                'For example text: उसने दरवाजा खोलकर चिट्ठी पढ़ी। Keys named visual or instruction are English. '
+                'Preserve the supplied canonical story; return JSON only.')
+    return ('Write original Hindi emotional fiction. Title and description are Hindi Devanagari. '
+            'English-only planning keys are summary, characters, world, chapters, visual and instruction. '
+            'Use transliterated names in English planning, never translate spoken Hindi into English. Return JSON only.')
+
+
 def ask(schema, prompt, seed, tokens=3000, checkpoint=None):
     from lyrics_cpu import request_story, MODEL_ID
     from jsonschema import Draft202012Validator
@@ -209,7 +233,7 @@ def ask(schema, prompt, seed, tokens=3000, checkpoint=None):
     reporter.start()
     try:
         response = request_story('chat/completions', dict(model=MODEL_ID,
-        messages=[{'role': 'system', 'content': 'You write original Hindi emotional motivational fiction for a general audience. Spoken text, title and description are Hindi Devanagari. Summary, characters, world, chapter planning, visual prompts and editorial instructions MUST be English with transliterated names. Return JSON only.'},
+        messages=[{'role': 'system', 'content': language_contract(schema)},
                   {'role': 'user', 'content': prompt}],
         response_format={'type': 'json_schema', 'json_schema': {'schema': planning_schema(schema)}},
         max_completion_tokens=tokens, seed=seed, temperature=.85))
