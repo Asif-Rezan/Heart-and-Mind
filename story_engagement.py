@@ -62,7 +62,11 @@ def polish_engagement(root,story):
     path=root/'engagement-review.json'
     saved=json.loads(path.read_text()) if path.exists() else {}
     if saved and saved.get('identity')!=identity:
-        raise StoryValidationError('editorial_checkpoint_identity_mismatch')
+        # Restored artifacts may contain an older upstream prose revision.
+        # Never apply those edits to a different script; audit the current one.
+        save_json(root/f"engagement-review-stale-{str(saved.get('identity','unknown'))[:12]}.json",saved)
+        print(json.dumps(dict(phase='stale editorial checkpoint invalidated',identity=identity)),flush=True)
+        saved={}
     if saved:
         story['scenes']=saved['scenes']
         story['lyrics']='\n'.join(s['text'] for s in story['scenes'])

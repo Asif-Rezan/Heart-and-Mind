@@ -38,6 +38,19 @@ class EngagementTests(unittest.TestCase):
             self.assertTrue(saved['approved'])
             self.assertEqual(saved['approval_basis'],'fixed_plan_edits_validated')
 
+    def test_changed_upstream_prose_reaudits_without_applying_stale_edits(self):
+        story=short_story();original=copy.deepcopy(story['scenes'])
+        review=dict(hook=True,progression=True,payoff=True,cta=True,repairs=[])
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            save_json(root/'engagement-review.json',dict(identity='old-source',scenes=[],review={},complete=[]))
+            with patch('story_engagement.ask',return_value=review) as model:
+                polish_engagement(root,story)
+            model.assert_called_once()
+            self.assertEqual(story['scenes'],original)
+            self.assertTrue((root/'engagement-review-stale-old-source.json').exists())
+            self.assertNotEqual(json.loads((root/'engagement-review.json').read_text())['identity'],'old-source')
+
     def test_incomplete_progression_plan_reports_specific_safe_error(self):
         failed=dict(hook=False,progression=False,payoff=False,cta=False,repairs=[])
         with tempfile.TemporaryDirectory() as folder,patch('story_engagement.ask',return_value=failed),self.assertRaisesRegex(ValueError,'editorial_plan_incomplete'):
