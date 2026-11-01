@@ -36,6 +36,8 @@ To restore production later, revert the animation change commit through a new co
 
 Run **One-minute Python 2D puppet story demo** (`puppet-demo.yml`) manually from Actions. It creates an exactly 60-second / 1500-frame 1280×720 preview with six scenes, the production Hindi Kokoro narrator, an original quiet synthesized pad and a storyboard. Download `puppet-story-demo-60s`; its verification JSON records duration, frame count, video hash and workflow run ID. This demo has no Google credentials and does not upload to YouTube or Drive. Its fixed 60-second narration uses a bounded tempo fit for preview purposes; the daily production narration rules are unchanged.
 
+Verified GitHub Actions demo: [run 41296717724 / demo #2](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41296717724), generated from `5fa109c`. The job succeeded in 2m 36s (14m 11s including runner queue). Downloaded output was independently checked: 60.000 seconds, 1500 frames, 1280×720, audio present, SHA-256 `a2fd4e381b483183da4403e004bd2ce698eaeb18e2fa2c5a01a5f61d3816308a`. Artifact: `puppet-story-demo-60s` (14-day retention). Local regression suite: 177 tests passed.
+
 Local graphics-only smoke check: `python demo_story_puppet.py --silent --output /tmp/puppet-demo`. Run without `--silent` with the CPU voice dependencies to include speech/music.
 
 ## Current story, voice and artwork contract
