@@ -1,0 +1,47 @@
+name: Hindi narration voice comparison
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/natural-hindi-voice]
+    paths:
+    - story_voice.py
+    - story_voice_model.py
+    - preview_story_voice.py
+    - .github/workflows/voice-preview.yml
+permissions:
+  contents: read
+jobs:
+  voices:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - name: Install CPU narration tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+        pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+        pip install -r requirements.txt -r requirements-voice-cpu.txt
+    - name: Generate current narrator and two Hindi-focused stock voices
+      run: python -u preview_story_voice.py
+    - uses: actions/upload-artifact@v4
+      with:
+        name: hindi-narration-comparison
+        path: output/hindi-voice-preview/
+        if-no-files-found: error
+        retention-days: 14
+    - name: Add listening guide
+      run: |
+        echo '### Hindi narration comparison' >> "$GITHUB_STEP_SUMMARY"
+        echo 'Same script, native speed 1.0, matched loudness, no music. 01 = existing Kokoro hm_omega; 02 = Hindi Goonj Ravi; 03 = Hindi Goonj Atul. Download hindi-narration-comparison to listen. No YouTube/Drive publication.' >> "$GITHUB_STEP_SUMMARY"
