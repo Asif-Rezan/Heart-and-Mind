@@ -304,7 +304,7 @@ def repair_story_budget(root, run_id, draft, chapters):
         eligible=[i for i,scene in enumerate(scenes)
                   if (len(scene['text'].split())<target_words if expanding else len(scene['text'].split())>target_words)]
         indices=sorted(eligible,key=lambda i:(tried[i],
-            len(scenes[i]['text'].split())*(1 if expanding else -1)))[:8]
+            len(scenes[i]['text'].split())*(1 if expanding else -1)))[:2 if is_short(draft) else 8]
         if not indices:
             break
         for i in indices:
@@ -322,10 +322,10 @@ def repair_story_budget(root, run_id, draft, chapters):
                 f' each requested text to {target_words-1}-{target_words+1} space-separated Hindi words, at most 400 characters. '
                 'Preserve actions, names, chronology and assigned speaker. No filler, repetition, '
                 'new plot events or stage directions. Return exactly the requested scene_N text objects. '
-                'Canonical outline: '+json.dumps(draft['outline'],ensure_ascii=False)+
-                '\nRequested scenes with surrounding context: '+json.dumps({f'scene_{i}':
-                    scenes[max(0,i-1):min(len(scenes),i+2)] for i in indices},ensure_ascii=False),
-                (seed+request*17)%(2**31-3),min(4000,500+400*len(indices)),
+                'Canonical plot and cast: '+json.dumps({k:draft['outline'][k] for k in ('summary','characters')},ensure_ascii=False)+
+                '\nRequested spoken beats and neighbors: '+json.dumps(scene_context(dict(scenes=scenes),indices),ensure_ascii=False)+
+                '\nRequested slots: '+json.dumps(indices),
+                (seed+request*17)%(2**31-3),min(4000,500+(200 if is_short(draft) else 400)*len(indices)),
                 checkpoint=Path(root)/'budget-responses'/f'request-{request}.json')
         except (StoryGenerationError,ValidationError,json.JSONDecodeError) as error:
             diagnostic['error_type']=type(error).__name__
@@ -355,13 +355,28 @@ def repair_story_budget(root, run_id, draft, chapters):
             total_words=total,minimum_words=minimum,maximum_words=maximum,requests=request))
 
 
-def assemble_story(root,run_id,history):
+def assemble_story(root,run_id,history,prose_only=False):
     root=Path(root)
     manifest=root/'story.json'
     if manifest.exists():
         story=validate_story(json.loads(manifest.read_text()))
         if story['run_id']!=run_id:
             raise StoryValidationError('story_identity_mismatch')
+        if prose_only:save_json(root/'story-prose.json',story)
+        return story
+    prose_path=root/'story-prose.json'
+    if prose_path.exists():
+        story=validate_story(json.loads(prose_path.read_text()),require_planning=False)
+        if story['run_id']!=run_id:raise StoryValidationError('story_identity_mismatch')
+        reason=novelty_reason(story,[h for h in history if h.get('run')!=run_id])
+        if reason:raise StoryValidationError('duplicate_story',dict(reason=reason))
+        if prose_only:return story
+        if is_short(story):
+            from story_packaging import prepare_packaging
+            prepare_packaging(root,story)
+            prepare_visuals(root,story)
+        validate_story(story)
+        save_json(manifest,story)
         return story
     draft=json.loads((root/'story-draft.json').read_text())
     if draft.get('run_id',run_id)!=run_id:
@@ -392,6 +407,12 @@ def assemble_story(root,run_id,history):
         from story_engagement import polish_engagement
         polish_engagement(root,story)
         repair_repetition(root, story)
+    validate_story(story,require_planning=False)
+    reason=novelty_reason(story,[h for h in history if h.get('run')!=run_id])
+    if reason:raise StoryValidationError('duplicate_story',dict(reason=reason))
+    save_json(root/'story-prose.json',story)
+    if prose_only:return story
+    if is_short(story):
         from story_packaging import prepare_packaging
         prepare_packaging(root,story)
         prepare_visuals(root, story)
@@ -501,55 +522,54 @@ def repair_repetition(root, story):
             requests=saved['requests'],rejections=saved['rejections']))
 
 
+def visual_batch(root,story,slots,identity):
+    schema=object_schema({f'scene_{i}':string(30,360) for i in slots})
+    response=ask(schema,
+        'Storyboard the FINAL Hindi narration faithfully. For every requested scene return a compact English image prompt. '
+        'Show exactly the concrete action, object and location described in that text. No generic unrelated scenery. '
+        'Use the canonical age, hair, clothing colors, props and architecture consistently. State visible appearance explicitly, '
+        'not just a character name. At most two visible people. Never invent a new character or change clothes. '
+        'One action per frame, main person and prop clear, same colorful 3D storybook style. '
+        'Keep each prompt under about 60 English words, put action and defining appearance first. '
+        'Canonical cast: '+story['characters']+' World: '+story['world']+
+        '\nCanonical plot: '+story['summary']+
+        '\nFinal chronological beats for this batch: '+json.dumps(scene_context(story,slots),ensure_ascii=False)+
+        '\nRequested indices: '+json.dumps(slots),
+        int(identity[:7],16)+slots[0],min(3500,400+180*len(slots)),
+        checkpoint=Path(root)/'visual-responses'/f'{slots[0]}.json')
+    return {str(i):response[f'scene_{i}'] for i in slots}
+
+
+def thumbnail_plan(root,story,identity):
+    response=ask(object_schema({'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
+                                'thumbnail_prompt':string(80,360)}),
+        'Choose the single scene that most truthfully represents this story main conflict or meaningful choice. '
+        'Also write a SEPARATE English image-generation prompt designed for a YouTube thumbnail at small mobile size. '
+        'This is a fresh composition, not a screenshot. Use the same canonical character appearance and actual '
+        'event/prop/setting of the selected scene. One dominant expressive face, one clear story object, '
+        'strong subject/background contrast, bright face lighting, bold saturated complementary colors, '
+        'uncluttered composition, instantly readable emotional stakes, no tiny details, no text or lettering. '
+        'Create curiosity about the real conflict without inventing danger, wealth, tears or plot events. '
+        'Put character appearance and the main visual action first; at most 60 words. '
+        'No unrelated poster, invented event, or generic sunrise. Canonical cast: '+story['characters']+' World: '+story['world']+' '
+        'Title: '+story['title']+' Summary: '+story['summary']+
+        '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False),
+        int(identity[:7],16),500,checkpoint=Path(root)/'thumbnail-selection.json')
+    return dict(thumbnail_scene=response['scene'],thumbnail_prompt=response['thumbnail_prompt'])
+
+
 def prepare_visuals(root, story):
-    """Review imagery against the final spoken script, after all prose repairs."""
-    from story_writer import scene_prompt
     path=Path(root)/'visual-plan.json'
     identity=text_hash(json.dumps(story,sort_keys=True,ensure_ascii=False))
     saved=json.loads(path.read_text()) if path.exists() else {}
-    if saved and saved.get('identity')!=identity:
-        saved={}
-    saved.setdefault('identity',identity)
-    saved.setdefault('scenes',{})
+    if saved and saved.get('identity')!=identity:saved={}
+    saved.setdefault('identity',identity);saved.setdefault('scenes',{})
     for start in range(0,len(story['scenes']),8):
         slots=list(range(start,min(start+8,len(story['scenes']))))
-        if all(str(i) in saved['scenes'] for i in slots):
-            continue
-        schema=object_schema({f'scene_{i}':string(30,360) for i in slots})
-        response=ask(schema,
-            'Storyboard the FINAL Hindi narration faithfully. For every requested scene return a compact English image prompt. '
-            'Show exactly the concrete action, object and location described in that text. No generic unrelated scenery. '
-            'Use the canonical age, hair, clothing colors, props and architecture consistently. State visible appearance explicitly, '
-            'not just a character name. At most two visible people. Never invent a new character or change clothes. '
-            'One action per frame, main person and prop clear, same colorful 3D storybook style. '
-            'Keep each prompt under about 60 English words, put action and defining appearance first. '
-            'Canonical cast: '+story['characters']+' World: '+story['world']+
-            '\nCanonical plot: '+story['summary']+
-            '\nFinal chronological beats for this batch: '+json.dumps(scene_context(story,slots),ensure_ascii=False)+
-            '\nRequested indices: '+json.dumps(slots),
-            int(identity[:7],16)+start,3500,
-            checkpoint=Path(root)/'visual-responses'/f'{start}.json')
-        for i in slots:
-            saved['scenes'][str(i)]=response[f'scene_{i}']
-        save_json(path,saved)
+        if not all(str(i) in saved['scenes'] for i in slots):
+            saved['scenes'].update(visual_batch(root,story,slots,identity))
+            save_json(path,saved)
     if 'thumbnail_scene' not in saved or 'thumbnail_prompt' not in saved:
-        response=ask(object_schema({'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
-                                    'thumbnail_prompt':string(80,360)}),
-            'Choose the single scene that most truthfully represents this story main conflict or meaningful choice. '
-            'Also write a SEPARATE English image-generation prompt designed for a YouTube thumbnail at small mobile size. '
-            'This is a fresh composition, not a screenshot. Use the same canonical character appearance and actual '
-            'event/prop/setting of the selected scene. One dominant expressive face, one clear story object, '
-            'strong subject/background contrast, bright face lighting, bold saturated complementary colors, '
-            'uncluttered composition, instantly readable emotional stakes, no tiny details, no text or lettering. '
-            'Create curiosity about the real conflict without inventing danger, wealth, tears or plot events. '
-            'Put character appearance and the main visual action first; at most 60 words. '
-            'No unrelated poster, invented event, or generic sunrise. Canonical cast: '+story['characters']+' World: '+story['world']+' '
-            'Title: '+story['title']+' Summary: '+story['summary']+
-            '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False),
-            int(identity[:7],16),500,checkpoint=Path(root)/'thumbnail-selection.json')
-        saved['thumbnail_scene']=response['scene']
-        saved['thumbnail_prompt']=response['thumbnail_prompt']
-        save_json(path,saved)
+        saved.update(thumbnail_plan(root,story,identity));save_json(path,saved)
     story['visuals']=saved['scenes']
-    story['thumbnail_scene']=saved['thumbnail_scene']
-    story['thumbnail_prompt']=saved['thumbnail_prompt']
+    story['thumbnail_scene']=saved['thumbnail_scene'];story['thumbnail_prompt']=saved['thumbnail_prompt']

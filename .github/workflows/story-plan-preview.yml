@@ -1,5 +1,5 @@
 name: Recover and time saved story planning only
-on:
+'on':
   workflow_dispatch:
     inputs:
       run_id:
@@ -14,7 +14,7 @@ permissions:
   contents: read
   actions: read
 jobs:
-  plan:
+  prose:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -38,33 +38,164 @@ jobs:
         run-id: ${{ inputs.prepared_run }}
         github-token: ${{ github.token }}
         path: output/
-    - name: Resume saved prose and measure compact planning
-      run: |
-        python - <<'PY'
-        import os, re, time
-        from pathlib import Path
-        from story_writer import save_json
-        from daily_story import plan
-        run_id=os.environ['STORY_RUN_ID']
-        if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}',run_id):
-            raise SystemExit('Invalid story run ID')
-        root=Path('output')/run_id
-        if not (root/'story-draft.json').is_file():
-            raise SystemExit('Matching saved story outline is required; no new story generation')
-        started=time.monotonic()
-        story=plan(root,run_id,False,mode='assemble')
-        result=dict(run_id=run_id,seconds=round(time.monotonic()-started,1),
-                    scenes=len(story['scenes']),words=len(story['lyrics'].split()),
-                    verified=True,publication=False)
-        save_json(root/'planning-preview.json',result)
-        (root/'failure.json').unlink(missing_ok=True)
-        with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
-            summary.write('### Saved story planning verified\n'+str(result)+'\n')
-        PY
+    - name: Recover final prose without regenerating chapters
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage prose
+    - id: planning_matrix
+      name: Choose at most eighteen non-empty visual planning workers
+      run: "python - <<'PYCODE'\nimport json,os\nfrom pathlib import Path\nfrom story_planning import load_prose,visual_worker_count\n\
+        story=load_prose(Path('output')/os.environ['STORY_RUN_ID'],os.environ['STORY_RUN_ID'])\nwith open(os.environ['GITHUB_OUTPUT'],'a')\
+        \ as output:\n    output.write('visual_parts='+json.dumps(list(range(visual_worker_count(story))))+'\\n')\n\
+        PYCODE\n"
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: story-prose-${{ github.run_id }}
+        path: output/
+        if-no-files-found: error
+        retention-days: 7
+    outputs:
+      visual_parts: ${{ steps.planning_matrix.outputs.visual_parts }}
+  planning_seo:
+    needs: prose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      STORY_RUN_ID: ${{ inputs.run_id }}
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: pip install -r requirements.txt -r requirements-lyrics.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-prose-${{ github.run_id }}
+        path: output/
+    - name: Plan seo from immutable final prose
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage planning-seo
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: story-planning-${{ github.run_id }}-seo
+        path: 'output/*/planning-*.json
+
+          output/*/failure.json'
+        retention-days: 7
+        if-no-files-found: error
+  planning_thumbnail:
+    needs: prose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      STORY_RUN_ID: ${{ inputs.run_id }}
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: pip install -r requirements.txt -r requirements-lyrics.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-prose-${{ github.run_id }}
+        path: output/
+    - name: Plan thumbnail from immutable final prose
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage planning-thumbnail
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: story-planning-${{ github.run_id }}-thumbnail
+        path: 'output/*/planning-*.json
+
+          output/*/failure.json'
+        retention-days: 7
+        if-no-files-found: error
+  planning_visuals:
+    needs: prose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      STORY_RUN_ID: ${{ inputs.run_id }}
+      CUDA_VISIBLE_DEVICES: ''
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+      STORY_PART: ${{ matrix.part }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: pip install -r requirements.txt -r requirements-lyrics.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-prose-${{ github.run_id }}
+        path: output/
+    - name: Plan visual from immutable final prose
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage planning-visual --part "$STORY_PART"
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: story-planning-${{ github.run_id }}-visual-${{ matrix.part }}
+        path: 'output/*/planning-*.json
+
+          output/*/failure.json'
+        retention-days: 7
+        if-no-files-found: error
+    strategy:
+      fail-fast: false
+      max-parallel: 18
+      matrix:
+        part: ${{ fromJSON(needs.prose.outputs.visual_parts) }}
+  plan:
+    needs:
+    - prose
+    - planning_seo
+    - planning_thumbnail
+    - planning_visuals
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      STORY_RUN_ID: ${{ inputs.run_id }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+    - run: pip install -r requirements.txt
+    - uses: actions/download-artifact@v4
+      with:
+        name: story-prose-${{ github.run_id }}
+        path: output/
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: story-planning-${{ github.run_id }}-*
+        merge-multiple: true
+        path: output/
+    - name: Verify all planning outputs match the sealed script and reserve story
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage planning-join
     - uses: actions/upload-artifact@v4
       if: always()
       with:
         name: story-input-${{ github.run_id }}
         path: output/
-        if-no-files-found: error
         retention-days: 7

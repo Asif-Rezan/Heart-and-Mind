@@ -19,8 +19,11 @@ def root_for(run_id):
     return root
 
 
-def load_story(root):
-    return validate_story(json.loads((root/'story.json').read_text()))
+def load_story(root,allow_prose=False):
+    path=root/'story.json'
+    if not path.exists() and allow_prose:
+        return validate_story(json.loads((root/'story-prose.json').read_text()),require_planning=False)
+    return validate_story(json.loads(path.read_text()))
 
 
 def plan(root, run_id, check_history, mode="plan"):
@@ -39,9 +42,12 @@ def plan(root, run_id, check_history, mode="plan"):
         from story_plan import prepare_outline
         prepare_outline(root,run_id,history)
         return
-    if mode == 'assemble':
+    if mode == 'planning-join':
+        from story_planning import join_planning
+        story=join_planning(root,run_id)
+    elif mode in ('assemble','prose'):
         from story_plan import assemble_story
-        story=assemble_story(root,run_id,history)
+        story=assemble_story(root,run_id,history,prose_only=(mode=='prose'))
     else:
         story = write_story(root, run_id, history)
     if story['run_id'] != run_id:
@@ -49,6 +55,7 @@ def plan(root, run_id, check_history, mode="plan"):
     others = [h for h in history if h.get('run') != run_id]
     if novelty_reason(story, others):
         raise ValueError('Duplicate story refused before synthesis')
+    if mode=='prose':return story
     if store:
         # Reserve unfinished/scheduled stories as well as publicly released ones.
         store.save(f'stories/runs/{run_id}/story.json', story)
@@ -264,7 +271,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--render-with-images',action='store_true',help='Render each image on its own worker as soon as it is ready')
-    parser.add_argument('--stage',choices=['plan','outline','chapter','assemble','voice','music','music-part','mix','images','render-clips','render','publish','recover'],required=True)
+    parser.add_argument('--stage',choices=['plan','outline','chapter','assemble','prose','planning-seo','planning-thumbnail','planning-visual','planning-join','voice','music','music-part','mix','images','render-clips','render','publish','recover'],required=True)
     parser.add_argument('--check-history',action='store_true')
     parser.add_argument('--part',type=int)
     parser.add_argument('--prepared-clips',action='store_true')
@@ -273,7 +280,7 @@ def main():
     args = parser.parse_args()
     root = root_for(args.run_id)
     try:
-        if args.stage in ('plan','outline','assemble'):
+        if args.stage in ('plan','outline','assemble','prose','planning-join'):
             plan(root,args.run_id,args.check_history,mode=args.stage)
             (root/'failure.json').unlink(missing_ok=True)
             return
@@ -285,7 +292,12 @@ def main():
             write_chapter(root,args.run_id,args.part)
             (root/'failure.json').unlink(missing_ok=True)
             return
-        story = load_story(root)
+        if args.stage in ('planning-seo','planning-thumbnail','planning-visual'):
+            from story_planning import run_worker
+            run_worker(root,args.run_id,args.stage.removeprefix('planning-'),args.part)
+            (root/'failure.json').unlink(missing_ok=True)
+            return
+        story = load_story(root,allow_prose=args.stage in ('voice','music','music-part','mix'))
         if story['run_id'] != args.run_id:
             raise ValueError('Manifest belongs to a different story run')
         if args.stage == 'voice':

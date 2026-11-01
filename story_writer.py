@@ -80,7 +80,7 @@ def repeated_scenes(scenes):
     return sorted(repeated)
 
 
-def validate_story(story):
+def validate_story(story,require_planning=True):
     if story.get('content_type') != 'hindi_story' or story.get('writer_version') != VERSION:
         raise ValueError('Not a supported Hindi story manifest')
     if not 1 <= len(story['title']) <= 100 or not 1 <= len(story['description']) <= 4400:
@@ -109,7 +109,7 @@ def validate_story(story):
         if any(s['speaker'] != 'narrator' for s in scenes):
             raise ValueError('Short stories require one narrator')
         visuals=story.get('visuals',{})
-        if (set(visuals)!={str(i) for i in range(expected)} or
+        if require_planning and (set(visuals)!={str(i) for i in range(expected)} or
                 any(not isinstance(v,str) or not 30<=len(v)<=360 for v in visuals.values()) or
                 not isinstance(story.get('thumbnail_prompt'),str) or not 80<=len(story['thumbnail_prompt'])<=360 or
                 type(story.get('thumbnail_scene')) is not int or not 0<=story['thumbnail_scene']<expected):

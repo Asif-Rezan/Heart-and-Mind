@@ -74,7 +74,7 @@ class SampleContracts(unittest.TestCase):
         workflow=yaml.safe_load(Path('.github/workflows/stories.yml').read_text())
         jobs=workflow['jobs']
         scripts='\n'.join(step.get('run','') for job in jobs.values() for step in job.get('steps',[]))
-        for stage in ('outline','chapter','assemble','voice','music-part','mix','images','render'):
+        for stage in ('outline','chapter','prose','planning-seo','planning-thumbnail','planning-visual','planning-join','voice','music-part','mix','images','render'):
             self.assertIn('--stage '+stage,scripts)
         upload=next(step for step in jobs['publish']['steps'] if '--stage publish ' in step.get('run',''))
         self.assertIn('!inputs.sample_mode',upload['if'])

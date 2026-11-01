@@ -86,6 +86,7 @@ def polish_engagement(root,story):
         saved=dict(version=EDITOR_VERSION,identity=identity,scenes=story['scenes'],review=review,
                    tasks={str(i):value for i,value in tasks.items()},complete=[],approved=False,requests=0)
         save_json(path,saved)
+    saved.setdefault('rejections',{})
     pending=[int(i) for i in saved['tasks'] if i not in saved['complete']]
     print(json.dumps(dict(phase='fixed editorial plan',pending_scenes=pending,completed_scenes=len(saved['complete']))),flush=True)
     for start in range(0,len(pending),2):
@@ -95,10 +96,15 @@ def polish_engagement(root,story):
             if not remaining:break
             saved['requests']+=1
             save_json(path,saved)
+            total_words=len(story['lyrics'].split())
+            headroom=max(0,maximum-total_words)
+            limits={i:dict(current_words=len(story['scenes'][i]['text'].split()),
+                           maximum_words=len(story['scenes'][i]['text'].split())+headroom) for i in remaining}
             schema=object_schema({f'scene_{i}':object_schema({'text':string(20,400),'visual':string(20,360)}) for i in remaining})
             response=ask(schema,
                 f'Execute ONLY the frozen editorial corrections below. The complete story has {len(story["lyrics"].split())} words and must stay within {minimum}-{maximum}. '
-                'Aim 11-18 Hindi words per edit, but retain enough detail to preserve the full-story budget. '
+                'Replace the existing beat, never append extra exposition. Use the SAME number of Hindi words or fewer '
+                'when close to the total maximum. Follow the exact per-scene word caps below; do not expand beyond them. '
                 'one narrator; no repeated line, no new character, no changed relationship or canonical event. '
                 'Preserve accepted scenes; do not reopen the review or invent additional requirements. '
                 f'Update each English visual to represent the edited text. For scene {last} the spoken text MUST '
@@ -106,18 +112,30 @@ def polish_engagement(root,story):
                 'Canonical summary: '+story['summary']+' Cast: '+story['characters']+
                 '\nFinal neighboring beats: '+json.dumps(scene_context(story,remaining),ensure_ascii=False)+
                 '\nRequested current visuals: '+json.dumps({i:story['scenes'][i]['visual'] for i in remaining},ensure_ascii=False)+
-                '\nFrozen corrections: '+json.dumps({i:saved['tasks'][str(i)] for i in remaining},ensure_ascii=False),
+                '\nFrozen corrections: '+json.dumps({i:saved['tasks'][str(i)] for i in remaining},ensure_ascii=False)+
+                '\nPer-scene word limits: '+json.dumps(limits)+
+                '\nPrevious rejection feedback: '+json.dumps({str(i):saved['rejections'].get(str(i)) for i in remaining}),
                 (int(identity[:7],16)+saved['requests']+100)%(2**31-3),1600,
                 checkpoint=root/f"engagement-edit-{saved['requests']}.json")
             for i in remaining:
                 value=response[f'scene_{i}']
-                if normalized(value['text'])==normalized(story['scenes'][i]['text']) or speech_issues(value['text']) or (i==last and not has_closing_cta([value])):
-                    continue
+                reason=None
+                if normalized(value['text'])==normalized(story['scenes'][i]['text']):reason='unchanged_text'
+                elif speech_issues(value['text']):reason='invalid_hindi'
+                elif i==last and not has_closing_cta([value]):reason='closing_cta_missing'
                 proposed=[dict(s) for s in story['scenes']]
                 proposed[i]=dict(value,index=i,speaker='narrator')
                 total=sum(len(s['text'].split()) for s in proposed)
-                if not minimum<=total<=maximum or i in repeated_scenes(proposed):
+                if not reason and not minimum<=total<=maximum:reason='story_word_budget'
+                if not reason and not set(repeated_scenes(proposed)).issubset(set(repeated_scenes(story['scenes']))):reason='new_repeated_line'
+                if reason:
+                    saved['rejections'][str(i)]=dict(reason=reason,proposed_total_words=total,
+                        minimum_words=minimum,maximum_words=maximum,
+                        maximum_scene_words=len(story['scenes'][i]['text'].split())+max(0,maximum-len(story['lyrics'].split())))
+                    save_json(path,saved)
+                    print(json.dumps(dict(phase='editorial edit rejected',scene=i,**saved['rejections'][str(i)])),flush=True)
                     continue
+                saved['rejections'].pop(str(i),None)
                 story['scenes']=proposed
                 story['lyrics']='\n'.join(s['text'] for s in proposed)
                 saved['scenes']=proposed
@@ -126,7 +144,8 @@ def polish_engagement(root,story):
                 print(json.dumps(dict(phase='editorial edit saved',scene=i,pending=len(saved['tasks'])-len(saved['complete']))),flush=True)
         missing=[i for i in slots if str(i) not in saved['complete']]
         if missing:
-            raise StoryValidationError('editorial_edit_incomplete',dict(pending_scenes=missing,requests=saved['requests']))
+            raise StoryValidationError('editorial_edit_incomplete',dict(pending_scenes=missing,requests=saved['requests'],
+                rejections={str(i):saved['rejections'].get(str(i)) for i in missing}))
     if not has_closing_cta(story['scenes']):
         raise StoryValidationError('story_closing_cta_missing')
     # Completion means the fixed edits passed content checks, not a claimed audience rating.

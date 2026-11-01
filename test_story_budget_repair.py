@@ -110,7 +110,7 @@ class StoryBudgetRepairChecks(unittest.TestCase):
 
     def test_workflow_installs_repair_runtime_and_keeps_failed_checkpoints(self):
         import yaml
-        job=yaml.safe_load(Path('.github/workflows/stories.yml').read_text())['jobs']['plan']
+        job=yaml.safe_load(Path('.github/workflows/stories.yml').read_text())['jobs']['prose']
         self.assertTrue(any('requirements-lyrics.txt' in step.get('run','') for step in job['steps']))
         self.assertEqual(job['steps'][-1]['if'],'always()')
         self.assertGreaterEqual(job['timeout-minutes'],90)

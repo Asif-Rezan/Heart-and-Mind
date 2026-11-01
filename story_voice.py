@@ -91,7 +91,7 @@ def generate_voice(root, story):
     import numpy as np
     import soundfile as sf
     import torch
-    validate_story(story)
+    validate_story(story,require_planning=False)
     minimum, maximum = duration_bounds(story)
     root = Path(root)
     profile=voice_profile(legacy=not is_short(story))
