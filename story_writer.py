@@ -4,6 +4,8 @@ import hashlib
 import json
 import re
 import unicodedata
+import threading
+import time
 from pathlib import Path
 from difflib import SequenceMatcher
 
@@ -159,7 +161,7 @@ def planning_schema(schema):
             if not isinstance(node,dict):
                 return
             for field,spec in node.get('properties',{}).items():
-                if field=='visual':
+                if field in ('visual','instruction'):
                     spec.pop('maxLength',None)
                 else:
                     relax(spec)
@@ -182,7 +184,7 @@ def normalize_planning(data, schema):
                 for field,child in spec.get('properties',{}).items():
                     if field not in value:
                         continue
-                    if field=='visual':
+                    if field in ('visual','instruction'):
                         value[field]=bound_prose(value[field],child)
                     else:
                         normalize(value[field],child)
@@ -196,11 +198,24 @@ def normalize_planning(data, schema):
 def ask(schema, prompt, seed, tokens=3000, checkpoint=None):
     from lyrics_cpu import request_story, MODEL_ID
     from jsonschema import Draft202012Validator
-    response = request_story('chat/completions', dict(model=MODEL_ID,
-        messages=[{'role': 'system', 'content': 'You write original Hindi emotional motivational fiction for a general audience. Return JSON only.'},
+    started=time.monotonic()
+    stop=threading.Event()
+    label=Path(checkpoint).name if checkpoint else 'story-request'
+    def heartbeat():
+        while not stop.wait(60):
+            print(json.dumps(dict(phase='story model request running',request=label,elapsed_seconds=round(time.monotonic()-started))),flush=True)
+    print(json.dumps(dict(phase='story model request started',request=label)),flush=True)
+    reporter=threading.Thread(target=heartbeat,daemon=True)
+    reporter.start()
+    try:
+        response = request_story('chat/completions', dict(model=MODEL_ID,
+        messages=[{'role': 'system', 'content': 'You write original Hindi emotional motivational fiction for a general audience. Spoken text, title and description are Hindi Devanagari. Summary, characters, world, chapter planning, visual prompts and editorial instructions MUST be English with transliterated names. Return JSON only.'},
                   {'role': 'user', 'content': prompt}],
         response_format={'type': 'json_schema', 'json_schema': {'schema': planning_schema(schema)}},
         max_completion_tokens=tokens, seed=seed, temperature=.85))
+    finally:
+        stop.set()
+        reporter.join(timeout=1)
     raw=json.loads(response['choices'][0]['message']['content'])
     if checkpoint:
         save_json(checkpoint,raw)
@@ -220,10 +235,14 @@ def object_schema(properties):
     return {'type': 'object', 'properties': properties, 'required': list(properties), 'additionalProperties': False}
 
 
+def english_planning(minimum,maximum):
+    return dict(string(minimum,maximum),pattern=r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$')
+
+
 OUTLINE = object_schema({
-    'title': string(8, 90), 'description': string(30, 1200), 'summary': string(100, 700),
-    'characters': string(60, 350), 'world': string(30, 220),
-    'chapters': {'type': 'array', 'minItems': 6, 'maxItems': 6, 'items': string(40, 220)}})
+    'title': string(8, 90), 'description': string(30, 1200), 'summary': english_planning(100, 700),
+    'characters': english_planning(60, 350), 'world': english_planning(30, 220),
+    'chapters': {'type': 'array', 'minItems': 6, 'maxItems': 6, 'items': english_planning(40, 220)}})
 ROW = object_schema({'speaker': {'type': 'string', 'enum': list(VOICES)},
                      'text': string(40, 400), 'visual': string(20, 360)})
 CHAPTER = object_schema({'scenes': {'type': 'array', 'minItems': 8, 'maxItems': 8, 'items': ROW}})

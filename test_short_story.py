@@ -21,6 +21,7 @@ def short_story():
     words=['दुकान','घर','सड़क','खेत','किताब','पेड़','नदी','गाँव','माँ','पिता','मेहनत','चिट्ठी','काम','दिन','सुबह','उम्मीद','सपना','हिम्मत','रास्ता','विश्वास','बच्चा','दोस्त']
     for i,scene in enumerate(story['scenes']):
         scene.update(speaker='narrator',text=' '.join(random.Random(i).sample(words,13))+'।')
+    story['scenes'][-1]['text']='इस फैसले पर आपकी क्या राय है, टिप्पणी में अपनी बात हमें बताइए।'
     story['lyrics']='\n'.join(s['text'] for s in story['scenes'])
     story['visuals']={str(i):f'Ram, blue kurta, black hair, opens parcel {i} in his village shop, warm 3D storybook.' for i in range(48)}
     story['thumbnail_scene']=30
