@@ -220,6 +220,85 @@ def write_chapter(root,run_id,index):
     print(json.dumps({'phase':'Hindi chapter ready','chapter':index+1,'chapters':CHAPTERS}),flush=True)
 
 
+def repair_story_budget(root, run_id, draft, chapters):
+    """Repair prose in place; keep canonical identities and checkpoint each gain."""
+    from jsonschema import ValidationError
+    from lyrics_cpu import StoryGenerationError
+
+    def distance(total):
+        return max(1000-total, total-1600, 0)
+
+    scenes=[scene for chapter in chapters for scene in chapter['scenes']]
+    total=sum(len(scene['text'].split()) for scene in scenes)
+    if not distance(total):
+        return
+    path=Path(root)/'story-budget-repair.json'
+    identity=outline_identity(draft)
+    progress=json.loads(path.read_text()) if path.exists() else {}
+    if progress and (progress.get('run_id')!=run_id or progress.get('outline_hash')!=identity):
+        raise StoryValidationError('story_budget_identity_mismatch')
+    request=progress.get('requests',0)
+    seed=int(hashlib.sha256((run_id+':budget').encode()).hexdigest()[:7],16)
+    tried={i:0 for i in range(len(scenes))}
+    for attempt in range(12):
+        if not distance(total):
+            return
+        expanding=total<1000
+        # Rotate failed slots so one uncooperative scene cannot block the rest.
+        eligible=[i for i,scene in enumerate(scenes)
+                  if (len(scene['text'].split())<27 if expanding else len(scene['text'].split())>27)]
+        indices=sorted(eligible,key=lambda i:(tried[i],
+            len(scenes[i]['text'].split())*(1 if expanding else -1)))[:8]
+        if not indices:
+            break
+        for i in indices:
+            tried[i]+=1
+        schema=object_schema({f'scene_{i}':object_schema({'text':string(1,400)}) for i in indices})
+        request+=1
+        diagnostic=dict(run_id=run_id,outline_hash=identity,requests=request,total_words=total,
+                        minimum_words=1000,maximum_words=1600,pending=True)
+        save_json(path,diagnostic)
+        try:
+            response=ask(schema,
+                'Revise ONLY the requested Hindi scene texts to repair the complete story word budget. '
+                f'The complete story currently has {total} words and needs 1000-1600. '
+                +('Expand' if expanding else 'Condense')+
+                ' each requested text to 25-30 space-separated Hindi words, at most 400 characters. '
+                'Preserve actions, names, chronology and assigned speaker. No filler, repetition, '
+                'new plot events or stage directions. Return exactly the requested scene_N text objects. '
+                'Canonical outline: '+json.dumps(draft['outline'],ensure_ascii=False)+
+                '\nRequested scenes with surrounding context: '+json.dumps({f'scene_{i}':
+                    scenes[max(0,i-1):min(len(scenes),i+2)] for i in indices},ensure_ascii=False),
+                (seed+request*17)%(2**31-3),min(4000,500+400*len(indices)),
+                checkpoint=Path(root)/'budget-responses'/f'request-{request}.json')
+        except (StoryGenerationError,ValidationError,json.JSONDecodeError) as error:
+            diagnostic['error_type']=type(error).__name__
+            save_json(path,diagnostic)
+            print(json.dumps(dict(phase='story budget retry',**diagnostic)),flush=True)
+            continue
+        for i in indices:
+            value=response.get(f'scene_{i}',{})
+            if not isinstance(value,dict):
+                continue
+            candidate=dict(scenes[i],text=value.get('text'))
+            if scene_issues(candidate):
+                continue
+            proposed=total-len(scenes[i]['text'].split())+len(candidate['text'].split())
+            if distance(proposed)>=distance(total):
+                continue
+            chapters[i//8]['scenes'][i%8]=candidate
+            # Persist first: interruption must never lose a successful repair.
+            save_json(chapter_path(root,i//8),chapters[i//8])
+            scenes[i]=candidate
+            total=proposed
+        diagnostic.update(total_words=total,pending=bool(distance(total)))
+        save_json(path,diagnostic)
+        print(json.dumps(dict(phase='story budget repair',**diagnostic)),flush=True)
+    if distance(total):
+        raise StoryValidationError('story_budget_repair_incomplete',dict(
+            total_words=total,minimum_words=1000,maximum_words=1600,requests=request))
+
+
 def assemble_story(root,run_id,history):
     root=Path(root)
     manifest=root/'story.json'
@@ -232,7 +311,7 @@ def assemble_story(root,run_id,history):
     if draft.get('run_id',run_id)!=run_id:
         raise StoryValidationError('draft_identity_mismatch')
     identity=outline_identity(draft)
-    scenes=[]
+    chapters=[]
     for i in range(CHAPTERS):
         path=chapter_path(root,i)
         if not path.exists():
@@ -240,6 +319,10 @@ def assemble_story(root,run_id,history):
         data=json.loads(path.read_text())
         if data.get('outline_hash')!=identity or chapter_issues(data):
             raise StoryValidationError('invalid_chapter_checkpoint',dict(chapter=i+1))
+        chapters.append(data)
+    repair_story_budget(root,run_id,draft,chapters)
+    scenes=[]
+    for data in chapters:
         for scene in data['scenes']:
             scenes.append(dict(scene,index=len(scenes)))
     outline=draft['outline']

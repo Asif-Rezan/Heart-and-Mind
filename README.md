@@ -35,6 +35,14 @@ Corrected production run: [41075270533](https://github.com/Asif-Rezan/Heart-and-
 
 For the fixed code, start a **new workflow dispatch on main** with the failed identity `story-2026-10-30` and `prepared_run=41050567153` to reuse any available checkpoint. Re-running the old run directly executes its old commit and cannot apply this fix.
 
+## Assembly word-budget recovery
+
+Individually valid chapters can still produce a complete script outside the required 1000–1600 Hindi words. Assembly now requests targeted prose revisions in batches of up to eight scenes, preserving speakers, visuals and the canonical outline. Only valid Hindi revisions that move the total toward the accepted range are saved. Every gain is checkpointed directly in its chapter before another model request; an interrupted dispatch can reuse those chapters. Already valid complete scripts do not invoke the model.
+
+Repair is bounded to twelve requests per invocation. Invalid JSON/schema responses and text-generation errors retry with new seeds. Safe word counts and request counters are stored in `story-budget-repair.json`; raw responses are saved separately. Exhausted recovery reports `story_budget_repair_incomplete` and retains checkpoints. Identity, originality, measured speech duration and publication checks still apply. The assembly worker installs the CPU text runtime and allows time for repair.
+
+For run [41254730257](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/41254730257), public job metadata confirms failure at assembly after all six chapter jobs completed; the detailed error requires authenticated log access and has not been verified here. After merging this change, dispatch a **new** story workflow on the updated main branch with the original story `run_id` and `prepared_run=41254730257`. Obtain the original identity from the outline job or saved artifact. Re-running the original job uses its old commit. This change has local regression coverage; it has not yet been verified against that run's private artifacts or a live model/video generation.
+
 ## Chapter scene repair and recovery
 
 The chapter jobs in run `41075270533`, including jobs `124132552574` and `124132552934`, repeatedly regenerated all eight scenes when any scene missed the old 23–31-word window or the model returned the wrong narrator count. Valid prose was lost on each retry.
