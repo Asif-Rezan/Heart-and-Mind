@@ -310,6 +310,10 @@ def repair_story_budget(root, run_id, draft, chapters):
         for i in indices:
             tried[i]+=1
         schema=object_schema({f'scene_{i}':object_schema({'text':string(1,400)}) for i in indices})
+        if is_short(draft):
+            from story_constraints import hindi_word_pattern
+            for spec in schema['properties'].values():
+                spec['properties']['text']['pattern']=hindi_word_pattern(target_words-1,target_words+1)
         request+=1
         diagnostic=dict(run_id=run_id,outline_hash=identity,requests=request,total_words=total,
                         minimum_words=minimum,maximum_words=maximum,pending=True)
@@ -478,7 +482,9 @@ def repair_repetition(root, story):
                 forbidden[str(i)]=lines
             saved['requests']+=1
             save_json(path,saved)
-            response=ask(scene_schema(slots),
+            from story_constraints import edit_word_limits,constrain_edits
+            limits=edit_word_limits(story,slots)
+            response=ask(constrain_edits(scene_schema(slots),limits),
                 'REWRITE the requested repeated narration, do not copy or return its current words. '
                 'Each later scene must ADVANCE its own chronological beat, not recap an earlier event. '
                 'Keep one narrator, established people and canonical events. Write natural Hindi Devanagari, '
@@ -489,6 +495,7 @@ def repair_repetition(root, story):
                 '\nFinal neighboring beats: '+json.dumps(scene_context(story,slots),ensure_ascii=False)+
                 '\nRequested scenes and current visuals: '+json.dumps([story['scenes'][i] for i in slots],ensure_ascii=False)+
                 '\nAlready narrated lines you MUST NOT repeat: '+json.dumps(forbidden,ensure_ascii=False)+
+                '\nPer-scene word limits: '+json.dumps(limits)+
                 '\nPrevious rejection feedback: '+json.dumps({str(i):saved['rejections'].get(str(i)) for i in slots}),
                 int(identity[:7],16)+saved['requests']*17,500+200*len(slots),
                 checkpoint=root/'repetition-responses'/f"rewrite-{saved['requests']}.json")

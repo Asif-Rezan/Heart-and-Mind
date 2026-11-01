@@ -73,10 +73,15 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         pattern: story-*
-        merge-multiple: true
+        merge-multiple: false
         run-id: ${{ inputs.prepared_run }}
         github-token: ${{ github.token }}
-        path: output/
+        path: restored-story-artifacts/
+    - name: Restore checkpoints in dependency order; newest prose wins
+      env:
+        STORY_RUN_ID: ${{ steps.identity.outputs.run_id }}
+      run: python story_restore.py --source restored-story-artifacts --destination output --run-id "$STORY_RUN_ID"
+      if: inputs.prepared_run != ''
     - name: Write bounded canonical story outline
       env:
         YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
@@ -228,7 +233,7 @@ jobs:
       if: always()
       with:
         name: story-planning-${{ github.run_id }}-seo
-        path: 'output/*/planning-*.json
+        path: 'output/*/planning-seo.json
 
           output/*/failure.json'
         retention-days: 7
@@ -262,7 +267,7 @@ jobs:
       if: always()
       with:
         name: story-planning-${{ github.run_id }}-thumbnail
-        path: 'output/*/planning-*.json
+        path: 'output/*/planning-thumbnail.json
 
           output/*/failure.json'
         retention-days: 7
@@ -297,7 +302,7 @@ jobs:
       if: always()
       with:
         name: story-planning-${{ github.run_id }}-visual-${{ matrix.part }}
-        path: 'output/*/planning-*.json
+        path: 'output/*/planning-visual-${{ matrix.part }}.json
 
           output/*/failure.json'
         retention-days: 7

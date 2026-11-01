@@ -54,6 +54,7 @@ def polish_engagement(root,story):
     """Freeze one editorial plan; checkpoint validated edits without moving goals."""
     from story_writer import StoryValidationError, repeated_scenes, normalized
     from story_format import word_bounds
+    from story_constraints import edit_word_limits, constrain_edits
     minimum,maximum=word_bounds(story)
     last=len(story['scenes'])-1
     from story_plan import scene_context
@@ -100,11 +101,8 @@ def polish_engagement(root,story):
             if not remaining:break
             saved['requests']+=1
             save_json(path,saved)
-            total_words=len(story['lyrics'].split())
-            headroom=max(0,maximum-total_words)
-            limits={i:dict(current_words=len(story['scenes'][i]['text'].split()),
-                           maximum_words=len(story['scenes'][i]['text'].split())+headroom) for i in remaining}
-            schema=object_schema({f'scene_{i}':object_schema({'text':string(20,400),'visual':string(20,360)}) for i in remaining})
+            limits=edit_word_limits(story,remaining)
+            schema=constrain_edits(object_schema({f'scene_{i}':object_schema({'text':string(20,400),'visual':string(20,360)}) for i in remaining}),limits)
             response=ask(schema,
                 f'Execute ONLY the frozen editorial corrections below. The complete story has {len(story["lyrics"].split())} words and must stay within {minimum}-{maximum}. '
                 'Replace the existing beat, never append extra exposition. Use the SAME number of Hindi words or fewer '
@@ -117,6 +115,7 @@ def polish_engagement(root,story):
                 '\nFinal neighboring beats: '+json.dumps(scene_context(story,remaining),ensure_ascii=False)+
                 '\nRequested current visuals: '+json.dumps({i:story['scenes'][i]['visual'] for i in remaining},ensure_ascii=False)+
                 '\nFrozen corrections: '+json.dumps({i:saved['tasks'][str(i)] for i in remaining},ensure_ascii=False)+
+                '\nRejected candidates to condense or correct: '+json.dumps({str(i):saved.get('rejected_candidates',{}).get(str(i)) for i in remaining},ensure_ascii=False)+
                 '\nPer-scene word limits: '+json.dumps(limits)+
                 '\nPrevious rejection feedback: '+json.dumps({str(i):saved['rejections'].get(str(i)) for i in remaining}),
                 (int(identity[:7],16)+saved['requests']+100)%(2**31-3),1600,
@@ -135,11 +134,13 @@ def polish_engagement(root,story):
                 if reason:
                     saved['rejections'][str(i)]=dict(reason=reason,proposed_total_words=total,
                         minimum_words=minimum,maximum_words=maximum,
-                        maximum_scene_words=len(story['scenes'][i]['text'].split())+max(0,maximum-len(story['lyrics'].split())))
+                        maximum_scene_words=limits[i]['maximum_words'])
+                    saved.setdefault('rejected_candidates',{})[str(i)]=value
                     save_json(path,saved)
                     print(json.dumps(dict(phase='editorial edit rejected',scene=i,**saved['rejections'][str(i)])),flush=True)
                     continue
                 saved['rejections'].pop(str(i),None)
+                saved.get('rejected_candidates',{}).pop(str(i),None)
                 story['scenes']=proposed
                 story['lyrics']='\n'.join(s['text'] for s in proposed)
                 saved['scenes']=proposed
