@@ -20,9 +20,11 @@ _model = None
 
 class StoryGenerationError(RuntimeError):
     """Only static, privacy-safe messages may be emitted in public job logs."""
-    def __init__(self,message,code='story_model_runtime_failure'):
+    def __init__(self,message,code='story_model_runtime_failure',details=None):
         super().__init__(message)
         self.code=code
+        self.details=details or {}
+        self.public_message=message
 
 
 def verify_model(path):
@@ -87,7 +89,11 @@ def request_story(endpoint, payload):
             node.pop('minLength', None)
             node.pop('maxLength', None)
             # Only our small, bounded Hindi word grammar is safe in the native parser.
-            if not is_hindi_word_pattern(node.get('pattern')):
+            if node.get('pattern') == r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$':
+                # A simple ASCII subset enforces English planning during decoding,
+                # avoiding the large Unicode negated ranges in the original pattern.
+                node['pattern'] = r'^[ -~]*[A-Za-z][ -~]*$'
+            elif not is_hindi_word_pattern(node.get('pattern')):
                 node.pop('pattern', None)
             for value in node.values():
                 remove_string_bounds(value)
@@ -115,6 +121,7 @@ def request_story(endpoint, payload):
             # Runtime/configuration errors are not content errors; don't spin on them.
             raise StoryGenerationError('Qwen CPU generation failed; inspect runner memory and runtime compatibility') from None
         issue, field, bound = None, '$', None
+        failed_pattern = None
         try:
             choice = result['choices'][0]
             if choice.get('finish_reason') != 'stop':
@@ -123,6 +130,7 @@ def request_story(endpoint, payload):
             validator.validate(json.loads(choice['message']['content']))
         except ValidationError as error:
             issue = error.validator
+            failed_pattern = error.schema.get('pattern')
             path = list(error.absolute_path)
             if path and path[0] in schema.get('properties', {}):
                 field = path[0]
@@ -136,11 +144,16 @@ def request_story(endpoint, payload):
                 'constraint': issue, 'field': field, 'bound': bound,
                 'completion_tokens': result.get('usage', {}).get('completion_tokens')}), flush=True)
             if attempt == 2:
-                raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts',code='story_model_response_invalid') from None
+                raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts',code='story_model_response_invalid',
+                    details=dict(constraint=issue,field=field,bound=bound,attempt_limit=3)) from None
             correction = f'The previous response failed {issue} for field {field}.'
             if bound is not None:
                 correction += f' The required {issue} is {bound}.'
-            if issue == 'pattern':
+            if issue == 'pattern' and failed_pattern == r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$':
+                correction += (f' Field {field} must be English only, with Latin-letter names and NO Devanagari. '
+                    'Write summary, characters, world and every chapters entry in English. '
+                    'Only title, description and spoken text use Hindi. Keep the English planning concise.')
+            if issue == 'pattern' and is_hindi_word_pattern(failed_pattern):
                 correction += ' Spoken Hindi must follow the exact word range in its schema: single spaces, Devanagari words, no quotations or ASCII numbers. Do not append exposition.'
             if issue == 'incomplete_output':
                 correction += ' Shorten prose and lyric lines so the entire JSON fits the output budget.'

@@ -79,6 +79,20 @@ class LanguageRecovery(unittest.TestCase):
         self.assertIn('English outline is reference',contract)
         self.assertIn('English-only planning keys',language_contract(object_schema({'summary':string(1,400)})))
 
+    def test_cli_preserves_outline_model_validation_diagnostics(self):
+        import sys
+        from daily_story import main
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            error=StoryGenerationError('Model response invalid after three attempts',
+                code='story_model_response_invalid',details={'field':'summary','constraint':'pattern','attempt_limit':3})
+            with patch.object(sys,'argv',['daily_story.py','--run-id','story-test','--stage','outline']), patch('daily_story.root_for',return_value=root), patch('story_plan.prepare_outline',side_effect=error), self.assertRaises(SystemExit):
+                main()
+            report=json.loads((root/'failure.json').read_text())
+            self.assertEqual(report['code'],'story_model_response_invalid')
+            self.assertEqual(report['details']['field'],'summary')
+            self.assertEqual(report['message'],'Model response invalid after three attempts')
+
     def test_cli_failure_report_explains_language_error_without_generated_text(self):
         import sys
         from daily_story import main

@@ -71,6 +71,33 @@ class QwenTests(unittest.TestCase):
             s.request_story('chat/completions', self.payload())
         self.assertEqual(model.create_chat_completion.call_count, 2)
 
+    def test_english_outline_pattern_retry_uses_english_feedback(self):
+        from story_writer import english_planning
+        payload=self.payload()
+        payload['response_format']['json_schema']['schema']={
+            'type':'object','properties':{'summary':english_planning(1,100)},'required':['summary']}
+        captured=[]
+        def generate(**kwargs):
+            captured.append(json.loads(json.dumps(kwargs['messages'])))
+            return self.result(json.dumps({'summary':'कहानी' if len(captured)==1 else 'A family resolves a conflict.'}))
+        model=self.model(create_chat_completion=Mock(side_effect=generate))
+        with patch.object(s,'load_model',return_value=model):
+            s.request_story('chat/completions',payload)
+        sent=model.create_chat_completion.call_args.kwargs['response_format']['schema']
+        self.assertEqual(sent['properties']['summary']['pattern'],r'^[ -~]*[A-Za-z][ -~]*$')
+        feedback=captured[1][-1]['content']
+        self.assertIn('summary must be English only',feedback)
+        self.assertNotIn('Spoken Hindi must follow',feedback)
+
+    def test_exhausted_validation_preserves_safe_field_details(self):
+        payload=self.payload()
+        model=self.model(create_chat_completion=Mock(return_value=self.result('{}')))
+        with patch.object(s,'load_model',return_value=model), self.assertRaises(s.StoryGenerationError) as caught:
+            s.request_story('chat/completions',payload)
+        self.assertEqual(caught.exception.code,'story_model_response_invalid')
+        self.assertEqual(caught.exception.details['constraint'],'required')
+        self.assertEqual(caught.exception.details['attempt_limit'],3)
+
     def test_context_overflow_stops_before_inference(self):
         model = self.model()
         model.tokenize.return_value = [1] * s.CONTEXT_TOKENS

@@ -325,8 +325,9 @@ def main():
         # Do not print API response bodies or credentials into public Actions logs.
         from pipeline import pipeline_failure_message, safe_api_details
         from story_writer import StoryValidationError
-        details=getattr(error,'details',{}) if isinstance(error,StoryValidationError) else {}
-        code=getattr(error,'code','pipeline_error') if isinstance(error,StoryValidationError) else 'pipeline_error'
+        from lyrics_cpu import StoryGenerationError
+        details=getattr(error,'details',{}) if isinstance(error,(StoryValidationError,StoryGenerationError)) else {}
+        code=getattr(error,'code','pipeline_error') if isinstance(error,(StoryValidationError,StoryGenerationError)) else 'pipeline_error'
         details = {**details, **safe_api_details(error)}
         diagnostic=dict(stage=args.stage,error_type=type(error).__name__,code=code,details=details,
             message=getattr(error,'public_message',pipeline_failure_message(error)))
