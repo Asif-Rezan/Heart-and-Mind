@@ -261,6 +261,7 @@ def cleanup_previous(store, history):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id', required=True)
+    parser.add_argument('--render-with-images',action='store_true',help='Render each image on its own worker as soon as it is ready')
     parser.add_argument('--stage',choices=['plan','outline','chapter','assemble','voice','music','music-part','mix','images','render-clips','render','publish','recover'],required=True)
     parser.add_argument('--check-history',action='store_true')
     parser.add_argument('--part',type=int)
@@ -290,7 +291,7 @@ def main():
             generate_voice(root,story)
         elif args.stage == 'images':
             from story_video import generate_images
-            generate_images(root,story)
+            generate_images(root,story,render_ready=args.render_with_images)
         elif args.stage == 'music-part':
             generate_score_part(root,story,args.part)
         elif args.stage == 'mix':

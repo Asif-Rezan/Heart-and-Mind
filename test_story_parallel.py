@@ -175,9 +175,9 @@ class IndependentChapterChecks(unittest.TestCase):
 class WorkflowConcurrencyChecks(unittest.TestCase):
     def test_dependency_graph_keeps_independent_work_parallel(self):
         jobs=yaml.safe_load(Path('.github/workflows/stories.yml').read_text())['jobs']
-        self.assertEqual(jobs['images']['strategy']['matrix']['shard'],list(range(18)))
-        self.assertEqual(jobs['images']['strategy']['max-parallel'],18)
-        self.assertEqual(jobs['images']['env']['IMAGE_SHARDS'],'18')
+        self.assertEqual(jobs['images']['strategy']['matrix']['shard'],list(range(17)))
+        self.assertEqual(jobs['images']['strategy']['max-parallel'],17)
+        self.assertEqual(jobs['images']['env']['IMAGE_SHARDS'],'17')
         self.assertEqual(jobs['chapters']['needs'],'outline')
         self.assertEqual(jobs['chapters']['strategy']['matrix']['chapter'],list(range(6)))
         self.assertEqual(jobs['music']['needs'],'plan')
@@ -185,11 +185,12 @@ class WorkflowConcurrencyChecks(unittest.TestCase):
         self.assertEqual(jobs['voice']['needs'],'plan')
         self.assertEqual(jobs['images']['needs'],['plan','voice'])
         self.assertTrue(any(step.get('with',{}).get('name')=='story-voice-${{ github.run_id }}' for step in jobs['images']['steps']))
-        self.assertNotIn('music',jobs['render']['needs'])
-        self.assertEqual(jobs['render']['strategy']['max-parallel'],18)
+        self.assertNotIn('render',jobs)
+        self.assertNotIn('music',jobs['images']['needs'])
+        self.assertTrue(any('--render-with-images' in step.get('run','') for step in jobs['images']['steps']))
         self.assertNotIn('render',jobs['mix']['needs'])
         self.assertIn('mix',jobs['publish']['needs'])
-        self.assertIn('render',jobs['publish']['needs'])
+        self.assertIn('images',jobs['publish']['needs'])
         self.assertTrue(any('--prepared-clips' in step.get('run','') for step in jobs['publish']['steps']))
 
     def test_all_48_images_are_generated_once_across_18_workers_and_reused(self):

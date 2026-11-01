@@ -36,7 +36,7 @@ def thumbnail_slot(story, timing):
     return min(slots,key=lambda slot:abs(slot['story_scene']-desired))['index']
 
 
-def generate_images(root, story):
+def generate_images(root, story, render_ready=False):
     from story_image_cpu import generate, MODEL, REVISION
     root = Path(root)
     shard, count = int(os.getenv('IMAGE_SHARD','0')), int(os.getenv('IMAGE_SHARDS','1'))
@@ -46,7 +46,7 @@ def generate_images(root, story):
     previous = json.loads(manifest.read_text()) if manifest.exists() else {}
     complete = {}
     short=is_short(story)
-    timing=json.loads((root/'timing.json').read_text()) if short else None
+    timing=json.loads((root/'timing.json').read_text()) if short or render_ready else None
     slots=visual_timeline(story,timing) if short else story['scenes']
     reference=None
     if short:
@@ -90,6 +90,9 @@ def generate_images(root, story):
             temp.replace(target)
         complete[str(i)] = plan
         save_json(manifest, complete)
+        if render_ready:
+            # This frame can render now; no cross-worker image barrier.
+            render_clips(root,story,timing,shard=shard,shards=count,only_indices={i})
 
     if short and shard==0:
         thumbnail_plan=dict(prompt=story['thumbnail_prompt']+'. Colorful 3D storybook, clear emotional focus, no text.',
@@ -157,7 +160,7 @@ def clip_is_current(root, scene, width=1920, height=1080):
         return False
 
 
-def render_clips(root,story,timing,width=1920,height=1080,shard=0,shards=1):
+def render_clips(root,story,timing,width=1920,height=1080,shard=0,shards=1,only_indices=None):
     from pipeline import duration
     validate_timing(story,timing)
     if not 0<=shard<shards:
@@ -168,7 +171,7 @@ def render_clips(root,story,timing,width=1920,height=1080,shard=0,shards=1):
     slots=visual_timeline(story,timing)
     for scene in slots:
         i=scene['index']
-        if i%shards!=shard or clip_is_current(root,scene,width,height):
+        if (only_indices is not None and i not in only_indices) or i%shards!=shard or clip_is_current(root,scene,width,height):
             continue
         frames=round(scene['end']*FPS)-round(scene['start']*FPS)
         # A final sub-frame tail still needs a visible frame; audio is never cut.

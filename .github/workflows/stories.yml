@@ -288,7 +288,7 @@ jobs:
       if: always()
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: 3
       matrix:
         part:
         - 0
@@ -321,11 +321,10 @@ jobs:
         - 14
         - 15
         - 16
-        - 17
-      max-parallel: 18
+      max-parallel: 17
     env:
       IMAGE_SHARD: ${{ matrix.shard }}
-      IMAGE_SHARDS: '18'
+      IMAGE_SHARDS: '17'
       CUDA_VISIBLE_DEVICES: ''
       OMP_NUM_THREADS: '4'
       HF_HUB_DISABLE_XET: '1'
@@ -342,8 +341,12 @@ jobs:
       with:
         python-version: '3.12'
         cache: pip
-    - name: Prepare CPU image memory
+    - name: Prepare CPU image memory and local rendering tools
       run: |
+        if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+          sudo timeout 180 apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+          sudo timeout 300 apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y ffmpeg
+        fi
         sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo fallocate -l 12G /swapfile-images
         sudo chmod 600 /swapfile-images
@@ -357,8 +360,8 @@ jobs:
       with:
         name: story-voice-${{ github.run_id }}
         path: output/
-    - name: Generate matching 3D storybook scenes with reference SSD-1B style
-      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage images
+    - name: Generate each story image and immediately render its four-second clip
+      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage images --render-with-images
     - uses: actions/upload-artifact@v4
       with:
         name: story-images-${{ github.run_id }}-${{ matrix.shard }}
@@ -367,72 +370,6 @@ jobs:
           output/*/image-manifest-*.json
           output/*/thumbnail-source.png
           output/*/thumbnail-manifest.json
-        retention-days: 7
-      if: always()
-  render:
-    needs:
-    - plan
-    - voice
-    - images
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      max-parallel: 18
-      matrix:
-        shard:
-        - 0
-        - 1
-        - 2
-        - 3
-        - 4
-        - 5
-        - 6
-        - 7
-        - 8
-        - 9
-        - 10
-        - 11
-        - 12
-        - 13
-        - 14
-        - 15
-        - 16
-        - 17
-    env:
-      CUDA_VISIBLE_DEVICES: ''
-      OMP_NUM_THREADS: '4'
-      HF_HUB_DISABLE_XET: '1'
-      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
-      STORY_RUN_ID: ${{ needs.plan.outputs.run_id }}
-      IMAGE_SHARD: ${{ matrix.shard }}
-      IMAGE_SHARDS: '18'
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        cache: pip
-    - run: |-
-        sudo apt-get update
-        sudo apt-get install -y ffmpeg
-        pip install -r requirements.txt
-    - uses: actions/download-artifact@v4
-      with:
-        name: story-voice-${{ github.run_id }}
-        path: output/
-    - uses: actions/download-artifact@v4
-      with:
-        name: story-images-${{ github.run_id }}-${{ matrix.shard }}
-        path: output/
-    - name: Render story-aligned images changing every four seconds
-      run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage render-clips
-    - uses: actions/upload-artifact@v4
-      with:
-        name: story-clips-${{ github.run_id }}-${{ matrix.shard }}
-        path: |-
           output/*/story-motion/*.mp4
           output/*/story-motion/*.json
           output/*/failure.json
@@ -486,7 +423,7 @@ jobs:
     needs:
     - plan
     - mix
-    - render
+    - images
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -518,11 +455,6 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         pattern: story-images-${{ github.run_id }}-*
-        merge-multiple: true
-        path: output/
-    - uses: actions/download-artifact@v4
-      with:
-        pattern: story-clips-${{ github.run_id }}-*
         merge-multiple: true
         path: output/
     - name: Join pre-rendered scenes and measured audio without re-rendering
