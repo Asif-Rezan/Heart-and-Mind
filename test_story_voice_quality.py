@@ -6,11 +6,23 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 from story_voice_model import voice_profile,GOONJ_REVISION
-from story_voice import prepare_speech,scene_pause,voice_identity,SAMPLE_RATE
+from story_voice import prepare_speech,scene_pause,voice_identity,SAMPLE_RATE,next_native_speed
 from test_short_story import short_story
 
 
 class VoiceQualityChecks(unittest.TestCase):
+    def test_user_selected_kokoro_is_the_default(self):
+        with patch.dict(os.environ,{},clear=True):
+            self.assertEqual(voice_profile()['engine'],'kokoro')
+            self.assertEqual(voice_profile()['voice'],'hm_omega')
+
+    def test_native_rate_adjustments_are_modest_and_do_not_force_five_minutes(self):
+        story=short_story()
+        self.assertEqual(next_native_speed(story,1.0,270),1.0)
+        self.assertEqual(next_native_speed(story,1.0,230),.92)
+        self.assertEqual(next_native_speed(story,1.0,150),.90)
+        self.assertEqual(next_native_speed(story,1.0,500),1.08)
+
     def test_stock_voice_profiles_are_pinned_and_invalid_combinations_fail(self):
         profile=voice_profile('goonj','hi_ravi')
         self.assertEqual(profile['revision'],GOONJ_REVISION)

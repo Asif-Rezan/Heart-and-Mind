@@ -187,6 +187,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
+      STORY_VOICE_ENGINE: ${{ vars.STORY_VOICE_ENGINE || 'kokoro' }}
+      STORY_NARRATOR_VOICE: ${{ vars.STORY_NARRATOR_VOICE || '' }}
       CUDA_VISIBLE_DEVICES: ''
       OMP_NUM_THREADS: '4'
       HF_HUB_DISABLE_XET: '1'

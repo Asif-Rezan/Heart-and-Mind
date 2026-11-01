@@ -213,7 +213,10 @@ def language_contract(schema):
         return any(has_text(value) for value in node.get('properties',{}).values()) or has_text(node.get('items'))
     if has_text(schema):
         return ('Every JSON key named text is SPOKEN narration: write it ONLY in Hindi Devanagari, '
-                'never English or Romanized Hindi. An English outline is reference material, not the output language. '
+                'never English or Romanized Hindi. Use idiomatic conversational Hindi a native storyteller would say, '
+                'with correct grammar, simple connected clauses and natural punctuation for breathing. Avoid literal '
+                'English translations, awkward word order, stiff announcements and fragmentary scene captions. '
+                'Keep each person name spelled consistently in Hindi. An English outline is reference material, not the output language. '
                 'For example text: उसने दरवाजा खोलकर चिट्ठी पढ़ी। Keys named visual or instruction are English. '
                 'Preserve the supplied canonical story; return JSON only.')
     return ('Write original Hindi emotional fiction. Title and description are Hindi Devanagari. '

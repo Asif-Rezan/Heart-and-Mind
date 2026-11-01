@@ -44,7 +44,7 @@ def prepare_outline(root, run_id, history):
             'Seed one detail whose significance is paid off at the end. Escalate stakes through choices, '
             'not artificial disasters. Reserve the final two scenes for one story-specific reflective comment '
             'question and a brief optional follow invitation, AFTER the emotional resolution. '
-            'Each chapter will have eight scenes, 11-15 Hindi words per scene, about 95-110 words per chapter. Pastel cute 3D storybook world. '
+            'Each chapter will have eight scenes with complete spoken Hindi sentences, aim about 110-120 words per chapter without padding. Pastel cute 3D storybook world. '
             'Avoid previous titles and plots: '+json.dumps(recent,ensure_ascii=False),
             seed,2800,checkpoint=root/'outline-response.json')
         draft=dict(run_id=run_id,version=VERSION,format=FORMAT,outline=outline,chapters=[])
@@ -218,7 +218,7 @@ def write_chapter(root,run_id,index):
             '\nFixed scene context: '+json.dumps(context,ensure_ascii=False)+
             '\nRequested slots/roles: '+json.dumps(targets,ensure_ascii=False)+
             '\nReturn exactly the required scene_N JSON keys. Each text is natural Hindi Devanagari, '+
-            ('aim 11-15 space-separated words, about 100 words total per chapter. ' if draft.get('format')==FORMAT else 'aim 26-30 words for narration, 12-24 for dialogue. ')+
+            ('aim about 110-120 words total per chapter, with fluid complete sentences, usually 14-16 words per beat. No filler or forced word padding. ' if draft.get('format')==FORMAT else 'aim 26-30 words for narration, 12-24 for dialogue. ')+
             'Use the assigned speaker role BEFORE writing: narrator tells events, male/female is direct dialogue '
             'by an established character. Each visual is English, about 120 characters: name the canonical person, exact visible action, story prop and current location from THIS text. No abstract mood-only pictures or unrelated scenery. Repeat the exact established clothing and age when visible. No speaker labels, stage directions, repeated filler or word padding. '
             'Preserve the scene meaning and canonical names. Do not narrate a line and then repeat it as dialogue. '

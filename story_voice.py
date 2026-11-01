@@ -1,4 +1,4 @@
-"""Hindi Kokoro CPU speech, scene timing derived from actual audio samples."""
+"""Hindi CPU narration with native pacing and measured scene timings."""
 import hashlib
 import json
 import math
@@ -6,9 +6,9 @@ from pathlib import Path
 from story_writer import VOICES, save_json, validate_story
 
 SAMPLE_RATE = 24000
-from story_format import NARRATOR, TARGET_SECONDS, duration_bounds, is_short
+from story_format import duration_bounds, is_short
 
-VOICE_VERSION = 'hindi-native-voice-v4-goonj-pauses'
+VOICE_VERSION = 'hindi-native-voice-v4-pause-profile'
 from story_voice_model import voice_profile, load_pipeline
 
 
@@ -79,6 +79,14 @@ def scene_pause(story,index):
     return .12 if story['scenes'][index]['text'].rstrip().endswith(('?','？','!')) else .08
 
 
+def next_native_speed(story,speed,seconds):
+    minimum,maximum=duration_bounds(story)
+    if minimum<=seconds<=maximum:return speed
+    target=(minimum+10 if seconds<minimum else maximum-10) if is_short(story) else 600
+    lower,upper=(.90,1.08) if is_short(story) else (.80,1.15)
+    return round(max(lower,min(upper,speed*seconds/target)),3)
+
+
 def generate_voice(root, story):
     import numpy as np
     import soundfile as sf
@@ -141,9 +149,7 @@ def generate_voice(root, story):
             return timing
         # Re-synthesize at a modest adjusted native speaking rate. Never loop,
         # pad minutes of silence, truncate the story or time-stretch final speech.
-        target=(minimum+10 if seconds<minimum else maximum-10) if is_short(story) else 600
-        lower,upper=(.90,1.08) if is_short(story) else (.80,1.15)
-        adjusted=round(max(lower,min(upper,speed*seconds/target)),3)
+        adjusted=next_native_speed(story,speed,seconds)
         if math.isclose(adjusted, speed):
             break
         speed = adjusted

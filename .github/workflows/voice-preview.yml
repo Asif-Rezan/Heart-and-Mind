@@ -1,13 +1,6 @@
 name: Hindi narration voice comparison
 on:
   workflow_dispatch:
-  push:
-    branches: [codex/natural-hindi-voice]
-    paths:
-    - story_voice.py
-    - story_voice_model.py
-    - preview_story_voice.py
-    - .github/workflows/voice-preview.yml
 permissions:
   contents: read
 jobs:

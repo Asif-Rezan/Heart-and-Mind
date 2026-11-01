@@ -8,7 +8,7 @@ KOKORO_MODEL='hexgrad/Kokoro-82M'
 
 
 def voice_profile(engine=None,voice=None,legacy=False):
-    engine='kokoro' if legacy else engine or os.getenv('STORY_VOICE_ENGINE','goonj')
+    engine='kokoro' if legacy else engine or os.getenv('STORY_VOICE_ENGINE','kokoro')
     voice=('hm_omega' if legacy else voice or os.getenv('STORY_NARRATOR_VOICE') or
            ('hi_ravi' if engine=='goonj' else 'hm_omega'))
     if engine=='goonj' and voice in GOONJ_VOICES:
