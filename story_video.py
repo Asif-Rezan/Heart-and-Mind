@@ -8,8 +8,32 @@ from PIL import Image, ImageOps
 from story_media import digest, run_ffmpeg
 from story_writer import scene_prompt, save_json
 
-VERSION = 'hindi-story-motion-v2-parallel'
+from story_format import IMAGE_SECONDS, duration_bounds, is_short
+
+VERSION = 'hindi-story-motion-v3-four-second-scenes'
 FPS = 25
+
+
+def visual_timeline(story, timing):
+    validate_timing(story,timing)
+    if not is_short(story):
+        return timing['scenes']
+    result=[]
+    for i in range(math.ceil(timing['duration']/IMAGE_SECONDS)):
+        start=i*IMAGE_SECONDS
+        end=min((i+1)*IMAGE_SECONDS,timing['duration'])
+        # Select the spoken beat occupying most of this exact display interval.
+        spoken=max(timing['scenes'],key=lambda s:max(0,min(end,s['end'])-max(start,s['start'])))
+        result.append(dict(index=i,start=start,end=end,story_scene=spoken['index']))
+    return result
+
+
+def thumbnail_slot(story, timing):
+    slots=visual_timeline(story,timing)
+    if not is_short(story):
+        return 0
+    desired=story['thumbnail_scene']
+    return min(slots,key=lambda slot:abs(slot['story_scene']-desired))['index']
 
 
 def generate_images(root, story):
@@ -21,12 +45,33 @@ def generate_images(root, story):
     manifest = root/f'image-manifest-{shard:02d}.json'
     previous = json.loads(manifest.read_text()) if manifest.exists() else {}
     complete = {}
-    for i, scene in enumerate(story['scenes']):
+    short=is_short(story)
+    timing=json.loads((root/'timing.json').read_text()) if short else None
+    slots=visual_timeline(story,timing) if short else story['scenes']
+    reference=None
+    if short:
+        reference=root/f'cast-reference-{shard:02d}.png'
+        reference_plan=dict(model=MODEL,revision=REVISION,width=1024,height=576,steps=20,prompt=story['characters']+'. '+story['world']+
+                            '. Colorful 3D storybook character reference, fixed clothes, no text.',
+                            seed=int(hashlib.sha256((story['run_id']+':cast-v1').encode()).hexdigest()[:8],16))
+        reference_state=reference.with_suffix('.json')
+        if not reference.exists() or not reference_state.exists() or json.loads(reference_state.read_text())!=reference_plan:
+            generate(reference_plan['prompt'],reference,seed=reference_plan['seed'],width=1024,height=576,steps=20)
+            save_json(reference_state,reference_plan)
+    for slot in slots:
+        i=slot['index']
+        scene=story['scenes'][slot.get('story_scene',i)]
         if i % count != shard:
             continue
-        plan = dict(prompt=scene_prompt(story, scene), model=MODEL, revision=REVISION,
+        prompt=scene_prompt(story,scene)
+        if short:
+            view='medium shot, clear expressive face and story object' if i%2 else 'wide shot, clear action and setting'
+            prompt=story['visuals'][str(scene['index'])]+'. '+view+'. Colorful 3D storybook, no text.'
+        plan = dict(prompt=prompt, model=MODEL, revision=REVISION,
                     width=1024, height=576, steps=20)
         plan['seed'] = int(hashlib.sha256((story['run_id']+str(i)).encode()).hexdigest()[:8],16)
+        if short:
+            plan.update(story_scene=scene['index'],start=slot['start'],end=slot['end'],reference=digest(reference),strength=.80)
         target = root/f'scene-{i:03d}-source.png'
         valid = False
         if previous.get(str(i)) == plan and target.exists():
@@ -38,17 +83,43 @@ def generate_images(root, story):
                 pass
         if not valid:
             temp = target.with_suffix('.tmp.png')
-            generate(plan['prompt'], temp, seed=plan['seed'], width=1024, height=576, steps=20)
+            generate(plan['prompt'], temp, seed=plan['seed'], width=1024, height=576, steps=20,
+                     **({'reference_path':reference} if short else {}))
             with Image.open(temp) as image:
                 image.verify()
             temp.replace(target)
         complete[str(i)] = plan
         save_json(manifest, complete)
 
+    if short and shard==0:
+        thumbnail_plan=dict(prompt=story['thumbnail_prompt']+'. Colorful 3D storybook, clear emotional focus, no text.',
+            model=MODEL,revision=REVISION,width=1024,height=576,steps=20,
+            seed=int(hashlib.sha256((story['run_id']+':thumbnail-v2').encode()).hexdigest()[:8],16),
+            story_scene=story['thumbnail_scene'],reference=digest(reference),strength=.80)
+        target=root/'thumbnail-source.png'
+        state=root/'thumbnail-manifest.json'
+        current=False
+        if target.exists() and state.exists() and json.loads(state.read_text())==thumbnail_plan:
+            try:
+                with Image.open(target) as image:
+                    image.verify()
+                current=True
+            except (OSError,ValueError):
+                pass
+        if not current:
+            temp=target.with_suffix('.tmp.png')
+            generate(thumbnail_plan['prompt'],temp,seed=thumbnail_plan['seed'],width=1024,height=576,
+                     steps=20,reference_path=reference)
+            with Image.open(temp) as image:
+                image.verify()
+            temp.replace(target)
+            save_json(state,thumbnail_plan)
+
 
 def validate_timing(story, timing):
-    if not 480 <= timing['duration'] <= 720 or len(timing['scenes']) != len(story['scenes']):
-        raise ValueError('Incomplete narration timeline or duration outside 8-12 minutes')
+    minimum,maximum=duration_bounds(story)
+    if not minimum <= timing['duration'] <= maximum or len(timing['scenes']) != len(story['scenes']):
+        raise ValueError('Incomplete narration timeline or duration outside the story format')
     end = 0
     for i, scene in enumerate(timing['scenes']):
         if scene['index'] != i or abs(scene['start']-end) > .001 or scene['end'] <= scene['start']:
@@ -61,7 +132,10 @@ def validate_timing(story, timing):
 def render_identity(root, story, width=1920, height=1080):
     root = Path(root)
     files = [root/'story.json',root/'timing.json',root/'song.wav']
-    files += [root/f"scene-{s['index']:03d}-source.png" for s in story['scenes']]
+    timing=json.loads((root/'timing.json').read_text())
+    files += [root/f"scene-{s['index']:03d}-source.png" for s in visual_timeline(story,timing)]
+    if is_short(story):
+        files += [root/'thumbnail-source.png']
     return dict(version=VERSION,width=width,height=height,fps=FPS,sources={p.name:digest(p) for p in files})
 
 
@@ -91,13 +165,14 @@ def render_clips(root,story,timing,width=1920,height=1080,shard=0,shards=1):
     root=Path(root)
     work=root/'story-motion'
     work.mkdir(exist_ok=True)
-    for scene in timing['scenes']:
+    slots=visual_timeline(story,timing)
+    for scene in slots:
         i=scene['index']
         if i%shards!=shard or clip_is_current(root,scene,width,height):
             continue
         frames=round(scene['end']*FPS)-round(scene['start']*FPS)
-        if frames<1:
-            raise ValueError('Spoken scene is too short to render')
+        # A final sub-frame tail still needs a visible frame; audio is never cut.
+        frames=max(1,frames)
         source=root/f'scene-{i:03d}-source.png'
         with Image.open(source) as image:
             image.verify()
@@ -114,7 +189,7 @@ def render_clips(root,story,timing,width=1920,height=1080,shard=0,shards=1):
             raise ValueError('Rendered scene duration failed verification')
         temp.replace(clip)
         save_json(clip.with_suffix('.json'),dict(identity=clip_identity(root,scene,width,height),sha256=digest(clip)))
-        print(json.dumps({'phase':'render story scene','scene':i+1,'total':len(timing['scenes']),
+        print(json.dumps({'phase':'render story scene','scene':i+1,'total':len(slots),
                          'shard':shard,'shards':shards}),flush=True)
 
 
@@ -130,20 +205,22 @@ def render(root,story,timing,width=1920,height=1080,prepared_clips=False):
         return
     if not prepared_clips:
         render_clips(root,story,timing,width,height)
-    if not all(clip_is_current(root,s,width,height) for s in timing['scenes']):
+    if not all(clip_is_current(root,s,width,height) for s in visual_timeline(story,timing)):
         raise ValueError('Missing or stale rendered scenes; resume render jobs before joining')
     work=root/'story-motion'
     listing=work/'clips.txt'
-    clips=[work/f"clip-{s['index']:03d}.mp4" for s in timing['scenes']]
+    clips=[work/f"clip-{s['index']:03d}.mp4" for s in visual_timeline(story,timing)]
     listing.write_text(''.join(f"file '{p.name}'\n" for p in clips))
-    with Image.open(root/'scene-000-source.png') as image:
+    thumbnail_source=root/'thumbnail-source.png' if is_short(story) else root/'scene-000-source.png'
+    with Image.open(thumbnail_source) as image:
         ImageOps.fit(image.convert('RGB'),(1280,720)).save(root/'thumbnail.jpg',quality=92)
     temp=root/'video.tmp.mp4'
     run_ffmpeg(['-f','concat','-safe','1','-i',str(listing),'-i',str(root/'song.wav'),
         '-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-b:a','192k',
         '-t',str(timing['duration']),'-movflags','+faststart',str(temp)])
     measured=duration(temp)
-    if not 480<=measured<=720 or abs(measured-timing['duration'])>.1:
+    minimum,maximum=duration_bounds(story)
+    if not minimum<=measured<=maximum or abs(measured-timing['duration'])>.1:
         raise ValueError('Rendered story duration failed verification')
     temp.replace(root/'video.mp4')
     save_json(state_path,identity)

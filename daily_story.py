@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import re
+from story_format import duration_bounds, is_short
 from story_writer import save_json, validate_story, write_story, novelty_reason, text_hash
 
 
@@ -58,8 +59,8 @@ def plan(root, run_id, check_history, mode="plan"):
 
 
 def music_parts(seconds):
-    if not 480 <= seconds <= 720:
-        raise ValueError('Story duration must be 8-12 minutes')
+    if not 240 <= seconds <= 720:
+        raise ValueError('Story duration must be 4-6 minutes (legacy recovery: 8-12)')
     # Equal parts bounded to 120 seconds; no tiny final music request.
     count = math.ceil(seconds/120)
     return [math.ceil(seconds/count)]*count
@@ -107,7 +108,7 @@ def mix_score(root,story,timing):
     work=root/'score'
     work.mkdir(exist_ok=True)
     paths=[]
-    for i in range(6):
+    for i in range(3 if is_short(story) else 6):
         part=work/f'part-{i}'
         path=part/'bgm.wav'
         expected=dict(story_hash=text_hash(story['lyrics']),run_id=story['run_id'],request=score_request(story,i),index=i)
@@ -124,7 +125,7 @@ def mix_score(root,story,timing):
     if duration(root/'background.wav')<timing['duration']-.05:
         raise RuntimeError('Complete background score is shorter than speech')
     seconds=timing['duration']
-    # All six parts may be generated before speech. Only excess instrumental
+    # Score parts may be generated before speech. Only excess instrumental
     # accompaniment is trimmed; the complete measured narration is preserved.
     graph=(f'[0:a]asplit=2[voice][control];[1:a]volume=0.10,afade=t=in:d=1,'
         f'afade=t=out:st={max(0,seconds-2)}:d=2[bed];'
@@ -141,8 +142,8 @@ def mix_score(root,story,timing):
 
 
 def score(root,story,timing):
-    # Local compatibility command. Production runs the six parts in separate jobs.
-    for i in range(6):
+    # Local compatibility command. Production runs score parts in separate jobs.
+    for i in range(3 if is_short(story) else 6):
         generate_score_part(root,story,i)
     mix_score(root,story,timing)
 
@@ -171,8 +172,9 @@ def publish_story(root, story, run_id, defer_drive_cleanup=False):
         history = store.load('stories/history.json', [])
         if novelty_reason(story, [h for h in history if h.get('run') != run_id]):
             raise ValueError('Duplicate story refused before publication')
-        if not 480 <= duration(root/'video.mp4') <= 720:
-            raise ValueError('Only 8-12 minute story videos may be published')
+        minimum, maximum = duration_bounds(story)
+        if not minimum <= duration(root/'video.mp4') <= maximum:
+            raise ValueError('Video is outside the story format duration')
         if json.loads((root/'render-state.json').read_text()) != render_identity(root, story):
             raise ValueError('Video render is stale; render current story assets first')
         fingerprint = digest(root/'video.mp4')

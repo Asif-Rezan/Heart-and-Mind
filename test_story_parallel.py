@@ -93,6 +93,7 @@ class IndependentChapterChecks(unittest.TestCase):
             root=Path(temporary)
             with patch('story_plan.ask',return_value=outline_fixture()):
                 prepare_outline(root,'story-test',[])
+            saved=json.loads((root/'story-draft.json').read_text()); saved.pop('format',None); save_json(root/'story-draft.json',saved)
             draft=(root/'story-draft.json').read_bytes()
             with patch('story_plan.ask',side_effect=lambda schema,*a,**k:slot_response(schema)) as model:
                 for index in (5,1,3,0,4):
@@ -122,6 +123,9 @@ class IndependentChapterChecks(unittest.TestCase):
                     argv+=['--part',str(index)]
                 with patch.object(sys,'argv',argv):
                     main()
+                if stage=='outline':
+                    path=Path('output/story-test/story-draft.json')
+                    saved=json.loads(path.read_text());saved.pop('format',None);save_json(path,saved)
             story=json.loads(Path('output/story-test/story.json').read_text())
             self.assertEqual(story['run_id'],'story-test')
             self.assertEqual(len(story['scenes']),48)
@@ -177,8 +181,10 @@ class WorkflowConcurrencyChecks(unittest.TestCase):
         self.assertEqual(jobs['chapters']['needs'],'outline')
         self.assertEqual(jobs['chapters']['strategy']['matrix']['chapter'],list(range(6)))
         self.assertEqual(jobs['music']['needs'],'plan')
-        self.assertEqual(jobs['music']['strategy']['matrix']['part'],list(range(6)))
+        self.assertEqual(jobs['music']['strategy']['matrix']['part'],list(range(3)))
         self.assertEqual(jobs['voice']['needs'],'plan')
+        self.assertEqual(jobs['images']['needs'],['plan','voice'])
+        self.assertTrue(any(step.get('with',{}).get('name')=='story-voice-${{ github.run_id }}' for step in jobs['images']['steps']))
         self.assertNotIn('music',jobs['render']['needs'])
         self.assertEqual(jobs['render']['strategy']['max-parallel'],18)
         self.assertNotIn('render',jobs['mix']['needs'])

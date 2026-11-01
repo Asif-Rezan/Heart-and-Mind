@@ -74,6 +74,19 @@ jobs:
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         STORY_RUN_ID: ${{ steps.identity.outputs.run_id }}
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage outline --check-history
+    - name: Require the four-to-six-minute format for new generation
+      env:
+        STORY_RUN_ID: ${{ steps.identity.outputs.run_id }}
+      run: |
+        python - <<'PYCODE'
+        import json, os
+        from pathlib import Path
+        from story_format import FORMAT
+        root=Path('output')/os.environ['STORY_RUN_ID']
+        path=root/'story.json' if (root/'story.json').exists() else root/'story-draft.json'
+        if json.loads(path.read_text()).get('format') != FORMAT:
+            raise SystemExit('Use a new story run ID for the 4-6 minute format. Old videos use saved-publication recovery.')
+        PYCODE
     - uses: actions/upload-artifact@v4
       with:
         name: story-outline-${{ github.run_id }}
@@ -196,7 +209,7 @@ jobs:
       with:
         name: story-input-${{ github.run_id }}
         path: output/
-    - name: Speak the complete Hindi script and measure 8-12 minute timeline
+    - name: Speak the complete Hindi script and measure 4-6 minute timeline
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage voice
     - uses: actions/upload-artifact@v4
       with:
@@ -281,11 +294,10 @@ jobs:
         - 0
         - 1
         - 2
-        - 3
-        - 4
-        - 5
   images:
-    needs: plan
+    needs:
+    - plan
+    - voice
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
@@ -343,7 +355,7 @@ jobs:
         pip install --no-cache-dir -r requirements.txt -r requirements-images-cpu.txt
     - uses: actions/download-artifact@v4
       with:
-        name: story-input-${{ github.run_id }}
+        name: story-voice-${{ github.run_id }}
         path: output/
     - name: Generate matching 3D storybook scenes with reference SSD-1B style
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage images
@@ -353,6 +365,8 @@ jobs:
         path: |-
           output/*/scene-*-source.png
           output/*/image-manifest-*.json
+          output/*/thumbnail-source.png
+          output/*/thumbnail-manifest.json
         retention-days: 7
       if: always()
   render:
@@ -413,7 +427,7 @@ jobs:
       with:
         name: story-images-${{ github.run_id }}-${{ matrix.shard }}
         path: output/
-    - name: Render assigned scenes using measured speech boundaries
+    - name: Render story-aligned images changing every four seconds
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage render-clips
     - uses: actions/upload-artifact@v4
       with:
@@ -484,7 +498,7 @@ jobs:
       UPLOAD_MODE: public
       VIDEO_LANGUAGE: hi
       AUDIO_LANGUAGE: hi
-      VIDEO_CATEGORY_ID: '27'
+      VIDEO_CATEGORY_ID: '24'
     steps:
     - uses: actions/checkout@v4
       with:

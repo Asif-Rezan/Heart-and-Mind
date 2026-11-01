@@ -49,11 +49,11 @@ class StoryChecks(unittest.TestCase):
         self.assertIn(story['characters'],prompt)
 
     def test_music_covers_all_speech_without_tiny_or_overlong_requests(self):
-        for seconds in (480,480.1,599.87,600,600.02,719.9,720):
+        for seconds in (240,240.1,299.87,300,300.02,359.9,360,480,720):
             parts=music_parts(seconds)
             self.assertGreaterEqual(sum(parts),seconds)
-            self.assertTrue(all(90 <= n <= 120 for n in parts))
-        for seconds in (479.99,720.01):
+            self.assertTrue(all(80 <= n <= 120 for n in parts))
+        for seconds in (239.99,720.01):
             with self.assertRaises(ValueError):
                 music_parts(seconds)
 
@@ -81,7 +81,7 @@ class StoryChecks(unittest.TestCase):
         self.assertFalse(story_settings['made_for_kids'])
         self.assertEqual(story_settings['language'],'hi')
         self.assertEqual(story_settings['audio_language'],'hi')
-        self.assertEqual(story_settings['category_id'],'27')
+        self.assertEqual(story_settings['category_id'],'24')
         self.assertEqual(story_settings['mode'],'public')
         body=upload_body(example_story(),'Description',['Hindi story'],story_settings)
         self.assertEqual(body['status']['privacyStatus'],'public')

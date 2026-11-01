@@ -30,7 +30,7 @@ jobs:
       UPLOAD_MODE: public
       VIDEO_LANGUAGE: hi
       AUDIO_LANGUAGE: hi
-      VIDEO_CATEGORY_ID: '27'
+      VIDEO_CATEGORY_ID: '24'
     steps:
       - uses: actions/checkout@v4
         with:

@@ -43,7 +43,7 @@ GUIDANCE_SCALE = 7.0
 
 def negative_prompt():
     return ('text, letters, typography, captions, Hindi writing, title, signature, watermark, logo, '
-            'poster, magazine, red brushwork, elderly, old man, gray hair, deep wrinkles, '
+            'poster, magazine, red brushwork, '
             'orange skin, underexposed faces, silhouette, crowd, extra people, fused faces, '
             'duplicated face, cropped head, extreme close-up, deformed hands, extra limbs, '
             'plastic skin, blur, low quality, photorealistic, horror, frightening, collage, split screen, '
@@ -52,11 +52,12 @@ def negative_prompt():
 
 
 _pipeline = None
+_reference_pipeline = None
 
-def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None):
+def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_path=None):
     if allow_text:
         raise ValueError('Heart and Mind story artwork must be text-free')
-    global _pipeline
+    global _pipeline, _reference_pipeline
     import torch
     from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
     torch.set_num_threads(min(os.cpu_count() or 2, 4))
@@ -79,16 +80,26 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
     if not 1 <= steps <= 50:
         raise ValueError('CPU generation requires 1–50 steps')
     pipeline = _pipeline
+    reference=None
+    if reference_path is not None:
+        from diffusers import AutoPipelineForImage2Image
+        from PIL import Image
+        if _reference_pipeline is None:
+            _reference_pipeline=AutoPipelineForImage2Image.from_pipe(_pipeline)
+        pipeline=_reference_pipeline
+        with Image.open(reference_path) as source:
+            reference=source.convert('RGB').resize((width,height))
     start = time.monotonic()
     image = None
     initial_prompt = safer_prompt(prompt)
-    rewritten = recovery_prompt(prompt)
+    rewritten = safer_prompt(prompt + ' Fully clothed, nonviolent scene, preserve the described action and setting.')
     for attempt in range(10):
         # Five seeds per composition; keep input sanitization and output checks.
         candidate = initial_prompt if attempt < 5 else rewritten
         if attempt == 5:
-            print('Five safety rejections; retrying a restrained music portrait.', flush=True)
-        result = pipeline(prompt=candidate, negative_prompt=negative_prompt(), width=width, height=height,
+            print('Five safety rejections; retrying a restrained story scene.', flush=True)
+        reference_args=dict(image=reference,strength=.80) if reference is not None else {}
+        result = pipeline(**reference_args, prompt=candidate, negative_prompt=negative_prompt(), width=width, height=height,
             num_inference_steps=steps, guidance_scale=GUIDANCE_SCALE,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):

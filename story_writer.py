@@ -7,6 +7,8 @@ import unicodedata
 from pathlib import Path
 from difflib import SequenceMatcher
 
+from story_format import FORMAT, MIN_WORDS, MAX_WORDS, is_short
+
 VERSION = 'hindi-emotional-story-v1'
 SCENE_COUNT = 48
 VOICES = {'narrator': 'hm_omega', 'male': 'hm_psi', 'female': 'hf_alpha'}
@@ -59,6 +61,23 @@ def speech_issues(text):
     return []
 
 
+def repeated_scenes(scenes):
+    seen = []
+    repeated = set()
+    for index, scene in enumerate(scenes):
+        for sentence in re.split(r'[।.!?\n]+', scene['text']):
+            line = normalized(sentence)
+            if len(line.split()) < 3:
+                continue
+            for old in seen:
+                if line == old or (min(len(line.split()), len(old.split())) >= 10 and
+                                   SequenceMatcher(None, old, line, autojunk=False).ratio() >= .92):
+                    repeated.add(index)
+                    break
+            seen.append(line)
+    return sorted(repeated)
+
+
 def validate_story(story):
     if story.get('content_type') != 'hindi_story' or story.get('writer_version') != VERSION:
         raise ValueError('Not a supported Hindi story manifest')
@@ -79,10 +98,23 @@ def validate_story(story):
         if not 20 <= len(scene['visual']) <= 360:
             raise ValueError('Scene image description is missing or overlong')
     total = sum(len(s['text'].split()) for s in scenes)
-    if not 1000<=total<=1600:
+    minimum, maximum = (MIN_WORDS, MAX_WORDS) if is_short(story) else (1000, 1600)
+    if not minimum<=total<=maximum:
         raise StoryValidationError('story_word_budget',dict(
-            total_words=total,minimum_words=1000,maximum_words=1600))
-    if not 30 <= sum(s['speaker'] == 'narrator' for s in scenes) <= 40:
+            total_words=total,minimum_words=minimum,maximum_words=maximum))
+    if is_short(story):
+        if any(s['speaker'] != 'narrator' for s in scenes):
+            raise ValueError('Short stories require one narrator')
+        visuals=story.get('visuals',{})
+        if (set(visuals)!={str(i) for i in range(SCENE_COUNT)} or
+                any(not isinstance(v,str) or not 30<=len(v)<=360 for v in visuals.values()) or
+                not isinstance(story.get('thumbnail_prompt'),str) or not 80<=len(story['thumbnail_prompt'])<=360 or
+                type(story.get('thumbnail_scene')) is not int or not 0<=story['thumbnail_scene']<SCENE_COUNT):
+            raise ValueError('Short story requires a complete story-grounded visual plan and thumbnail scene')
+        repeated = repeated_scenes(scenes)
+        if repeated:
+            raise StoryValidationError('repeated_story_lines', dict(scenes=repeated))
+    elif not 30 <= sum(s['speaker'] == 'narrator' for s in scenes) <= 40:
         raise ValueError('Story requires 30-40 narrator scenes and some dialogue')
     if story['lyrics'] != '\n'.join(s['text'] for s in scenes):
         raise ValueError('Spoken script differs from scene script')

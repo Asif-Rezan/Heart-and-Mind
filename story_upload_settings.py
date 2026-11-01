@@ -18,8 +18,8 @@ def load_settings(now=None, *, profile='story'):
             settings[field]=os.environ[env]
     if settings['mode'] not in ('public','scheduled'):
         raise ValueError('Unknown story upload mode')
-    if settings['language'] != 'hi' or settings['audio_language'] != 'hi' or settings['category_id'] != '27':
-        raise ValueError('Stories require Hindi metadata/audio and Education category')
+    if settings['language'] != 'hi' or settings['audio_language'] != 'hi' or settings['category_id'] != '24':
+        raise ValueError('Stories require Hindi metadata/audio and Entertainment category')
     for field in ('made_for_kids','contains_synthetic_media','embeddable','public_stats_viewable',
                   'notify_subscribers','paid_product_placement'):
         if type(settings[field]) is not bool:
@@ -39,6 +39,8 @@ def load_settings(now=None, *, profile='story'):
 
 
 def upload_body(song, description, tags, settings):
+    from story_packaging import clean_tags
+    tags=clean_tags(tags)
     status = dict(privacyStatus='private' if settings['mode']=='scheduled' else 'public',
         selfDeclaredMadeForKids=settings['made_for_kids'], containsSyntheticMedia=settings['contains_synthetic_media'],
         license=settings['license'], embeddable=settings['embeddable'], publicStatsViewable=settings['public_stats_viewable'])
