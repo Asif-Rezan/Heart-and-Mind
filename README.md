@@ -341,3 +341,31 @@ Audio-mix recovery (2026-11-01): mix job 124900325814 in run 41321499778 produce
 
 
 Owned-image artifact recovery (2026-11-02): publish job 124942547630 failed during prepared-clip validation, before any YouTube upload. Resumed image workers inherited a full prior media snapshot and uploaded other workers' restored images/clip manifests. Parallel merged downloads could mix independently overwritten versions. Two downloaded production artifacts each contained 244 files; replaying a foreign worker's clip metadata over the owner's image reproduced a stale clip. Image workers now package only their own scene indices, manifest, clips and cast reference; only worker zero owns the thumbnail. Image downloads remain separate until an ownership-aware restore selects each scene from its worker. Legacy full-snapshot artifacts are recovered the same way, after other broad checkpoints. Render failures identify missing assets, stale scene indices or exact duration mismatches instead of a generic ValueError. The Publish saved Hindi story video workflow accepts assemble=true to join existing clips/audio and publish with existing duplicate-upload guards, without model generation. Ten actual owned clips from two failed-run artifacts passed validation after this restore.
+
+
+### Story-grounded artwork and visual acceptance
+
+New visual workers plan from the final spoken narration, retaining an exact source quote,
+scene index, action-first composition and open visual questions about required story objects
+or interactions. Thumbnail selection chooses a concrete unresolved conflict/discovery and
+records the viewer question; attractive faces are supporting details, not the composition.
+Preview generation now takes a completed story manifest (or its Actions run), rather than
+unrelated fixed chest/letter examples.
+
+Every new scene/thumbnail is checked on CPU with pinned public BLIP VQA weights
+(`Salesforce/blip-vqa-base`, revision `787b3d35d57e49572baabd22884b3d5a05acf072`).
+A missing story anchor causes a wider-composition retry with a different seed; two rejected
+candidates stop the worker before publication. Rejected candidates and answers are retained
+for review. Passing reports include a source-image hash; changed images, contracts or review
+versions invalidate the cache. Portrait references are no longer used as scene/thumbnail
+composition inputs. Image workers have a bounded 180-minute budget for the additional checks.
+
+Old visual planning checkpoints must be regenerated from the saved prose: the visual-contract
+version invalidates visual/thumbnail worker caches while SEO can still resume. Historical
+render/publication recovery remains available for already-created media. The preview workflow
+also tests rejection of an actual previous portrait that omitted its required letter.
+
+These checks screen for story adherence; they are not a measured CTR score or a guarantee of
+correct visual semantics. Review the accepted pixels against the saved evidence and viewer
+question before judging the thumbnail, and use real impressions/clicks to evaluate CTR.
+Thumbnail generation remains 1344×768 with a centered 16:9 crop and 1920×1080 JPEG export.

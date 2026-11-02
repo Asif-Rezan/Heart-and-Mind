@@ -21,9 +21,10 @@ def normalized(text):
 
 def matches(answer, expected):
     answer = normalized(answer)
-    if not answer or re.match(r'^(no|none|nothing|unknown|cannot|can not)\b', answer):
+    if not answer or re.search(r'\b(no|none|nothing|without|not|unknown|cannot)\b', answer):
         return False
-    return any(re.search(r'\b'+re.escape(normalized(item))+r'\b', answer) for item in expected)
+    acceptable = [normalized(item) for item in expected if normalized(item)]
+    return any(re.search(r'\b'+re.escape(item)+r's?\b', answer) for item in acceptable)
 
 
 def review_image(path, checks):

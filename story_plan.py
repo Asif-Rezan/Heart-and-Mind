@@ -554,9 +554,11 @@ def visual_batch(root,story,slots,identity):
 
 
 def thumbnail_plan(root,story,identity):
+    visual_schema=contract_schema()
+    visual_schema['properties']['prompt']['minLength']=80
     response=ask(object_schema({
         'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
-        'visual':contract_schema(), 'viewer_question':string(10,180)}),
+        'visual':visual_schema, 'viewer_question':string(10,180)}),
         'Design a truthful story-driven YouTube thumbnail from the FINAL spoken script. '
         'Select an imageable conflict, costly choice or discovery BEFORE its outcome. '
         'Avoid abstract thoughts, generic smiles, attractive headshots, and already-resolved ending scenes. '

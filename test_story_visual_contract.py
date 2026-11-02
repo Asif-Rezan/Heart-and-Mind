@@ -41,6 +41,9 @@ class StoryVisualChecks(unittest.TestCase):
         self.assertFalse(matches('nothing',['letter']))
         self.assertFalse(matches('no letter',['letter']))
         self.assertFalse(matches('newsletter',['letter']))
+        self.assertFalse(matches('man without a letter',['letter']))
+        self.assertFalse(matches('a man',['चिट्ठी']))
+        self.assertTrue(matches('letters',['letter']))
         self.assertTrue(matches('a sealed envelope',['letter','envelope']))
 
     def test_old_plan_or_changed_prose_cannot_be_used_for_new_generation(self):

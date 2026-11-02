@@ -44,7 +44,8 @@ def validate_contract(record, scene):
         question = check['question'].strip().lower()
         if not re.match(r'^(what|who|where|how many)\b', question):
             raise ValueError('visual_question_not_open')
-        if any(answer.strip().lower() in ('yes', 'no', 'unknown', 'nothing') for answer in check['answers']):
+        if any(not re.search(r'[a-zA-Z0-9]', answer) or re.search(r'[\u0900-\u097f]',answer) or
+               answer.strip().lower() in ('yes', 'no', 'unknown', 'nothing') for answer in check['answers']):
             raise ValueError('visual_answer_not_grounded')
     return record
 
