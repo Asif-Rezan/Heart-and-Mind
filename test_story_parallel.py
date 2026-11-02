@@ -263,8 +263,10 @@ class ParallelMediaChecks(unittest.TestCase):
                 render(root,story,timing,width=128,height=72,prepared_clips=True)
             self.assertEqual(duration(root/'video.mp4'),480)
             Image.new('RGB',(128,72),'red').save(root/'scene-001-source.png')
-            with self.assertRaisesRegex(ValueError,'stale'):
+            with self.assertRaisesRegex(ValueError,'stale') as caught:
                 render(root,story,timing,width=128,height=72,prepared_clips=True)
+            self.assertEqual(caught.exception.code,'render_clips_missing_or_stale')
+            self.assertEqual(caught.exception.details['scenes'],[1])
 
 
 if __name__=='__main__':

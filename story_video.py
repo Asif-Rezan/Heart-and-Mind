@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from PIL import Image, ImageOps
 from story_media import digest, run_ffmpeg
-from story_writer import scene_prompt, save_json
+from story_writer import scene_prompt, save_json, StoryValidationError
 
 from story_format import IMAGE_SECONDS, duration_bounds, is_short
 
@@ -201,15 +201,21 @@ def render(root,story,timing,width=1920,height=1080,prepared_clips=False):
     root=Path(root)
     validate_timing(story,timing)
     if abs(duration(root/'song.wav')-timing['duration'])>.05:
-        raise ValueError('Mixed audio does not match narration timeline')
+        raise StoryValidationError('render_audio_duration_mismatch',dict(expected_seconds=timing['duration'],actual_seconds=duration(root/'song.wav')))
+    required=[root/'story.json',root/'timing.json',root/'song.wav']
+    required += [root/f"scene-{s['index']:03d}-source.png" for s in visual_timeline(story,timing)]
+    if is_short(story):required.append(root/'thumbnail-source.png')
+    missing=[p.name for p in required if not p.is_file()]
+    if missing:raise StoryValidationError('render_assets_missing',dict(files=missing))
     identity=render_identity(root,story,width,height)
     state_path=root/'render-state.json'
     if (root/'video.mp4').exists() and state_path.exists() and json.loads(state_path.read_text())==identity:
         return
     if not prepared_clips:
         render_clips(root,story,timing,width,height)
-    if not all(clip_is_current(root,s,width,height) for s in visual_timeline(story,timing)):
-        raise ValueError('Missing or stale rendered scenes; resume render jobs before joining')
+    invalid=[s['index'] for s in visual_timeline(story,timing) if not clip_is_current(root,s,width,height)]
+    if invalid:
+        raise StoryValidationError('render_clips_missing_or_stale',dict(scenes=invalid))
     work=root/'story-motion'
     listing=work/'clips.txt'
     clips=[work/f"clip-{s['index']:03d}.mp4" for s in visual_timeline(story,timing)]
@@ -224,6 +230,6 @@ def render(root,story,timing,width=1920,height=1080,prepared_clips=False):
     measured=duration(temp)
     minimum,maximum=duration_bounds(story)
     if not minimum<=measured<=maximum or abs(measured-timing['duration'])>.1:
-        raise ValueError('Rendered story duration failed verification')
+        raise StoryValidationError('render_duration_mismatch',dict(expected_seconds=timing['duration'],actual_seconds=measured))
     temp.replace(root/'video.mp4')
     save_json(state_path,identity)

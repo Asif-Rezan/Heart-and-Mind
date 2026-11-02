@@ -565,22 +565,13 @@ jobs:
         path: output/
     - name: Generate each story image and immediately render its four-second clip
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage images --render-with-images
+    - name: Package only this worker's owned images and clips
+      if: always()
+      run: python story_image_artifacts.py pack --source output --destination image-artifact --run-id "$STORY_RUN_ID" --shard "$IMAGE_SHARD" --shards "$IMAGE_SHARDS"
     - uses: actions/upload-artifact@v4
       with:
         name: story-images-${{ github.run_id }}-${{ matrix.shard }}
-        path: 'output/*/scene-*-source.png
-
-          output/*/image-manifest-*.json
-
-          output/*/thumbnail-source.png
-
-          output/*/thumbnail-manifest.json
-
-          output/*/story-motion/*.mp4
-
-          output/*/story-motion/*.json
-
-          output/*/failure.json'
+        path: image-artifact/
         retention-days: 7
       if: always()
   mix:
@@ -669,8 +660,10 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         pattern: story-images-${{ github.run_id }}-*
-        merge-multiple: true
-        path: output/
+        merge-multiple: false
+        path: .story-image-artifacts/
+    - name: Restore each image and clip from its owning worker
+      run: python story_image_artifacts.py restore --source .story-image-artifacts --destination output --run-id "$STORY_RUN_ID" --shards 17
     - name: Join pre-rendered scenes and measured audio without re-rendering
       run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage render --prepared-clips
     - uses: actions/upload-artifact@v4

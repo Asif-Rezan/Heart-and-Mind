@@ -6,6 +6,11 @@ on:
         description: Original workflow run containing the completed video and source artifacts
         required: true
         type: string
+      assemble:
+        description: Assemble saved clips and mixed audio before publishing; no model generation
+        required: false
+        type: boolean
+        default: false
       run_id:
         description: Original story run ID (reuse exactly)
         required: true
@@ -60,16 +65,31 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: story-images-${{ inputs.source_run }}-*
-          merge-multiple: true
+          merge-multiple: false
           run-id: ${{ inputs.source_run }}
           github-token: ${{ github.token }}
-          path: output/
+          path: .story-image-artifacts/
+      - name: Restore owned image assets
+        run: python story_image_artifacts.py restore --source .story-image-artifacts --destination output --run-id "$STORY_RUN_ID"
       - uses: actions/download-artifact@v4
+        if: ${{ !inputs.assemble }}
         with:
           name: story-video-${{ inputs.source_run }}
           run-id: ${{ inputs.source_run }}
           github-token: ${{ github.token }}
           path: output/
+      - name: Assemble saved clips and measured audio
+        if: inputs.assemble
+        run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage render --prepared-clips
+      - uses: actions/upload-artifact@v4
+        if: inputs.assemble
+        with:
+          name: story-video-${{ github.run_id }}
+          path: |
+            output/*/video.mp4
+            output/*/thumbnail.jpg
+            output/*/render-state.json
+          retention-days: 7
       - name: Publish saved video with original identity and duplicate-upload guards
         run: python -u daily_story.py --run-id "$STORY_RUN_ID" --stage publish --defer-drive-cleanup
       - uses: actions/upload-artifact@v4

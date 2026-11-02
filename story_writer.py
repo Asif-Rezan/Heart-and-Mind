@@ -131,6 +131,13 @@ class StoryValidationError(ValueError):
         self.code=code
         self.details=details or {}
         messages={
+            'render_clips_missing_or_stale':'Rendered scenes are missing or stale. Restore each scene from its owning image worker; inspect scene indices.',
+            'render_assets_missing':'Video assembly is missing required source assets. Inspect the listed filenames.',
+            'render_audio_duration_mismatch':'Mixed audio does not match the narration timeline. Inspect expected and actual seconds.',
+            'render_duration_mismatch':'Joined video does not match the narration timeline. Publication is blocked.',
+            'image_artifact_ownership_mismatch':'Image artifact shard ownership does not match the worker count. Restore matching image artifacts.',
+            'image_artifact_manifest_missing':'An image artifact is missing its own worker manifest.',
+            'image_artifacts_missing':'No saved image artifacts match this story run.',
             'narration_duration_mismatch':'Saved narration does not match its measured timeline. Restore matching voice assets.',
             'normalized_narration_duration_mismatch':'Voice normalization changed the narration duration. The original narration is preserved; inspect expected and actual seconds.',
             'mixed_story_duration_mismatch':'The audio mix does not preserve the complete narration. Publication is blocked; inspect expected and actual seconds.',

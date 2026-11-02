@@ -30,8 +30,15 @@ def restore_artifacts(source, destination, run_id):
             path = root/identity_file
             if path.exists() and json.loads(path.read_text()).get('run_id') != run_id:
                 raise ValueError('Saved artifact story identity mismatch')
+        if name.startswith('story-images-'):
+            # Legacy image archives contain stale copies belonging to other shards.
+            restored.append(name)
+            continue
         shutil.copytree(root, target, dirs_exist_ok=True)
         restored.append(name)
+    if any(name.startswith('story-images-') for _,name,_ in ordered):
+        from story_image_artifacts import restore_images
+        restore_images(source,destination,run_id)
     print(json.dumps(dict(phase='story checkpoints restored in dependency order',artifacts=restored)),flush=True)
     return restored
 
