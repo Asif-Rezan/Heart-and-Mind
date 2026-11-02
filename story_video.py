@@ -1,4 +1,5 @@
 """Reference-style SSD-1B illustrations and measured scene camera motion."""
+from story_art_style import art_prompt, VERSION as ART_VERSION
 import hashlib
 import json
 import math
@@ -51,8 +52,7 @@ def generate_images(root, story, render_ready=False):
     reference=None
     if short:
         reference=root/f'cast-reference-{shard:02d}.png'
-        reference_plan=dict(model=MODEL,revision=REVISION,width=1024,height=576,steps=20,prompt=story['characters']+'. '+story['world']+
-                            '. Colorful 3D storybook character reference, fixed clothes, no text.',
+        reference_plan=dict(model=MODEL,revision=REVISION,art_version=ART_VERSION,width=1024,height=576,steps=20,prompt=art_prompt(story['characters'], 'reference'),
                             seed=int(hashlib.sha256((story['run_id']+':cast-v1').encode()).hexdigest()[:8],16))
         reference_state=reference.with_suffix('.json')
         if not reference.exists() or not reference_state.exists() or json.loads(reference_state.read_text())!=reference_plan:
@@ -66,8 +66,8 @@ def generate_images(root, story, render_ready=False):
         prompt=scene_prompt(story,scene)
         if short:
             view='medium shot, clear expressive face and story object' if i%2 else 'wide shot, clear action and setting'
-            prompt=story['visuals'][str(scene['index'])]+'. '+view+'. Colorful 3D storybook, no text.'
-        plan = dict(prompt=prompt, model=MODEL, revision=REVISION,
+            prompt=art_prompt(story['visuals'][str(scene['index'])]+'. '+view)
+        plan = dict(prompt=prompt, model=MODEL, revision=REVISION,art_version=ART_VERSION,
                     width=1024, height=576, steps=20)
         plan['seed'] = int(hashlib.sha256((story['run_id']+str(i)).encode()).hexdigest()[:8],16)
         if short:
@@ -95,8 +95,8 @@ def generate_images(root, story, render_ready=False):
             render_clips(root,story,timing,shard=shard,shards=count,only_indices={i})
 
     if short and shard==0:
-        thumbnail_plan=dict(prompt=story['thumbnail_prompt']+'. Colorful 3D storybook, clear emotional focus, no text.',
-            model=MODEL,revision=REVISION,width=1024,height=576,steps=20,
+        thumbnail_plan=dict(prompt=art_prompt(story['thumbnail_prompt'], 'thumbnail'),
+            model=MODEL,revision=REVISION,art_version=ART_VERSION,width=1024,height=576,steps=20,
             seed=int(hashlib.sha256((story['run_id']+':thumbnail-v2').encode()).hexdigest()[:8],16),
             story_scene=story['thumbnail_scene'],reference=digest(reference),strength=.80)
         target=root/'thumbnail-source.png'

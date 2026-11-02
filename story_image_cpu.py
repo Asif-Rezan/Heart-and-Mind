@@ -44,7 +44,7 @@ GUIDANCE_SCALE = 7.0
 def negative_prompt():
     return ('text, letters, typography, captions, Hindi writing, title, signature, watermark, logo, '
             'poster, magazine, red brushwork, '
-            'orange skin, underexposed faces, silhouette, crowd, extra people, fused faces, '
+            'asymmetric eyes, crossed eyes, malformed pupils, distorted face, disfigured, flat 2D, sketch, doll, waxy face, orange skin, underexposed faces, silhouette, crowd, extra people, fused faces, '
             'duplicated face, cropped head, extreme close-up, deformed hands, extra limbs, '
             'plastic skin, blur, low quality, photorealistic, horror, frightening, collage, split screen, '
             'black panel, border, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''))

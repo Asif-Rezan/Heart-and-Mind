@@ -43,9 +43,10 @@ class StoryChecks(unittest.TestCase):
     def test_reference_style_and_scene_action_are_included(self):
         story=example_story()
         prompt=scene_prompt(story,story['scenes'][0])
-        self.assertTrue(prompt.startswith(story['scenes'][0]['visual']))
-        self.assertIn('Cute colorful 3D storybook cartoon',prompt)
-        self.assertIn('bright pastel colors',prompt)
+        self.assertTrue(prompt.startswith('3D storybook illustration'))
+        self.assertIn(story['scenes'][0]['visual'],prompt)
+        self.assertIn('balanced facial features',prompt)
+        self.assertIn('warm soft key light',prompt)
         self.assertIn(story['characters'],prompt)
 
     def test_music_covers_all_speech_without_tiny_or_overlong_requests(self):

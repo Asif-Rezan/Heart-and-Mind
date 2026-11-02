@@ -14,10 +14,7 @@ from story_format import FORMAT, MIN_WORDS, MAX_WORDS, is_short, scene_count, wo
 VERSION = 'hindi-emotional-story-v1'
 SCENE_COUNT = 48
 VOICES = {'narrator': 'hm_omega', 'male': 'hm_psi', 'female': 'hf_alpha'}
-STYLE = ('Cute colorful 3D storybook cartoon. Rounded soft shapes, adorable expressive faces, '
-         'bright pastel colors, soft cinematic lighting, large expressive eyes, polished 3D rendering, '
-         'detailed beautiful environment, soft depth of field, '
-         'wide landscape, no text.')
+from story_art_style import STYLE, art_prompt
 
 
 def save_json(path, data):
@@ -300,7 +297,4 @@ def write_story(root, run_id, history):
 
 
 def scene_prompt(story, scene):
-    # Same model and exact core style vocabulary as kids_rhymes.make_song.
-    # Text conditioning guides consistency; it does not guarantee identical faces.
-    return (scene['visual']+'. Cute colorful 3D storybook cartoon. '+story['characters']+'. '+
-            story['world']+'. '+STYLE.replace('Cute colorful 3D storybook cartoon. ', ''))
+    return art_prompt(scene['visual']+'. '+story['characters']+'. '+story['world'])
