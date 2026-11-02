@@ -42,7 +42,8 @@ GUIDANCE_SCALE = 7.0
 
 
 def negative_prompt():
-    return ('text, letters, typography, captions, Hindi writing, title, signature, watermark, logo, '
+    return ('photograph, photorealistic, live action, realistic skin pores, flat 2D, '
+            'text, letters, typography, captions, Hindi writing, title, signature, watermark, logo, '
             'poster, magazine, red brushwork, '
             'asymmetric eyes, crossed eyes, malformed pupils, distorted face, disfigured, flat 2D, sketch, doll, waxy face, orange skin, underexposed faces, silhouette, crowd, extra people, fused faces, '
             'duplicated face, cropped head, extreme close-up, deformed hands, extra limbs, '
