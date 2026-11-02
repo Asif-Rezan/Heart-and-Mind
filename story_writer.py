@@ -183,7 +183,7 @@ def planning_schema(schema):
             if not isinstance(node,dict):
                 return
             for field,spec in node.get('properties',{}).items():
-                if field in ('visual','instruction','thumbnail_prompt'):
+                if field in ('visual','instruction','thumbnail_prompt','prompt') and spec.get('type')=='string':
                     spec.pop('maxLength',None)
                 else:
                     relax(spec)
@@ -206,7 +206,7 @@ def normalize_planning(data, schema):
                 for field,child in spec.get('properties',{}).items():
                     if field not in value:
                         continue
-                    if field in ('visual','instruction','thumbnail_prompt'):
+                    if field in ('visual','instruction','thumbnail_prompt','prompt') and child.get('type')=='string' and isinstance(value[field],str):
                         value[field]=bound_prose(value[field],child)
                     else:
                         normalize(value[field],child)

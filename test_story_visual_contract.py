@@ -13,6 +13,20 @@ from test_short_story import short_story
 
 
 class StoryVisualChecks(unittest.TestCase):
+    def test_nested_visual_records_normalize_prompt_only_and_preserve_exact_evidence(self):
+        from story_writer import planning_schema,normalize_planning,object_schema
+        from story_visual_contract import contract_schema
+        schema=object_schema({'visual':contract_schema()})
+        record=record_for(dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and begins reading beside the counter.'))
+        record['prompt']+=' Additional setting detail.'*30
+        inferred=planning_schema(schema)
+        self.assertNotIn('maxLength',inferred['properties']['visual']['properties']['prompt'])
+        self.assertEqual(inferred['properties']['visual']['properties']['evidence']['maxLength'],360)
+        fixed=normalize_planning({'visual':record},schema)['visual']
+        self.assertLessEqual(len(fixed['prompt']),360)
+        self.assertEqual(fixed['evidence'],record['evidence'])
+        self.assertEqual(fixed['checks'],record['checks'])
+
     def test_paraphrased_or_other_scene_evidence_is_rejected(self):
         scene=dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and begins reading beside the counter.')
         record=record_for(scene)
