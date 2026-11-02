@@ -1,5 +1,6 @@
 """Reference-style SSD-1B illustrations and measured scene camera motion."""
 from story_art_style import art_prompt, VERSION as ART_VERSION
+from story_thumbnail import SOURCE_SIZE as THUMBNAIL_SOURCE_SIZE, export_thumbnail
 import hashlib
 import json
 import math
@@ -96,7 +97,7 @@ def generate_images(root, story, render_ready=False):
 
     if short and shard==0:
         thumbnail_plan=dict(prompt=art_prompt(story['thumbnail_prompt'], 'thumbnail'),
-            model=MODEL,revision=REVISION,art_version=ART_VERSION,width=1024,height=576,steps=20,
+            model=MODEL,revision=REVISION,art_version=ART_VERSION,width=THUMBNAIL_SOURCE_SIZE[0],height=THUMBNAIL_SOURCE_SIZE[1],steps=20,
             seed=int(hashlib.sha256((story['run_id']+':thumbnail-v2').encode()).hexdigest()[:8],16),
             story_scene=story['thumbnail_scene'],reference=digest(reference),strength=.80)
         target=root/'thumbnail-source.png'
@@ -111,7 +112,8 @@ def generate_images(root, story, render_ready=False):
                 pass
         if not current:
             temp=target.with_suffix('.tmp.png')
-            generate(thumbnail_plan['prompt'],temp,seed=thumbnail_plan['seed'],width=1024,height=576,
+            generate(thumbnail_plan['prompt'],temp,seed=thumbnail_plan['seed'],
+                     width=thumbnail_plan['width'],height=thumbnail_plan['height'],
                      steps=20,reference_path=reference)
             with Image.open(temp) as image:
                 image.verify()
@@ -207,6 +209,8 @@ def render(root,story,timing,width=1920,height=1080,prepared_clips=False):
     if is_short(story):required.append(root/'thumbnail-source.png')
     missing=[p.name for p in required if not p.is_file()]
     if missing:raise StoryValidationError('render_assets_missing',dict(files=missing))
+    thumbnail_source=root/'thumbnail-source.png' if is_short(story) else root/'scene-000-source.png'
+    export_thumbnail(thumbnail_source,root/'thumbnail.jpg')
     identity=render_identity(root,story,width,height)
     state_path=root/'render-state.json'
     if (root/'video.mp4').exists() and state_path.exists() and json.loads(state_path.read_text())==identity:
@@ -220,9 +224,6 @@ def render(root,story,timing,width=1920,height=1080,prepared_clips=False):
     listing=work/'clips.txt'
     clips=[work/f"clip-{s['index']:03d}.mp4" for s in visual_timeline(story,timing)]
     listing.write_text(''.join(f"file '{p.name}'\n" for p in clips))
-    thumbnail_source=root/'thumbnail-source.png' if is_short(story) else root/'scene-000-source.png'
-    with Image.open(thumbnail_source) as image:
-        ImageOps.fit(image.convert('RGB'),(1280,720)).save(root/'thumbnail.jpg',quality=92)
     temp=root/'video.tmp.mp4'
     run_ffmpeg(['-f','concat','-safe','1','-i',str(listing),'-i',str(root/'song.wav'),
         '-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-b:a','192k',

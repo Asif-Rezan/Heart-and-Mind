@@ -91,6 +91,8 @@ class ShortStoryContract(unittest.TestCase):
                 thumb=json.loads((root/'thumbnail-manifest.json').read_text())
                 self.assertIn(story['thumbnail_prompt'],thumb['prompt'])
                 self.assertEqual(thumb['story_scene'],30)
+                self.assertEqual((thumb['width'],thumb['height']),(1344,768))
+                self.assertEqual((model.call_args.kwargs['width'],model.call_args.kwargs['height']),(1344,768))
                 self.assertNotEqual(thumb['seed'],manifest['0']['seed'])
                 generate_images(root,story)
                 self.assertEqual(model.call_count,7)
@@ -176,4 +178,5 @@ class ShortMediaSmoke(unittest.TestCase):
                 with Image.open(target) as frame:
                     pixel=frame.getpixel((64,36));self.assertGreater(pixel[channel],180)
             with Image.open(root/'thumbnail.jpg') as thumb, Image.open(root/'thumbnail-source.png') as source:
+                self.assertEqual(thumb.size,(1920,1080))
                 self.assertTrue(all(abs(a-b)<4 for a,b in zip(thumb.getpixel((640,360)),source.getpixel((64,36)))))
