@@ -38,7 +38,10 @@ DIRECTION = (
     'Evidence: an EXACT quote from this requested final Hindi scene that supports the visible event. '
     'Use ONLY the requested scene for props/actions; do not borrow facts from nearby scenes. '
     'Do not invent danger, magic, wealth, props or discoveries. Ordinary spatial staging is allowed. '
-    'Supply 1-3 OPEN visual questions about the key object/action/interaction and short English answer alternatives. '
+    'First write literal_scene as a plain English translation of ONLY the requested narration, without interpretation. '
+    'Then depict that translation. Preserve stated actions; anger is an expression, never permission to slam or throw things. '
+    'Use ONE open visual question checking the key story object; at most one additional interaction check. '
+    'Ask about visible categories, not an earlier or later event. '
     'Use generic people labels (man, woman, girl), NEVER fictional names or invisible family relationships '
     'in questions/answers. Questions start What, Who, Where or How many; no yes/no questions, '
     'no expected-answer hints in the question, no beauty/skin/clothing checks. '
@@ -71,7 +74,7 @@ def validate_contract(record, scene):
         if not re.match(r'^(what|who|where|how many)\b', question):
             raise ValueError('visual_question_not_open')
         if any(not re.search(r'[a-zA-Z0-9]', answer) or re.search(r'[\u0900-\u097f]',answer) or
-               answer.strip().lower() in ('yes', 'no', 'unknown', 'nothing') for answer in check['answers']):
+               answer.strip().lower() in ('yes', 'no', 'unknown', 'nothing', 'none') for answer in check['answers']):
             raise ValueError('visual_answer_not_grounded')
     return record
 
@@ -110,6 +113,8 @@ def composition_schema():
     schema['properties'].pop('prompt')
     schema['required'].remove('prompt')
     schema['properties'].pop('planning_review',None)
+    schema['properties']={'literal_scene':{'type':'string','minLength':10,'maxLength':400,'pattern':ENGLISH_PATTERN},**schema['properties']}
+    schema['required'].insert(0,'literal_scene')
     return schema
 
 
@@ -140,6 +145,11 @@ def assess_plan(record,scene,cast,world,seed,checkpoint,viewer_question=None,ask
         'For example anger does not imply throwing, picking up, burning, hitting or discarding an object. '
         'A broken object does not imply anyone broke it deliberately or is holding it. '
         'If narration is ambiguous, preserve that ambiguity; do not complete a missing story event. '
+        'Allow ordinary static staging required to draw a frame: a mentioned object rests on a surface, '
+        'a broken object shows damage, canonical architecture appears behind the scene, '
+        'and stated anger becomes an angry facial expression. These are not new plot events. '
+        'Do not require a reaction from every cast member. Reject new causal actions, additional props '
+        'or unsupported specific object types (for example car when the source only says toy). '
         'Do not use events from neighboring scenes or assume missing props/actions. '
         'Canonical cast and world may supply appearance/location only. Ordinary camera staging is allowed, '
         'but inventing a notebook, making a person hold an unmentioned object, or contradictory object states is not. '

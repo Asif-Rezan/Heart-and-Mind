@@ -45,6 +45,7 @@ class StoryVisualChecks(unittest.TestCase):
         from story_visual_contract import composition_schema
         record=record_for(dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and begins reading beside the counter.'))
         raw={k:v for k,v in record.items() if k not in ('prompt','planning_review')}
+        raw['literal_scene']='The man opens a letter and starts reading.'
         schema=composition_schema();self.assertTrue(Draft202012Validator(schema).is_valid(raw))
         raw['event']='उसने चिट्ठी खोलकर पढ़ना शुरू किया।'
         self.assertFalse(Draft202012Validator(schema).is_valid(raw))
