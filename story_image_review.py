@@ -7,7 +7,7 @@ import re
 
 MODEL = 'Salesforce/blip-vqa-base'
 REVISION = '787b3d35d57e49572baabd22884b3d5a05acf072'
-VERSION = 'open-vqa-v2'
+VERSION = 'open-vqa-v3'
 _processor = _model = None
 
 
@@ -72,9 +72,8 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
     reports = []
     for attempt in range(2):
         candidate = work/f'candidate-{attempt}.png'
-        composition = prompt if attempt == 0 else (
-            'Wide narrative scene. '+contract['prompt']+
-            ' Show the complete action and the important story object prominently. Cinematic 3D render.')
+        from story_art_style import focused_prompt
+        composition = focused_prompt(contract,kind,attempt)
         try:
             generate(composition, candidate, seed=seed+attempt*7919,
                      negative_extra='headshot, beauty portrait, fashion editorial, isolated face', **kwargs)

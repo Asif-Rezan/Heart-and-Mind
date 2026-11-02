@@ -397,3 +397,8 @@ uses a neutral fallback instead. Translation recovery remains explicitly unappro
 Story diffusion preserves the model safety checker with two safe-composition attempts. A safety
 block uses the neutral offline asset immediately instead of repeating ten expensive blocked
 seeds and potentially consuming the whole worker timeout.
+
+Rendering now starts with a large, visible foreground story object and keeps event, cast and
+setting concise for CLIP. Spoken dialogue and optional hair detail cannot displace the object.
+A saved preview plan can be rerendered with `reuse_plan_run` without rerunning Qwen; the source
+quote is revalidated and the current rendering version is recorded separately from planning.

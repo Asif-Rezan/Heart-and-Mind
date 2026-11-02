@@ -33,7 +33,8 @@ def contract_schema():
 DIRECTION = (
     'Return a literal composition record: event, people, setting, evidence and checks. '
     'Event: concrete action and key story object FIRST, at most 160 characters; never start with camera, scenery or beauty. '
-    'People: canonical actors, exact ages and fixed clothes, at most 130 characters. '
+    'People: describe each actor with a generic visible role (man, woman, boy or girl), exact age and fixed clothes; at most 130 characters. '
+    'Names alone do not tell an image model the actor gender/age. Include the visible role explicitly. '
     'Setting: canonical location, at most 60 characters. '
     'Evidence: an EXACT quote from this requested final Hindi scene that supports the visible event. '
     'Use ONLY the requested scene for props/actions; do not borrow facts from nearby scenes. '

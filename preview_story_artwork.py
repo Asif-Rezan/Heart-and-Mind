@@ -75,6 +75,10 @@ def main():
         return
     from story_image_review import generate_reviewed
     plan=json.loads(plan_path.read_text())
+    validate_contract(plan['contract'],dict(text=plan['narration']))
+    plan['planning_art_version']=plan.get('planning_art_version',plan['art_version'])
+    plan['art_version']=VERSION
+    plan_path.write_text(json.dumps(plan,ensure_ascii=False,indent=2))
     source=root/f'{args.kind}-source.png'
     review=generate_reviewed(plan['prompt'],source,seed=plan['seed'],contract=plan['contract'],
                              kind=args.kind,width=plan['width'],height=plan['height'],steps=plan['steps'])

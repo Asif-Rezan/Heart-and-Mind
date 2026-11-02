@@ -8,6 +8,10 @@ on:
         description: Optional completed story run; blank uses the saved production-story regression
         type: string
         required: false
+      reuse_plan_run:
+        description: Optional run containing saved artwork plans; rerender without repeating Qwen planning
+        type: string
+        required: false
       scene_index:
         description: Narrated scene to preview as a video background
         type: number
@@ -52,6 +56,7 @@ jobs:
     env:
       IMAGE_KIND: ${{ matrix.kind }}
       SOURCE_RUN: ${{ inputs.source_run }}
+      REUSE_PLAN_RUN: ${{ inputs.reuse_plan_run }}
       SCENE_INDEX: ${{ inputs.scene_index || 0 }}
     steps:
       - uses: actions/checkout@v4
@@ -70,10 +75,21 @@ jobs:
           github-token: ${{ github.token }}
           path: output/source/
       - name: Audit previous invented notebook and toy plans
-        if: matrix.kind == 'thumbnail'
+        if: matrix.kind == 'thumbnail' && inputs.reuse_plan_run == ''
         continue-on-error: true
         run: python -u preview_story_artwork.py --stage audit-plan
+      - name: Validate saved plan run identity
+        if: inputs.reuse_plan_run != ''
+        run: '[[ "$REUSE_PLAN_RUN" =~ ^[0-9]+$ ]]'
+      - uses: actions/download-artifact@v4
+        if: inputs.reuse_plan_run != ''
+        with:
+          name: story-artwork-plan-${{ matrix.kind }}
+          run-id: ${{ inputs.reuse_plan_run }}
+          github-token: ${{ github.token }}
+          path: output/story-artwork-preview/
       - name: Plan from final narration with exact evidence and visible-event checks
+        if: inputs.reuse_plan_run == ''
         run: |
           STORY_SOURCE=tests/fixtures/production-artwork-story.json
           if [ -n "$SOURCE_RUN" ]; then STORY_SOURCE=output/source; fi

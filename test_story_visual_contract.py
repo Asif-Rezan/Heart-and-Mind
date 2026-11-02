@@ -127,6 +127,21 @@ class StoryVisualChecks(unittest.TestCase):
             self.assertEqual(report['fallback'],'best-candidate')
             self.assertTrue(target.exists())
 
+    def test_render_prompt_foregrounds_the_story_object_within_short_encoder_context(self):
+        from story_art_style import focused_prompt
+        from story_visual_contract import compile_contract
+        record=compile_contract(dict(event="Rain fell and Niti's toy broke, father got angry and said, 'Never again.'",
+            people='Arjun, 38, brown shirt with yellow vest, short black hair; Niti, 10, red cotton kurta with green sari, curly black hair',
+            setting='Village roadside during rain',evidence='असली कहानी का उद्धरण।',
+            checks=[dict(question='What object is central?',answers=['toy'])]))
+        prompt=focused_prompt(record)
+        self.assertTrue(prompt.startswith('Broken toy in foreground'))
+        self.assertLessEqual(len(prompt.split()),60)
+        self.assertNotIn('Never again',prompt)
+        self.assertIn('38',prompt);self.assertIn('10',prompt)
+        self.assertIn('red',prompt);self.assertIn('yellow',prompt)
+        self.assertIn('fair skin',prompt)
+
     def test_safety_block_uses_neutral_asset_without_repeating_blocked_generation(self):
         from story_image_cpu import ImageSafetyBlocked
         contract=record_for(dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter.'))
