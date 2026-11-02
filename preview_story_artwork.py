@@ -7,7 +7,7 @@ from story_image_cpu import generate, MODEL, REVISION, negative_prompt, GUIDANCE
 
 SCENES = {
     'background': 'Beautiful adult Indian woman, long dark braid, turquoise sari, discovering a locked wooden chest in a sunlit attic, holding a brass key, curious expression, warm golden rays.',
-    'thumbnail': 'Beautiful adult Indian woman, long dark braid, turquoise sari, holding a brass key beside her face, intrigued expression, closed mysterious chest in foreground, teal and golden attic.',
+    'thumbnail': 'Large partly-open wooden chest in foreground, golden light through narrow lid gap, contents hidden. Beautiful adult Indian woman beside chest, turquoise sari, long dark braid, wide-eyed surprise, raising brass key.',
 }
 
 
@@ -19,7 +19,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     prompt = art_prompt(SCENES[args.kind], args.kind)
     plan = dict(prompt=prompt, art_version=VERSION, model=MODEL, revision=REVISION,
-                seed=1142 if args.kind == 'background' else 7042, steps=20,
+                seed=1142 if args.kind == 'background' else 8042, steps=20,
                 width=1024, height=576, negative_prompt=negative_prompt(), guidance_scale=GUIDANCE_SCALE)
     (args.output/f'{args.kind}-plan.json').write_text(json.dumps(plan, indent=2))
     generate(prompt, args.output/f'{args.kind}.png', seed=plan['seed'], steps=plan['steps'])

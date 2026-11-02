@@ -563,7 +563,9 @@ def thumbnail_plan(root,story,identity):
         'Create curiosity about the real conflict without inventing danger, wealth, tears or plot events. '
         'Use polished 3D storybook graphics. A beautiful adult woman may be the focal character only when she is in the actual scene; preserve her canonical age and appearance. '
             'Show the moment before the real choice or reveal, leaving its outcome unseen to create a curiosity gap. '
-            'Put character appearance and the main visual action first; at most 60 words. '
+            'Start with the large story object and its unresolved visual clue, then the character reacting beside it. '
+        'Use a medium shot with face and object both clearly visible, not an isolated beauty portrait. '
+        'Keep the core composition within 40 English words, with clothing and scenery last. '
         'No unrelated poster, invented event, or generic sunrise. Canonical cast: '+story['characters']+' World: '+story['world']+' '
         'Title: '+story['title']+' Summary: '+story['summary']+
         '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False),

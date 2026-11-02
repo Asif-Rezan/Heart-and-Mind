@@ -3,6 +3,12 @@ on:
   push:
     branches: [codex/storybook-artwork]
   workflow_dispatch:
+    inputs:
+      kind:
+        description: Artwork to generate
+        type: choice
+        default: thumbnail
+        options: [thumbnail, background, both]
 permissions:
   contents: read
   actions: read
@@ -14,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kind: [background, thumbnail]
+        kind: ${{ fromJSON(inputs.kind == 'both' && '["background","thumbnail"]' || inputs.kind == 'background' && '["background"]' || '["thumbnail"]') }}
     env:
       CUDA_VISIBLE_DEVICES: ''
       OMP_NUM_THREADS: '4'

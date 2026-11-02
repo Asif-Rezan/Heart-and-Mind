@@ -1,10 +1,14 @@
 """Compact shared art direction, placed before scene detail for CLIP encoders."""
-VERSION = 'storybook-realistic-3d-v5'
+VERSION = 'storybook-realistic-3d-v6'
 STYLE = ('Realistic cinematic 3D storybook render, lifelike facial proportions, beautiful expressive face, '
          'natural skin, detailed fabrics, soft volumetric lighting. ')
 
 
 def art_prompt(scene, kind='background'):
+    if kind == 'thumbnail':
+        # The story object must reach CLIP before portrait/style embellishments.
+        return ('Realistic cinematic 3D storybook render. '+scene+
+                ' Medium shot, object and face both prominent, natural proportions, soft dramatic lighting, no text.')
     framing = {
         'background': 'Medium wide shot. ',
         'reference': 'Character portrait, fixed clothes. ',
