@@ -46,7 +46,7 @@ def negative_prompt():
             'distorted face, crossed eyes, fused faces, extra fingers, '
             'text, letters, captions, typography, watermark, logo, '
             'waxy skin, plastic skin, orange skin, underexposed faces, silhouette, '
-            'extra people, duplicated face, cropped head, deformed hands, extra limbs, '
+            'duplicated face, cropped head, deformed hands, extra limbs, '
             'blur, low quality, horror, collage, split screen, border, '
             + os.getenv('IMAGE_NEGATIVE_PROMPT', ''))
 
@@ -56,7 +56,7 @@ def negative_prompt():
 _pipeline = None
 _reference_pipeline = None
 
-def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_path=None):
+def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_path=None, negative_extra=""):
     if allow_text:
         raise ValueError('Heart and Mind story artwork must be text-free')
     global _pipeline, _reference_pipeline
@@ -101,7 +101,7 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
         if attempt == 5:
             print('Five safety rejections; retrying a restrained story scene.', flush=True)
         reference_args=dict(image=reference,strength=.80) if reference is not None else {}
-        result = pipeline(**reference_args, prompt=candidate, negative_prompt=negative_prompt(), width=width, height=height,
+        result = pipeline(**reference_args, prompt=candidate, negative_prompt=negative_extra+", "+negative_prompt(), width=width, height=height,
             num_inference_steps=steps, guidance_scale=GUIDANCE_SCALE,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):

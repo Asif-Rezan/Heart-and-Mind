@@ -1,6 +1,8 @@
 """Reference-style SSD-1B illustrations and measured scene camera motion."""
 from story_art_style import art_prompt, VERSION as ART_VERSION
-from story_thumbnail import SOURCE_SIZE as THUMBNAIL_SOURCE_SIZE, export_thumbnail
+from story_thumbnail import SOURCE_SIZE as THUMBNAIL_SOURCE_SIZE, EXPORT_SIZE as THUMBNAIL_EXPORT_SIZE, export_thumbnail
+from story_visual_contract import require_visuals
+from story_image_review import generate_reviewed, cache_current, VERSION as REVIEW_VERSION
 import hashlib
 import json
 import math
@@ -39,7 +41,8 @@ def thumbnail_slot(story, timing):
 
 
 def generate_images(root, story, render_ready=False):
-    from story_image_cpu import generate, MODEL, REVISION
+    from story_image_cpu import MODEL, REVISION
+    require_visuals(story)
     root = Path(root)
     shard, count = int(os.getenv('IMAGE_SHARD','0')), int(os.getenv('IMAGE_SHARDS','1'))
     if not 0 <= shard < count:
@@ -50,32 +53,24 @@ def generate_images(root, story, render_ready=False):
     short=is_short(story)
     timing=json.loads((root/'timing.json').read_text()) if short or render_ready else None
     slots=visual_timeline(story,timing) if short else story['scenes']
-    reference=None
-    if short:
-        reference=root/f'cast-reference-{shard:02d}.png'
-        reference_plan=dict(model=MODEL,revision=REVISION,art_version=ART_VERSION,width=1024,height=576,steps=20,prompt=art_prompt(story['characters'], 'reference'),
-                            seed=int(hashlib.sha256((story['run_id']+':cast-v1').encode()).hexdigest()[:8],16))
-        reference_state=reference.with_suffix('.json')
-        if not reference.exists() or not reference_state.exists() or json.loads(reference_state.read_text())!=reference_plan:
-            generate(reference_plan['prompt'],reference,seed=reference_plan['seed'],width=1024,height=576,steps=20)
-            save_json(reference_state,reference_plan)
     for slot in slots:
         i=slot['index']
         scene=story['scenes'][slot.get('story_scene',i)]
         if i % count != shard:
             continue
-        prompt=scene_prompt(story,scene)
+        prompt=art_prompt(story['visuals'][str(scene['index'])])
         if short:
             view='medium shot, clear expressive face and story object' if i%2 else 'wide shot, clear action and setting'
             prompt=art_prompt(story['visuals'][str(scene['index'])]+'. '+view)
-        plan = dict(prompt=prompt, model=MODEL, revision=REVISION,art_version=ART_VERSION,
+        contract=story['visual_contracts'][str(scene['index'])]
+        plan = dict(prompt=prompt, model=MODEL, revision=REVISION,art_version=ART_VERSION,review_version=REVIEW_VERSION,contract=contract,
                     width=1024, height=576, steps=20)
         plan['seed'] = int(hashlib.sha256((story['run_id']+str(i)).encode()).hexdigest()[:8],16)
         if short:
-            plan.update(story_scene=scene['index'],start=slot['start'],end=slot['end'],reference=digest(reference),strength=.80)
+            plan.update(story_scene=scene['index'],start=slot['start'],end=slot['end'])
         target = root/f'scene-{i:03d}-source.png'
         valid = False
-        if previous.get(str(i)) == plan and target.exists():
+        if cache_current(previous.get(str(i)),plan,target):
             try:
                 with Image.open(target) as image:
                     image.verify()
@@ -84,12 +79,12 @@ def generate_images(root, story, render_ready=False):
                 pass
         if not valid:
             temp = target.with_suffix('.tmp.png')
-            generate(plan['prompt'], temp, seed=plan['seed'], width=1024, height=576, steps=20,
-                     **({'reference_path':reference} if short else {}))
+            review=generate_reviewed(plan['prompt'],temp,seed=plan['seed'],contract=contract,
+                                     width=1024,height=576,steps=20)
             with Image.open(temp) as image:
                 image.verify()
             temp.replace(target)
-        complete[str(i)] = plan
+        complete[str(i)] = dict(plan,review=previous[str(i)]['review'] if valid else review)
         save_json(manifest, complete)
         if render_ready:
             # This frame can render now; no cross-worker image barrier.
@@ -99,11 +94,12 @@ def generate_images(root, story, render_ready=False):
         thumbnail_plan=dict(prompt=art_prompt(story['thumbnail_prompt'], 'thumbnail'),
             model=MODEL,revision=REVISION,art_version=ART_VERSION,width=THUMBNAIL_SOURCE_SIZE[0],height=THUMBNAIL_SOURCE_SIZE[1],steps=20,
             seed=int(hashlib.sha256((story['run_id']+':thumbnail-v2').encode()).hexdigest()[:8],16),
-            story_scene=story['thumbnail_scene'],reference=digest(reference),strength=.80)
+            story_scene=story['thumbnail_scene'],contract=story['thumbnail_contract'],
+            viewer_question=story['thumbnail_question'],review_version=REVIEW_VERSION,export_size=list(THUMBNAIL_EXPORT_SIZE))
         target=root/'thumbnail-source.png'
         state=root/'thumbnail-manifest.json'
         current=False
-        if target.exists() and state.exists() and json.loads(state.read_text())==thumbnail_plan:
+        if state.exists() and cache_current(json.loads(state.read_text()),thumbnail_plan,target):
             try:
                 with Image.open(target) as image:
                     image.verify()
@@ -112,13 +108,14 @@ def generate_images(root, story, render_ready=False):
                 pass
         if not current:
             temp=target.with_suffix('.tmp.png')
-            generate(thumbnail_plan['prompt'],temp,seed=thumbnail_plan['seed'],
+            review=generate_reviewed(thumbnail_plan['prompt'],temp,seed=thumbnail_plan['seed'],
+                     contract=story['thumbnail_contract'],kind='thumbnail',
                      width=thumbnail_plan['width'],height=thumbnail_plan['height'],
-                     steps=20,reference_path=reference)
+                     steps=20)
             with Image.open(temp) as image:
                 image.verify()
             temp.replace(target)
-            save_json(state,thumbnail_plan)
+            save_json(state,dict(thumbnail_plan,review=review))
 
 
 def validate_timing(story, timing):

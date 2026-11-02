@@ -111,6 +111,9 @@ def validate_story(story,require_planning=True):
                 not isinstance(story.get('thumbnail_prompt'),str) or not 80<=len(story['thumbnail_prompt'])<=360 or
                 type(story.get('thumbnail_scene')) is not int or not 0<=story['thumbnail_scene']<expected):
             raise ValueError('Short story requires a complete story-grounded visual plan and thumbnail scene')
+        if require_planning and story.get('visual_plan_version'):
+            from story_visual_contract import require_visuals
+            require_visuals(story)
         repeated = repeated_scenes(scenes)
         if repeated:
             raise StoryValidationError('repeated_story_lines', dict(scenes=repeated))

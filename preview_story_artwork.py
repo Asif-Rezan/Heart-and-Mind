@@ -1,36 +1,73 @@
-"""Review-only images using the same art direction and model as story production."""
+"""Preview actual story events using the production planner, generator and visual gate."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from story_art_style import art_prompt, VERSION
 from story_thumbnail import SOURCE_SIZE, EXPORT_SIZE, export_thumbnail
-from story_image_cpu import generate, MODEL, REVISION, negative_prompt, GUIDANCE_SCALE
+from story_visual_contract import validate_contract
 
-SCENES = {
-    'background': 'Beautiful adult Indian woman with fair skin and refined features, long dark braid, turquoise sari, discovering a locked wooden chest in a sunlit attic, holding a brass key, curious expression, warm golden rays.',
-    'thumbnail': 'Large partly-open wooden chest in foreground, golden light through narrow lid gap, contents hidden. Beautiful adult Indian woman with fair skin and refined features beside chest, turquoise sari, long dark braid, wide-eyed surprise, raising brass key.',
-}
+
+def load_story(path):
+    path = Path(path)
+    if path.is_dir():
+        found = list(path.rglob('story.json'))
+        if len(found) != 1:raise ValueError('Preview requires exactly one completed story.json')
+        path = found[0]
+    return json.loads(path.read_text())
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--kind', choices=SCENES, required=True)
+    parser.add_argument('--stage', choices=['plan','generate','audit'], required=True)
+    parser.add_argument('--kind', choices=['background','thumbnail'], default='thumbnail')
+    parser.add_argument('--story', type=Path, default=Path('tests/fixtures/production-artwork-story.json'))
+    parser.add_argument('--scene-index', type=int, default=0)
     parser.add_argument('--output', type=Path, default=Path('output/story-artwork-preview'))
     args = parser.parse_args()
-    args.output.mkdir(parents=True, exist_ok=True)
-    prompt = art_prompt(SCENES[args.kind], args.kind)
-    width, height = SOURCE_SIZE if args.kind == 'thumbnail' else (1024, 576)
-    plan = dict(prompt=prompt, art_version=VERSION, model=MODEL, revision=REVISION,
-                seed=1142 if args.kind == 'background' else 8042, steps=20,
-                width=width, height=height, negative_prompt=negative_prompt(), guidance_scale=GUIDANCE_SCALE)
-    if args.kind == 'thumbnail':
-        plan.update(export_size=EXPORT_SIZE, crop='center to 16:9', resampling='lanczos')
-    (args.output/f'{args.kind}-plan.json').write_text(json.dumps(plan, indent=2))
-    generate(prompt, args.output/f'{args.kind}.png', seed=plan['seed'], steps=plan['steps'],
-             width=width, height=height)
-    if args.kind == 'thumbnail':
-        export_thumbnail(args.output/'thumbnail.png', args.output/'thumbnail.jpg')
+    args.output.mkdir(parents=True,exist_ok=True)
+    if args.stage == 'audit':
+        from story_image_review import review_image
+        rejected = review_image('tests/fixtures/rejected-letter-portrait.jpg',[
+            dict(question='What is the man holding in his hands?',answers=['letter','envelope','paper'])])
+        (args.output/'rejected-portrait-review.json').write_text(json.dumps(rejected,indent=2))
+        print(json.dumps(rejected),flush=True)
+        if rejected['passed']:raise RuntimeError('Visual gate failed to reject the actual portrait-only regression')
+        return
+    root = args.output / args.kind
+    root.mkdir(parents=True,exist_ok=True)
+    plan_path = root/'plan.json'
+    if args.stage == 'plan':
+        from story_plan import visual_batch, thumbnail_plan
+        story = load_story(args.story)
+        identity=hashlib.sha256(json.dumps(story,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        if args.kind == 'thumbnail':
+            selected = thumbnail_plan(root,story,identity)
+            index, contract = selected['thumbnail_scene'], selected['thumbnail_contract']
+            question = selected['thumbnail_question']
+        else:
+            index = args.scene_index
+            if not 0 <= index < len(story['scenes']):raise ValueError('Preview scene index outside story')
+            contract = visual_batch(root,story,[index],identity)[str(index)]
+            question = ''
+        validate_contract(contract,story['scenes'][index])
+        width,height=SOURCE_SIZE if args.kind=='thumbnail' else (1024,576)
+        plan=dict(kind=args.kind,story_run_id=story['run_id'],story_title=story['title'],
+                  story_sha256=identity,story_scene=index,narration=story['scenes'][index]['text'],
+                  cast=story['characters'],viewer_question=question,contract=contract,
+                  prompt=art_prompt(contract['prompt'],args.kind),art_version=VERSION,
+                  seed=int(identity[:8],16)+(0 if args.kind=='background' else 7001),
+                  width=width,height=height,steps=20)
+        if args.kind=='thumbnail':plan['export_size']=EXPORT_SIZE
+        plan_path.write_text(json.dumps(plan,ensure_ascii=False,indent=2))
+        return
+    from story_image_review import generate_reviewed
+    plan=json.loads(plan_path.read_text())
+    source=root/f'{args.kind}-source.png'
+    review=generate_reviewed(plan['prompt'],source,seed=plan['seed'],contract=plan['contract'],
+                             kind=args.kind,width=plan['width'],height=plan['height'],steps=plan['steps'])
+    (root/'review.json').write_text(json.dumps(review,indent=2))
+    if args.kind=='thumbnail':export_thumbnail(source,root/'thumbnail.jpg')
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__':main()

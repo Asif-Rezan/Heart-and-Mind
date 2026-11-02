@@ -1,5 +1,6 @@
 """Checkpointed outline, independent chapter workers, then one validated reservation."""
 from story_art_style import CAST_DIRECTION
+from story_visual_contract import VERSION as VISUAL_VERSION, DIRECTION as VISUAL_DIRECTION, contract_schema, validate_contract, install_visuals
 import copy
 import hashlib
 import json
@@ -536,50 +537,51 @@ def repair_repetition(root, story):
 
 
 def visual_batch(root,story,slots,identity):
-    schema=object_schema({f'scene_{i}':string(30,360) for i in slots})
+    schema=object_schema({f'scene_{i}':contract_schema() for i in slots})
     response=ask(schema,
-        'Storyboard the FINAL Hindi narration faithfully. For every requested scene return a compact English image prompt. '
-        'Show exactly the concrete action, object and location described in that text. No generic unrelated scenery. '
-        'Use the canonical age, hair, clothing colors, props and architecture consistently. State visible appearance explicitly, '
-        'not just a character name. At most two visible people. Never invent a new character or change clothes. '
-        'One action per frame, main person and prop clear, same colorful 3D storybook style. '
+        'Storyboard the FINAL Hindi narration faithfully, one literal visible event per frame. '
+        +VISUAL_DIRECTION+
+        'Use the canonical age, hair and clothing consistently. Do not replace an action with a beauty portrait. '
         +CAST_DIRECTION+
-        'Keep each prompt under about 60 English words, put action and defining appearance first. '
+        'Visual style: realistic cinematic 3D storytelling. Appearance is secondary to story action. '
         'Canonical cast: '+story['characters']+' World: '+story['world']+
         '\nCanonical plot: '+story['summary']+
         '\nFinal chronological beats for this batch: '+json.dumps(scene_context(story,slots),ensure_ascii=False)+
         '\nRequested indices: '+json.dumps(slots),
-        int(identity[:7],16)+slots[0],min(3500,400+180*len(slots)),
+        int(identity[:7],16)+slots[0],min(5000,600+450*len(slots)),
         checkpoint=Path(root)/'visual-responses'/f'{slots[0]}.json')
-    return {str(i):response[f'scene_{i}'] for i in slots}
+    return {str(i):validate_contract(response[f'scene_{i}'],story['scenes'][i]) for i in slots}
 
 
 def thumbnail_plan(root,story,identity):
-    response=ask(object_schema({'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
-                                'thumbnail_prompt':string(80,360)}),
-        'Choose the single scene that most truthfully represents this story main conflict or meaningful choice. '
-        'Also write a SEPARATE English image-generation prompt designed for a YouTube thumbnail at small mobile size. '
-        'This is a fresh composition, not a screenshot. Use the same canonical character appearance and actual '
-        'event/prop/setting of the selected scene. One dominant expressive face, one clear story object, '
-        'strong subject/background contrast, bright face lighting, bold saturated complementary colors, '
-        'uncluttered composition, instantly readable emotional stakes, no tiny details, no text or lettering. '
-        'Create curiosity about the real conflict without inventing danger, wealth, tears or plot events. '
-        +CAST_DIRECTION+
-        'Use realistic cinematic 3D storybook graphics. A beautiful adult woman may be the focal character only when she is in the actual scene; preserve her canonical age and appearance. '
-            'Show the moment before the real choice or reveal, leaving its outcome unseen to create a curiosity gap. '
-            'Start with the large story object and its unresolved visual clue, then the character reacting beside it. '
-        'Use a medium shot with face and object both clearly visible, not an isolated beauty portrait. '
-        'Keep the core composition within 40 English words, with clothing and scenery last. '
-        'No unrelated poster, invented event, or generic sunrise. Canonical cast: '+story['characters']+' World: '+story['world']+' '
+    response=ask(object_schema({
+        'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
+        'visual':contract_schema(), 'viewer_question':string(10,180)}),
+        'Design a truthful story-driven YouTube thumbnail from the FINAL spoken script. '
+        'Select an imageable conflict, costly choice or discovery BEFORE its outcome. '
+        'Avoid abstract thoughts, generic smiles, attractive headshots, and already-resolved ending scenes. '
+        'Show the actual story object/action, the affected character reacting, and the meaningful tension '
+        'between them. Use two interacting characters when the selected narration calls for it. '
+        'A single person is allowed only when the important action/object and stakes are clearly visible. '
+        'No unrelated woman for attraction, invented danger, magic glow, wealth, props or plot events. '
+        'Write viewer_question as the genuine unresolved story question this composition raises; '
+        'do not draw that text in the image or reveal the answer. '
+        +VISUAL_DIRECTION+CAST_DIRECTION+
+        'Keep faces attractive but secondary to the event. Use clear foreground action, strong separation, '
+        'readable expressions and an uncluttered medium-wide composition at mobile size. '
+        'Canonical cast: '+story['characters']+' World: '+story['world']+' '
         'Title: '+story['title']+' Summary: '+story['summary']+
         '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False),
-        int(identity[:7],16),500,checkpoint=Path(root)/'thumbnail-selection.json')
-    return dict(thumbnail_scene=response['scene'],thumbnail_prompt=response['thumbnail_prompt'])
+        int(identity[:7],16),1000,checkpoint=Path(root)/'thumbnail-selection.json')
+    scene=response['scene']
+    record=validate_contract(response['visual'],story['scenes'][scene])
+    return dict(thumbnail_scene=scene,thumbnail_prompt=record['prompt'],thumbnail_contract=record,
+                thumbnail_question=response['viewer_question'])
 
 
 def prepare_visuals(root, story):
     path=Path(root)/'visual-plan.json'
-    identity=text_hash(json.dumps(story,sort_keys=True,ensure_ascii=False))
+    identity=text_hash(json.dumps(dict(version=VISUAL_VERSION,story=story),sort_keys=True,ensure_ascii=False))
     saved=json.loads(path.read_text()) if path.exists() else {}
     if saved and saved.get('identity')!=identity:saved={}
     saved.setdefault('identity',identity);saved.setdefault('scenes',{})
@@ -588,7 +590,8 @@ def prepare_visuals(root, story):
         if not all(str(i) in saved['scenes'] for i in slots):
             saved['scenes'].update(visual_batch(root,story,slots,identity))
             save_json(path,saved)
-    if 'thumbnail_scene' not in saved or 'thumbnail_prompt' not in saved:
+    if 'thumbnail_contract' not in saved:
         saved.update(thumbnail_plan(root,story,identity));save_json(path,saved)
-    story['visuals']=saved['scenes']
-    story['thumbnail_scene']=saved['thumbnail_scene'];story['thumbnail_prompt']=saved['thumbnail_prompt']
+    install_visuals(story,saved['scenes'])
+    for field in ('thumbnail_scene','thumbnail_prompt','thumbnail_contract','thumbnail_question'):
+        story[field]=saved[field]

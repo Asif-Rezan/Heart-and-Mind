@@ -10,6 +10,7 @@ from story_writer import save_json,validate_story,StoryValidationError
 from story_planning import run_worker,join_planning,visual_indices,visual_worker_count
 from story_engagement import polish_engagement
 from test_short_story import short_story
+from test_visual_support import record_for
 from test_pipeline_sample import sample_story
 
 
@@ -19,11 +20,18 @@ def prose_fixture(sample=False):
     return story
 
 
-def planning_response(schema,*args,**kwargs):
+def planning_response(schema,prompt,*args,**kwargs):
     fields=schema['properties']
+    import re
+    # Read the supplied final narration, never supply a paraphrased evidence quote.
+    beats=json.loads(prompt.split('Final spoken beats: ')[1] if 'Final spoken beats: ' in prompt else prompt.split('Final chronological beats for this batch: ')[1].split('\nRequested indices:')[0])
+    text_by_index={b['index']:b['text'] for b in beats}
+    def record(index):
+        return dict(prompt='Ram in his blue kurta reads a letter at the counter inside his familiar village shop.',
+                    evidence=text_by_index[index][:300],checks=[dict(question='What is the man reading?',answers=['letter','paper'])])
     if 'scene' in fields:
-        return dict(scene=5,thumbnail_prompt='Ram in his blue kurta holds the story letter in his village shop, large expressive face, bright warm light and a clean contrasting blue background.')
-    return {key:'Ram in his blue kurta reads the story letter at the counter inside his familiar village shop.' for key in fields}
+        return dict(scene=5,visual=record(5),viewer_question='What decision will this letter make Ram reconsider?')
+    return {key:record(int(key.split('_')[1])) for key in fields}
 
 
 def seo_response(*args,**kwargs):

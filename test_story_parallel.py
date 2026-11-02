@@ -1,3 +1,4 @@
+from test_visual_support import attach_contracts,passed_review
 """Regression coverage for failed outline lengths and independent production workers."""
 import contextlib
 import copy
@@ -196,10 +197,10 @@ class WorkflowConcurrencyChecks(unittest.TestCase):
     def test_all_48_images_are_generated_once_across_18_workers_and_reused(self):
         from PIL import Image
         from story_video import generate_images
-        story=example_story()
+        story=attach_contracts(example_story())
         def generate(prompt,path,**kwargs):
             Image.new('RGB',(32,24),'gold').save(path)
-        with tempfile.TemporaryDirectory() as temporary,patch('story_image_cpu.generate',side_effect=generate) as model:
+        with tempfile.TemporaryDirectory() as temporary,patch('story_image_cpu.generate',side_effect=generate) as model,patch('story_image_review.review_image',side_effect=passed_review):
             root=Path(temporary)
             counts=[]
             for shard in range(18):

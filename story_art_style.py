@@ -1,5 +1,5 @@
 """Compact shared art direction, placed before scene detail for CLIP encoders."""
-VERSION = 'storybook-realistic-3d-v7'
+VERSION = 'storybook-events-3d-v8'
 CAST_DIRECTION = (
     'Give every character a fair complexion, attractive harmonious facial features and clear face lighting, '
     'while preserving their exact age, identity and distinct appearance. '
@@ -12,14 +12,8 @@ STYLE = ('Realistic cinematic 3D storybook render, attractive characters, fair s
 
 
 def art_prompt(scene, kind='background'):
-    if kind == 'thumbnail':
-        # The story object must reach CLIP before portrait/style embellishments.
-        return ('Realistic cinematic 3D storybook render, attractive faces, fair skin. '+scene+
-                ' Medium shot, object and face both prominent, natural proportions, soft dramatic lighting, no text.')
-    framing = {
-        'background': 'Medium wide shot. ',
-        'reference': 'Character portrait, fixed clothes. ',
-    }[kind]
-    return STYLE + framing + scene + (
-        ' Rich teal and gold colors, soft depth of field, no text.'
-    )
+    if kind == 'reference':
+        return 'Realistic cinematic 3D character reference. '+scene+' Natural proportions, fair skin, no text.'
+    # Action/object must lead both CLIP encoders. Appearance cannot displace the story.
+    return ('Narrative scene, medium wide shot. '+scene+
+            ' Realistic cinematic 3D storybook, expressive attractive characters, fair skin, soft light, no text.')
