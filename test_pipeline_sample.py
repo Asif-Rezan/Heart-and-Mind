@@ -1,4 +1,4 @@
-from test_visual_support import attach_contracts,record_for,passed_review
+from test_visual_support import attach_contracts,record_for,passed_review,PLAN_VERDICT
 """The one-minute sample exercises production stages with an explicit small format."""
 import copy
 import importlib.util
@@ -50,6 +50,7 @@ class SampleContracts(unittest.TestCase):
         reference=sample_story()
         def respond(schema,prompt,*args,**kwargs):
             props=schema['properties']
+            if 'faithful' in props:return PLAN_VERDICT.copy()
             if 'chapters' in props:return outline_fixture()
             if 'scene' in props:return dict(scene=5,visual=record_for(reference['scenes'][5],reference['thumbnail_prompt']),viewer_question='What will the shopkeeper decide after reading the letter?')
             if 'title' in props:return dict(title=reference['title'],description=reference['description'],tags=[f'Hindi story theme {i}' for i in range(8)])

@@ -69,6 +69,9 @@ jobs:
           run-id: ${{ inputs.source_run }}
           github-token: ${{ github.token }}
           path: output/source/
+      - name: Reject the actual invented-notebook plan before making a new thumbnail
+        if: matrix.kind == 'thumbnail'
+        run: python -u preview_story_artwork.py --stage audit-plan
       - name: Plan from final narration with exact evidence and visible-event checks
         run: |
           STORY_SOURCE=tests/fixtures/production-artwork-story.json

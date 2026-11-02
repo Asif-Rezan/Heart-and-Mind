@@ -10,7 +10,7 @@ from story_writer import save_json,validate_story,StoryValidationError
 from story_planning import run_worker,join_planning,visual_indices,visual_worker_count
 from story_engagement import polish_engagement
 from test_short_story import short_story
-from test_visual_support import record_for
+from test_visual_support import record_for,PLAN_VERDICT
 from test_pipeline_sample import sample_story
 
 
@@ -22,13 +22,15 @@ def prose_fixture(sample=False):
 
 def planning_response(schema,prompt,*args,**kwargs):
     fields=schema['properties']
+    if 'faithful' in fields:return PLAN_VERDICT.copy()
     import re
     # Read the supplied final narration, never supply a paraphrased evidence quote.
-    beats=json.loads(prompt.split('Final spoken beats: ')[1] if 'Final spoken beats: ' in prompt else prompt.split('Final chronological beats for this batch: ')[1].split('\nRequested indices:')[0])
+    beats=json.loads(prompt.split('Final spoken beats: ')[1] if 'Final spoken beats: ' in prompt else prompt.split('ONLY these requested narrated scenes may supply props and actions: ')[1].split('\nRequested indices:')[0])
     text_by_index={b['index']:b['text'] for b in beats}
     def record(index):
-        return dict(prompt='Ram in his blue kurta reads a letter at the counter inside his familiar village shop.',
-                    evidence=text_by_index[index][:300],checks=[dict(question='What is the man reading?',answers=['letter','paper'])])
+        result=record_for(dict(text=text_by_index[index],visual='Ram in his blue kurta reads a letter at the counter inside his familiar village shop.'))
+        result['checks']=[dict(question='What is the man reading?',answers=['letter','paper'])]
+        return result
     if 'scene' in fields:
         return dict(scene=5,visual=record(5),viewer_question='What decision will this letter make Ram reconsider?')
     return {key:record(int(key.split('_')[1])) for key in fields}
@@ -87,7 +89,7 @@ class ParallelPlanning(unittest.TestCase):
                 run_worker(root,story['run_id'],'thumbnail')
             path=root/'planning-visual-0.json';data=json.loads(path.read_text());data['payload']={};save_json(path,data)
             with patch('story_plan.ask',side_effect=planning_response) as model:run_worker(root,story['run_id'],'visual',0)
-            model.assert_called_once()
+            self.assertEqual(model.call_count,1+len(visual_indices(story,0)))
 
     def test_workflow_fanout_and_join_are_real_independent_github_jobs(self):
         for filename in ('stories.yml','story-plan-preview.yml'):

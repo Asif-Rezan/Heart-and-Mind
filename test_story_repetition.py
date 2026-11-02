@@ -1,4 +1,4 @@
-from test_visual_support import record_for
+from test_visual_support import record_for,PLAN_VERDICT
 """Regression for run 41293514297: three identical repair responses were accepted."""
 import copy
 import json
@@ -94,11 +94,12 @@ class RepetitionRecovery(unittest.TestCase):
         prompts=[]
         def model(schema,prompt,*args,**kwargs):
             prompts.append(prompt)
+            if 'faithful' in schema['properties']:return PLAN_VERDICT.copy()
             if 'scene' in schema['properties']:
                 return dict(scene=30,visual=record_for(story['scenes'][30],'Ram in his fixed blue kurta holds the story letter in his actual village shop before making his decision.'),viewer_question='What will Ram decide after reading the letter?')
             return {key:record_for(story['scenes'][int(key.split('_')[1])],'Ram in his fixed blue kurta handles the actual story parcel inside his village shop.') for key in schema['properties']}
         with tempfile.TemporaryDirectory() as folder,patch('story_plan.ask',side_effect=model):prepare_visuals(Path(folder),story)
         self.assertIn(story['scenes'][0]['text'],prompts[0])
-        self.assertIn(story['scenes'][8]['text'],prompts[0])
+        self.assertNotIn(story['scenes'][8]['text'],prompts[0])
         self.assertNotIn(story['scenes'][40]['text'],prompts[0])
         self.assertNotIn('DISTANT_VISUAL_PAYLOAD_SHOULD_NOT_APPEAR',''.join(prompts))

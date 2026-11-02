@@ -1,11 +1,20 @@
 """Lightweight fixtures for image orchestration tests; no model inference."""
-from story_visual_contract import install_visuals
+from story_visual_contract import install_visuals, compile_contract, REVIEW_VERSION
 from story_image_review import VERSION, MODEL, REVISION, digest
 
 
+PLAN_VERDICT=dict(faithful=True,visible_event=True,checks_observable=True,
+                  story_conflict=True,outcome_hidden=True,issues=[])
+
+
 def record_for(scene, prompt=None):
-    return dict(prompt=prompt or scene['visual'], evidence=scene['text'][:300],
-                checks=[dict(question='What is the person holding?',answers=['letter','book'])])
+    event=prompt or scene['visual']
+    if len(event)>160:event=event[:160].rsplit(' ',1)[0]
+    result=compile_contract(dict(event=event,people='The canonical shopkeeper in his fixed blue kurta',
+        setting='Inside the familiar village shop',evidence=scene['text'][:300],
+        checks=[dict(question='What is the person holding?',answers=['letter','book'])]))
+    result['planning_review']=dict(version=REVIEW_VERSION,passed=True,verdict=PLAN_VERDICT.copy())
+    return result
 
 
 def attach_contracts(story):

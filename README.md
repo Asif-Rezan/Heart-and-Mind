@@ -346,8 +346,10 @@ Owned-image artifact recovery (2026-11-02): publish job 124942547630 failed duri
 ### Story-grounded artwork and visual acceptance
 
 New visual workers plan from the final spoken narration, retaining an exact source quote,
-scene index, action-first composition and open visual questions about required story objects
-or interactions. Thumbnail selection chooses a concrete unresolved conflict/discovery and
+scene index, separate event/cast/setting fields and open visual questions about required story objects
+or interactions. Code composes the event first. A separate narrow-scene planning review
+rejects invented props/actions, abstract portrait-only choices and unobservable checks, with one
+bounded replan. It also tests rejection of an actual invented-notebook plan. Thumbnail selection chooses a concrete unresolved conflict/discovery and
 records the viewer question; attractive faces are supporting details, not the composition.
 Preview generation now takes a completed story manifest (or its Actions run), rather than
 unrelated fixed chest/letter examples.

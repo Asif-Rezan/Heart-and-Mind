@@ -1,6 +1,6 @@
 """Checkpointed outline, independent chapter workers, then one validated reservation."""
 from story_art_style import CAST_DIRECTION
-from story_visual_contract import VERSION as VISUAL_VERSION, DIRECTION as VISUAL_DIRECTION, contract_schema, validate_contract, install_visuals
+from story_visual_contract import VERSION as VISUAL_VERSION, DIRECTION as VISUAL_DIRECTION, contract_schema, composition_schema, compile_contract, assess_plan, validate_contract, install_visuals
 import copy
 import hashlib
 import json
@@ -537,48 +537,67 @@ def repair_repetition(root, story):
 
 
 def visual_batch(root,story,slots,identity):
-    schema=object_schema({f'scene_{i}':contract_schema() for i in slots})
-    response=ask(schema,
-        'Storyboard the FINAL Hindi narration faithfully, one literal visible event per frame. '
-        +VISUAL_DIRECTION+
-        'Use the canonical age, hair and clothing consistently. Do not replace an action with a beauty portrait. '
-        +CAST_DIRECTION+
-        'Visual style: realistic cinematic 3D storytelling. Appearance is secondary to story action. '
-        'Canonical cast: '+story['characters']+' World: '+story['world']+
-        '\nCanonical plot: '+story['summary']+
-        '\nFinal chronological beats for this batch: '+json.dumps(scene_context(story,slots),ensure_ascii=False)+
-        '\nRequested indices: '+json.dumps(slots),
-        int(identity[:7],16)+slots[0],min(5000,600+450*len(slots)),
-        checkpoint=Path(root)/'visual-responses'/f'{slots[0]}.json')
-    return {str(i):validate_contract(response[f'scene_{i}'],story['scenes'][i]) for i in slots}
+    accepted={};pending=list(slots);feedback=''
+    for attempt in range(2):
+        schema=object_schema({f'scene_{i}':composition_schema() for i in pending})
+        response=ask(schema,
+            'Storyboard each requested FINAL Hindi scene faithfully, one literal visible event per frame. '
+            +VISUAL_DIRECTION+CAST_DIRECTION+
+            'Style is realistic cinematic 3D storytelling. Appearance is secondary to the story event. '
+            'Canonical cast: '+story['characters']+' World: '+story['world']+
+            '\nONLY these requested narrated scenes may supply props and actions: '+json.dumps(scene_context(story,pending,neighbors=0),ensure_ascii=False)+
+            '\nRequested indices: '+json.dumps(pending)+feedback,
+            int(identity[:7],16)+slots[0]+attempt*1009,min(5000,600+450*len(pending)),
+            checkpoint=Path(root)/'visual-responses'/f'{slots[0]}-{attempt}.json')
+        errors={}
+        for i in pending:
+            try:
+                record=validate_contract(compile_contract(response[f'scene_{i}']),story['scenes'][i])
+                review=assess_plan(record,story['scenes'][i],story['characters'],story['world'],
+                    int(identity[:7],16)+i+attempt*1009,Path(root)/'visual-reviews'/f'{i}-{attempt}.json',ask_fn=ask)
+                if not review['passed']:raise ValueError(json.dumps(review['verdict']['issues']))
+                record['planning_review']=review;accepted[str(i)]=record
+            except ValueError as exc:errors[i]=str(exc)[:650]
+        if not errors:return accepted
+        pending=list(errors)
+        feedback='\nPrevious compositions were rejected. Correct these issues without changing narration: '+json.dumps(errors)
+        save_json(Path(root)/'visual-plan-rejections.json',errors)
+    raise StoryValidationError('visual_planning_rejected',dict(scenes=pending))
 
 
 def thumbnail_plan(root,story,identity):
-    visual_schema=contract_schema()
-    visual_schema['properties']['prompt']['minLength']=80
-    response=ask(object_schema({
-        'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
-        'visual':visual_schema, 'viewer_question':string(10,180)}),
-        'Design a truthful story-driven YouTube thumbnail from the FINAL spoken script. '
-        'Select an imageable conflict, costly choice or discovery BEFORE its outcome. '
-        'Avoid abstract thoughts, generic smiles, attractive headshots, and already-resolved ending scenes. '
-        'Show the actual story object/action, the affected character reacting, and the meaningful tension '
-        'between them. Use two interacting characters when the selected narration calls for it. '
-        'A single person is allowed only when the important action/object and stakes are clearly visible. '
-        'No unrelated woman for attraction, invented danger, magic glow, wealth, props or plot events. '
-        'Write viewer_question as the genuine unresolved story question this composition raises; '
-        'do not draw that text in the image or reveal the answer. '
-        +VISUAL_DIRECTION+CAST_DIRECTION+
-        'Keep faces attractive but secondary to the event. Use clear foreground action, strong separation, '
-        'readable expressions and an uncluttered medium-wide composition at mobile size. '
-        'Canonical cast: '+story['characters']+' World: '+story['world']+' '
-        'Title: '+story['title']+' Summary: '+story['summary']+
-        '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False),
-        int(identity[:7],16),1000,checkpoint=Path(root)/'thumbnail-selection.json')
-    scene=response['scene']
-    record=validate_contract(response['visual'],story['scenes'][scene])
-    return dict(thumbnail_scene=scene,thumbnail_prompt=record['prompt'],thumbnail_contract=record,
-                thumbnail_question=response['viewer_question'])
+    feedback=''
+    for attempt in range(2):
+        response=ask(object_schema({
+            'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
+            'visual':composition_schema(), 'viewer_question':string(10,180)}),
+            'Design a truthful story-driven YouTube thumbnail from the FINAL spoken script. '
+            'Prioritize a concrete scene with TWO interacting/opposing characters and an important story object '
+            'over passive thinking, scenery or a solo portrait. Select the conflict/choice BEFORE its outcome. '
+            'A single character is allowed only when their visible action/object makes the stakes clear. '
+            'Reject abstract internal realizations as thumbnail choices. Do not borrow a notebook or any other '
+            'object/action from another scene. No unrelated woman, invented danger, magic glow, wealth or plot event. '
+            'Write viewer_question as the real unresolved question the composition raises; do not draw it '
+            'in the image or reveal its answer. '
+            +VISUAL_DIRECTION+CAST_DIRECTION+
+            'Keep faces attractive but secondary to foreground action and readable conflict. '
+            'Canonical cast: '+story['characters']+' World: '+story['world']+' '
+            'Title: '+story['title']+' Summary: '+story['summary']+
+            '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False)+feedback,
+            int(identity[:7],16)+attempt*1009,1200,checkpoint=Path(root)/f'thumbnail-selection-{attempt}.json')
+        scene=response['scene']
+        try:
+            record=validate_contract(compile_contract(response['visual']),story['scenes'][scene])
+            review=assess_plan(record,story['scenes'][scene],story['characters'],story['world'],
+                int(identity[:7],16)+scene+attempt*1009,Path(root)/f'thumbnail-review-{attempt}.json',response['viewer_question'],ask_fn=ask)
+            if not review['passed']:raise ValueError(json.dumps(review['verdict']['issues']))
+            record['planning_review']=review
+            return dict(thumbnail_scene=scene,thumbnail_prompt=record['prompt'],thumbnail_contract=record,
+                        thumbnail_question=response['viewer_question'])
+        except ValueError as exc:
+            feedback='\nYour previous scene '+str(scene)+' composition was rejected: '+str(exc)[:800]+'. Choose an actual visible conflict and correct the facts.'
+            save_json(Path(root)/'thumbnail-plan-rejection.json',dict(scene=scene,reason=str(exc)))
+    raise StoryValidationError('thumbnail_planning_rejected')
 
 
 def prepare_visuals(root, story):

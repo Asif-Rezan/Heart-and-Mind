@@ -8,7 +8,7 @@ from unittest.mock import patch
 from PIL import Image
 from story_visual_contract import validate_contract, require_visuals
 from story_image_review import generate_reviewed, cache_current, digest, matches
-from test_visual_support import record_for,passed_review,attach_contracts
+from test_visual_support import record_for,passed_review,attach_contracts,PLAN_VERDICT
 from test_short_story import short_story
 
 
@@ -26,6 +26,19 @@ class StoryVisualChecks(unittest.TestCase):
         self.assertLessEqual(len(fixed['prompt']),360)
         self.assertEqual(fixed['evidence'],record['evidence'])
         self.assertEqual(fixed['checks'],record['checks'])
+
+    def test_invented_plan_is_rejected_and_replanned_before_any_image_generation(self):
+        from story_plan import visual_batch
+        story=short_story();first=record_for(story['scenes'][0],'A shopkeeper opens a magical treasure chest inside his village shop.')
+        corrected=record_for(story['scenes'][0],'A shopkeeper opens his actual story letter beside the village shop counter.')
+        rejected=PLAN_VERDICT.copy();rejected.update(faithful=False,issues=['The chest is not in the narrated scene.'])
+        with tempfile.TemporaryDirectory() as folder,patch('story_plan.ask',side_effect=[
+                {'scene_0':first},rejected,{'scene_0':corrected},PLAN_VERDICT.copy()]) as model:
+            result=visual_batch(Path(folder),story,[0],'1234567')
+            self.assertEqual(model.call_count,4)
+            self.assertIn('chest is not',model.call_args_list[2].args[1])
+            self.assertTrue(result['0']['planning_review']['passed'])
+            self.assertTrue(result['0']['prompt'].startswith(corrected['event']))
 
     def test_paraphrased_or_other_scene_evidence_is_rejected(self):
         scene=dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and begins reading beside the counter.')

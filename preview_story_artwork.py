@@ -19,7 +19,7 @@ def load_story(path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--stage', choices=['plan','generate','audit'], required=True)
+    parser.add_argument('--stage', choices=['plan','generate','audit','audit-plan'], required=True)
     parser.add_argument('--kind', choices=['background','thumbnail'], default='thumbnail')
     parser.add_argument('--story', type=Path, default=Path('tests/fixtures/production-artwork-story.json'))
     parser.add_argument('--scene-index', type=int, default=0)
@@ -33,6 +33,15 @@ def main():
         (args.output/'rejected-portrait-review.json').write_text(json.dumps(rejected,indent=2))
         print(json.dumps(rejected),flush=True)
         if rejected['passed']:raise RuntimeError('Visual gate failed to reject the actual portrait-only regression')
+        return
+    if args.stage == 'audit-plan':
+        from story_visual_contract import assess_plan
+        old=json.loads(Path('tests/fixtures/rejected-notebook-plan.json').read_text())
+        verdict=assess_plan(old['contract'],dict(text=old['narration']),old['cast'],
+            load_story(args.story)['world'],73192,args.output/'rejected-plan-review-raw.json',old['viewer_question'])
+        (args.output/'rejected-plan-review.json').write_text(json.dumps(verdict,indent=2))
+        print(json.dumps(verdict),flush=True)
+        if verdict['verdict']['faithful']:raise RuntimeError('Planner reviewer failed to reject the invented notebook regression')
         return
     root = args.output / args.kind
     root.mkdir(parents=True,exist_ok=True)
