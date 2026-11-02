@@ -536,10 +536,16 @@ def repair_repetition(root, story):
             requests=saved['requests'],rejections=saved['rejections']))
 
 
+def scene_composition_schema(scene):
+    schema=composition_schema()
+    schema['properties']['evidence']['enum']=[scene['text'][:360]]
+    return schema
+
+
 def _visual_batch(root,story,slots,identity):
     accepted={};pending=list(slots);feedback=''
     for attempt in range(2):
-        schema=object_schema({f'scene_{i}':composition_schema() for i in pending})
+        schema=object_schema({f'scene_{i}':scene_composition_schema(story['scenes'][i]) for i in pending})
         response=ask(schema,
             'Storyboard each requested FINAL Hindi scene faithfully, one literal visible event per frame. '
             +VISUAL_DIRECTION+CAST_DIRECTION+
@@ -573,11 +579,14 @@ def _visual_batch(root,story,slots,identity):
 
 def _thumbnail_plan(root,story,identity):
     feedback=''
+    opening=list(range(min(8,len(story['scenes']))))
+    visual_schema=composition_schema()
+    visual_schema['properties']['evidence']['enum']=[story['scenes'][i]['text'][:360] for i in opening]
     for attempt in range(2):
         response=ask(object_schema({
-            'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
-            'visual':composition_schema(), 'viewer_question':english_planning(10,180)}),
-            'Design a truthful story-driven YouTube thumbnail from the FINAL spoken script. '
+            'scene':{'type':'integer','enum':opening},
+            'visual':visual_schema, 'viewer_question':english_planning(10,180)}),
+            'Design a truthful story-driven YouTube thumbnail from these opening FINAL spoken beats, before the resolution. '
             'Prioritize a concrete scene with TWO interacting/opposing characters and an important story object '
             'over passive thinking, scenery or a solo portrait. Select the conflict/choice BEFORE its outcome. '
             'A single character is allowed only when their visible action/object makes the stakes clear. '
@@ -588,8 +597,8 @@ def _thumbnail_plan(root,story,identity):
             +VISUAL_DIRECTION+CAST_DIRECTION+
             'Keep faces attractive but secondary to foreground action and readable conflict. '
             'Canonical cast: '+story['characters']+' World: '+story['world']+' '
-            'Title: '+story['title']+' Summary: '+story['summary']+
-            '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False)+feedback,
+            'Title: '+story['title']+
+            '\nFinal spoken beats: '+json.dumps(scene_context(story,opening,neighbors=0),ensure_ascii=False)+feedback,
             int(identity[:7],16)+attempt*1009,1200,checkpoint=Path(root)/f'thumbnail-selection-{attempt}.json')
         scene=response['scene']
         try:

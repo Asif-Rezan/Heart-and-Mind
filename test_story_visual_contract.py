@@ -138,13 +138,20 @@ class StoryVisualChecks(unittest.TestCase):
             thumb=thumbnail_plan(Path(folder),story,'1234567')
             self.assertTrue(is_fallback(thumb['thumbnail_contract']))
 
+    def test_source_quote_decoder_can_only_copy_the_actual_requested_narration(self):
+        from story_plan import scene_composition_schema
+        scene=dict(text='बारिश में निति का खिलौना टूट गया।')
+        schema=scene_composition_schema(scene)
+        self.assertEqual(schema['properties']['evidence']['enum'],[scene['text']])
+
     def test_literal_recovery_discards_rejected_action_and_never_claims_approval(self):
         from story_visual_contract import literal_recovery,is_fallback
         scene=dict(text='बारिश में निति का खिलौना टूट गया।',visual='The toy is broken in the rain.')
-        raw=dict(literal_scene="Niti's toy is broken in the rain.",event='Father throws the toy away.',
+        raw=dict(evidence=scene['text'],literal_scene="Niti's toy is broken in the rain.",event='Father throws the toy away.',
                  people='Arjun, 38, brown shirt; Niti, 10, red kurta',setting='A village porch')
         record=literal_recovery(scene,raw,'rejected')
         self.assertTrue(is_fallback(record))
+        self.assertIsNone(literal_recovery(scene,dict(raw,evidence='बनाया हुआ उद्धरण।'),'rejected'))
         self.assertNotIn('throws',record['prompt'])
         self.assertFalse(record['planning_review']['passed'])
         self.assertEqual(record['checks'][0]['answers'],['toy'])

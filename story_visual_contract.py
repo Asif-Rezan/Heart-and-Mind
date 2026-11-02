@@ -1,7 +1,7 @@
 """Tie every composition and visual check to an exact spoken story scene."""
 import re
 
-VERSION = 'story-events-v4'
+VERSION = 'story-events-v5'
 ENGLISH_PATTERN = r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$'
 
 
@@ -199,6 +199,8 @@ def fallback_contract(scene, world, reason):
 
 def literal_recovery(scene, candidate, reason):
     """Reuse the translation, never the rejected composition's invented action."""
+    evidence=candidate.get('evidence','')
+    if not evidence or evidence not in scene['text']:return None
     literal=candidate.get('literal_scene','').strip()
     if len(literal)<15 or not re.fullmatch(ENGLISH_PATTERN,literal):return None
     nouns=('notebook','letter','toy','book','door','key','box','bag','photograph','phone','tree','house','school')

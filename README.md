@@ -388,3 +388,8 @@ four seconds for short stories, matched to the overlapping narrated beat.
 Preview background and thumbnail workers now plan and generate independently, so a slow thumbnail
 plan cannot hold back the background image. Literal translation recovery discards the rejected
 composition action and records an unapproved planning fallback; it is not a passed semantic audit.
+
+Thumbnail planning is restricted to the opening eight narrated beats before the payoff. Exact
+source quotes are decoder enums, preventing invented evidence. Literal recovery is allowed only
+when the proposed quote actually belongs to the selected scene; fabricated/mismatched evidence
+uses a neutral fallback instead. Translation recovery remains explicitly unapproved.
