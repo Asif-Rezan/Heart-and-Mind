@@ -1,3 +1,4 @@
+from test_visual_support import attach_contracts,record_for,passed_review,PLAN_VERDICT
 """The one-minute sample exercises production stages with an explicit small format."""
 import copy
 import importlib.util
@@ -49,8 +50,9 @@ class SampleContracts(unittest.TestCase):
         reference=sample_story()
         def respond(schema,prompt,*args,**kwargs):
             props=schema['properties']
+            if 'faithful' in props:return PLAN_VERDICT.copy()
             if 'chapters' in props:return outline_fixture()
-            if 'scene' in props:return dict(scene=5,thumbnail_prompt=reference['thumbnail_prompt'])
+            if 'scene' in props:return dict(scene=5,visual=record_for(reference['scenes'][5],reference['thumbnail_prompt']),viewer_question='What will the shopkeeper decide after reading the letter?')
             if 'title' in props:return dict(title=reference['title'],description=reference['description'],tags=[f'Hindi story theme {i}' for i in range(8)])
             result={}
             checkpoint=Path(kwargs['checkpoint'])
@@ -58,7 +60,7 @@ class SampleContracts(unittest.TestCase):
             for key,spec in props.items():
                 index=int(key.split('_')[-1])
                 scene=reference['scenes'][(chapter*2+index) if chapter is not None else index]
-                result[key]=dict(text=scene['text'],visual=scene['visual']) if spec['type']=='object' else reference['visuals'][str(index)]
+                result[key]=(record_for(scene,reference['visuals'][str(index)]) if 'evidence' in spec.get('properties',{}) else dict(text=scene['text'],visual=scene['visual'])) if spec['type']=='object' else reference['visuals'][str(index)]
             return result
         with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{'STORY_FORMAT':SAMPLE_FORMAT}),patch('story_plan.ask',side_effect=respond),patch('story_packaging.ask',side_effect=respond),patch('story_engagement.ask',return_value=dict(hook=True,progression=True,payoff=True,cta=True,repairs=[])):
             root=Path(folder)
@@ -111,7 +113,8 @@ class SamePipelineMedia(unittest.TestCase):
             with patch('story_music_cpu.generate_segment',side_effect=music):
                 for i in range(3):generate_score_part(root,story,i)
             mix_score(root,story,timing)
-            with patch('story_image_cpu.generate',side_effect=image):generate_images(root,story)
+            attach_contracts(story)
+            with patch('story_image_cpu.generate',side_effect=image),patch('story_image_review.review_image',side_effect=passed_review):generate_images(root,story)
             render(root,story,timing,width=128,height=72)
             self.assertAlmostEqual(duration(root/'video.mp4'),timing['duration'],places=1)
             self.assertAlmostEqual(duration(root/'song.wav'),timing['duration'],delta=.05)

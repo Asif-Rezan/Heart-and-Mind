@@ -1,0 +1,55 @@
+{
+  "kind": "background",
+  "story_run_id": "story-2026-11-02-new-1044",
+  "story_title": "खिलौने का टूटना या बचाव? एक घर की शिक्षा की चुनाव, Emotional Hindi Story",
+  "story_sha256": "e4a869f53b7965deadf97d7020444a90ac4dddc5a4e68af4d53e813cecdf09f1",
+  "story_scene": 0,
+  "narration": "बारिश में निति का खिलौना टूट गया, पिता नाराज होकर कहता है, इसे हमेशा नहीं।",
+  "cast": "Rajeshwari, 42, white kurta with blue borders, grey chunni, black hair tied in bun; Arjun, 38, brown shirt with yellow vest, short black hair, walks with quiet intensity; Niti, 10, red cotton kurta with green sari, curly black hair, always carries a small notebook.",
+  "viewer_question": "",
+  "contract": {
+    "event": "Arjun picks up the broken toy from the ground and throws it into the dust pile near the porch",
+    "people": "Arjun, 38, brown shirt with yellow vest, short black hair; Niti, 10, red cotton kurta with green sari, curly black hair",
+    "setting": "Village porch with painted yellow door",
+    "evidence": "पिता नाराज होकर कहता है, इसे हमेशा नहीं।",
+    "checks": [
+      {
+        "question": "What object is thrown",
+        "answers": [
+          "toy"
+        ]
+      },
+      {
+        "question": "Where is the toy placed",
+        "answers": [
+          "dust pile"
+        ]
+      },
+      {
+        "question": "Who performs the action",
+        "answers": [
+          "Arjun"
+        ]
+      }
+    ],
+    "prompt": "Arjun picks up the broken toy from the ground and throws it into the dust pile near the porch. Arjun, 38, brown shirt with yellow vest, short black hair; Niti, 10, red cotton kurta with green sari, curly black hair. Village porch with painted yellow door.",
+    "planning_review": {
+      "version": "literal-scene-review-v1",
+      "passed": true,
+      "verdict": {
+        "faithful": true,
+        "visible_event": true,
+        "checks_observable": true,
+        "story_conflict": false,
+        "outcome_hidden": false,
+        "issues": []
+      }
+    }
+  },
+  "prompt": "Realistic 3D narrative scene. Arjun picks up the broken toy from the ground and throws it into the dust pile near the porch. Arjun, 38, brown shirt with yellow vest, short black hair; Niti, 10, red cotton kurta with green sari, curly black hair. Village porch with painted yellow door. Realistic cinematic 3D storybook, expressive attractive characters, fair skin, soft light, no text.",
+  "art_version": "storybook-events-3d-v9",
+  "seed": 3836242421,
+  "width": 1024,
+  "height": 576,
+  "steps": 20
+}

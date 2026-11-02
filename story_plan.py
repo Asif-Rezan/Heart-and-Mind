@@ -1,11 +1,12 @@
 """Checkpointed outline, independent chapter workers, then one validated reservation."""
 from story_art_style import CAST_DIRECTION
+from story_visual_contract import VERSION as VISUAL_VERSION, DIRECTION as VISUAL_DIRECTION, contract_schema, composition_schema, compile_contract, assess_plan, validate_contract, install_visuals
 import copy
 import hashlib
 import json
 from pathlib import Path
 from story_writer import (ask, OUTLINE, CHAPTER, VERSION, VOICES, save_json,
-                          validate_story, novelty_reason, text_hash, StoryValidationError, object_schema, string, speech_issues, normalize_planning)
+                          validate_story, novelty_reason, text_hash, StoryValidationError, object_schema, string, speech_issues, normalize_planning, english_planning)
 
 from story_engagement import chapter_direction
 from story_format import FORMAT, MIN_WORDS, MAX_WORDS, SAMPLE_FORMAT, is_short, is_sample, scenes_per_chapter, word_bounds
@@ -535,51 +536,115 @@ def repair_repetition(root, story):
             requests=saved['requests'],rejections=saved['rejections']))
 
 
+def scene_composition_schema(scene):
+    schema=composition_schema()
+    schema['properties']['evidence']['enum']=[scene['text'][:360]]
+    return schema
+
+
+def _visual_batch(root,story,slots,identity):
+    accepted={};pending=list(slots);feedback=''
+    for attempt in range(2):
+        schema=object_schema({f'scene_{i}':scene_composition_schema(story['scenes'][i]) for i in pending})
+        response=ask(schema,
+            'Storyboard each requested FINAL Hindi scene faithfully, one literal visible event per frame. '
+            +VISUAL_DIRECTION+CAST_DIRECTION+
+            'Style is realistic cinematic 3D storytelling. Appearance is secondary to the story event. '
+            'Canonical cast: '+story['characters']+' World: '+story['world']+
+            '\nONLY these requested narrated scenes may supply props and actions: '+json.dumps(scene_context(story,pending,neighbors=0),ensure_ascii=False)+
+            '\nRequested indices: '+json.dumps(pending)+feedback,
+            int(identity[:7],16)+slots[0]+attempt*1009,min(5000,600+450*len(pending)),
+            checkpoint=Path(root)/'visual-responses'/f'{slots[0]}-{attempt}.json')
+        errors={}
+        for i in pending:
+            try:
+                record=validate_contract(compile_contract(response[f'scene_{i}']),story['scenes'][i])
+                review=assess_plan(record,story['scenes'][i],story['characters'],story['world'],
+                    int(identity[:7],16)+i+attempt*1009,Path(root)/'visual-reviews'/f'{i}-{attempt}.json',ask_fn=ask)
+                if not review['passed']:raise ValueError(json.dumps(review['verdict']['issues']))
+                record['planning_review']=review;accepted[str(i)]=record
+            except ValueError as exc:errors[i]=str(exc)[:650]
+        if not errors:return accepted
+        pending=list(errors)
+        feedback='\nPrevious compositions were rejected. Correct these issues without changing narration: '+json.dumps(errors)
+        save_json(Path(root)/'visual-plan-rejections.json',errors)
+    from story_visual_contract import literal_recovery, fallback_contract
+    for i in pending:
+        recovered=literal_recovery(story['scenes'][i],response[f'scene_{i}'],'visual_planning_rejected')
+        accepted[str(i)]=recovered or fallback_contract(story['scenes'][i],story['world'],'visual_planning_rejected')
+    save_json(Path(root)/'visual-fallbacks'/f'{slots[0]}.json',{str(i):accepted[str(i)]['fallback'] for i in pending})
+    print(json.dumps(dict(phase='visual planning fallback',scenes=pending)),flush=True)
+    return accepted
+
+
+def _thumbnail_plan(root,story,identity):
+    # Selection sees opening beats; composition sees exactly ONE selected beat.
+    opening=list(range(min(8,len(story['scenes']))));remaining=opening.copy()
+    feedback='';records={}
+    for attempt in range(2):
+        response=ask(object_schema({
+            'scene':{'type':'integer','enum':remaining},
+            'viewer_question':english_planning(10,180)}),
+            'Select ONE opening narrated beat for a truthful YouTube thumbnail BEFORE its outcome. '
+            'Choose a concrete visible conflict/discovery with an important object and interacting characters. '
+            'Reject abstract thoughts and passive portraits. Return only its index and a genuine unresolved '
+            'viewer question. Do not compose the image or add any facts. '
+            '\nFinal spoken beats: '+json.dumps(scene_context(story,remaining,neighbors=0),ensure_ascii=False)+feedback,
+            int(identity[:7],16)+attempt*1009,260,checkpoint=Path(root)/f'thumbnail-selection-{attempt}.json')
+        scene=response['scene']
+        if scene not in remaining:raise ValueError('thumbnail_selection_outside_opening')
+        record=visual_batch(Path(root)/'thumbnail-composition',story,[scene],identity)[str(scene)]
+        records[scene]=record
+        review=assess_plan(record,story['scenes'][scene],story['characters'],story['world'],
+            int(identity[:7],16)+scene+attempt*1009,Path(root)/f'thumbnail-review-{attempt}.json',response['viewer_question'],ask_fn=ask)
+        if review['passed'] and not record.get('fallback'):
+            record['planning_review']=review
+            return dict(thumbnail_scene=scene,thumbnail_prompt=record['prompt'],thumbnail_contract=record,
+                        thumbnail_question=response['viewer_question'])
+        remaining.remove(scene)
+        feedback='\nRejected choice '+str(scene)+': '+json.dumps(review['verdict'].get('issues',[]))+'. Choose another concrete opening event.'
+        save_json(Path(root)/'thumbnail-plan-rejection.json',dict(scene=scene,reason=feedback))
+        if not remaining:break
+    # A single-scene opening recovery cannot borrow props from other selected beats.
+    record=records.get(0) or visual_batch(Path(root)/'thumbnail-opening-recovery',story,[0],identity)['0']
+    record=copy.deepcopy(record)
+    record['fallback']=dict(mode='scene-recovery',literal_event=record['event'],reason='thumbnail_planning_rejected')
+    from story_visual_contract import REVIEW_VERSION
+    record['planning_review']=dict(version=REVIEW_VERSION,passed=False,issues=['Opening scene recovery; thumbnail audit not approved.'])
+    anchor=record['checks'][0]['answers'][0]
+    question='What will happen next to the '+anchor+'?'
+    save_json(Path(root)/'thumbnail-fallback.json',record)
+    print(json.dumps(dict(phase='thumbnail planning fallback',mode='opening-scene',scene=0)),flush=True)
+    return dict(thumbnail_scene=0,thumbnail_prompt=record['prompt'],thumbnail_contract=record,thumbnail_question=question)
+
+
 def visual_batch(root,story,slots,identity):
-    schema=object_schema({f'scene_{i}':string(30,360) for i in slots})
-    response=ask(schema,
-        'Storyboard the FINAL Hindi narration faithfully. For every requested scene return a compact English image prompt. '
-        'Show exactly the concrete action, object and location described in that text. No generic unrelated scenery. '
-        'Use the canonical age, hair, clothing colors, props and architecture consistently. State visible appearance explicitly, '
-        'not just a character name. At most two visible people. Never invent a new character or change clothes. '
-        'One action per frame, main person and prop clear, same colorful 3D storybook style. '
-        +CAST_DIRECTION+
-        'Keep each prompt under about 60 English words, put action and defining appearance first. '
-        'Canonical cast: '+story['characters']+' World: '+story['world']+
-        '\nCanonical plot: '+story['summary']+
-        '\nFinal chronological beats for this batch: '+json.dumps(scene_context(story,slots),ensure_ascii=False)+
-        '\nRequested indices: '+json.dumps(slots),
-        int(identity[:7],16)+slots[0],min(3500,400+180*len(slots)),
-        checkpoint=Path(root)/'visual-responses'/f'{slots[0]}.json')
-    return {str(i):response[f'scene_{i}'] for i in slots}
+    try:
+        return _visual_batch(root,story,slots,identity)
+    except Exception as exc:
+        from story_visual_contract import fallback_contract
+        reason=type(exc).__name__
+        records={str(i):fallback_contract(story['scenes'][i],story['world'],reason) for i in slots}
+        save_json(Path(root)/'visual-fallbacks'/f'{slots[0]}.json',dict(reason=reason,scenes=slots))
+        print(json.dumps(dict(phase='visual planning fallback',scenes=slots,error_type=reason)),flush=True)
+        return records
 
 
 def thumbnail_plan(root,story,identity):
-    response=ask(object_schema({'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
-                                'thumbnail_prompt':string(80,360)}),
-        'Choose the single scene that most truthfully represents this story main conflict or meaningful choice. '
-        'Also write a SEPARATE English image-generation prompt designed for a YouTube thumbnail at small mobile size. '
-        'This is a fresh composition, not a screenshot. Use the same canonical character appearance and actual '
-        'event/prop/setting of the selected scene. One dominant expressive face, one clear story object, '
-        'strong subject/background contrast, bright face lighting, bold saturated complementary colors, '
-        'uncluttered composition, instantly readable emotional stakes, no tiny details, no text or lettering. '
-        'Create curiosity about the real conflict without inventing danger, wealth, tears or plot events. '
-        +CAST_DIRECTION+
-        'Use realistic cinematic 3D storybook graphics. A beautiful adult woman may be the focal character only when she is in the actual scene; preserve her canonical age and appearance. '
-            'Show the moment before the real choice or reveal, leaving its outcome unseen to create a curiosity gap. '
-            'Start with the large story object and its unresolved visual clue, then the character reacting beside it. '
-        'Use a medium shot with face and object both clearly visible, not an isolated beauty portrait. '
-        'Keep the core composition within 40 English words, with clothing and scenery last. '
-        'No unrelated poster, invented event, or generic sunrise. Canonical cast: '+story['characters']+' World: '+story['world']+' '
-        'Title: '+story['title']+' Summary: '+story['summary']+
-        '\nFinal spoken beats: '+json.dumps(scene_context(story,range(len(story['scenes'])),neighbors=0),ensure_ascii=False),
-        int(identity[:7],16),500,checkpoint=Path(root)/'thumbnail-selection.json')
-    return dict(thumbnail_scene=response['scene'],thumbnail_prompt=response['thumbnail_prompt'])
+    try:
+        return _thumbnail_plan(root,story,identity)
+    except Exception as exc:
+        from story_visual_contract import fallback_contract
+        record=fallback_contract(story['scenes'][0],story['world'],type(exc).__name__)
+        save_json(Path(root)/'thumbnail-fallback.json',record)
+        print(json.dumps(dict(phase='thumbnail planning fallback',error_type=type(exc).__name__)),flush=True)
+        return dict(thumbnail_scene=0,thumbnail_prompt=record['prompt'],thumbnail_contract=record,
+                    thumbnail_question='What happens next in this story?')
 
 
 def prepare_visuals(root, story):
     path=Path(root)/'visual-plan.json'
-    identity=text_hash(json.dumps(story,sort_keys=True,ensure_ascii=False))
+    identity=text_hash(json.dumps(dict(version=VISUAL_VERSION,story=story),sort_keys=True,ensure_ascii=False))
     saved=json.loads(path.read_text()) if path.exists() else {}
     if saved and saved.get('identity')!=identity:saved={}
     saved.setdefault('identity',identity);saved.setdefault('scenes',{})
@@ -588,7 +653,8 @@ def prepare_visuals(root, story):
         if not all(str(i) in saved['scenes'] for i in slots):
             saved['scenes'].update(visual_batch(root,story,slots,identity))
             save_json(path,saved)
-    if 'thumbnail_scene' not in saved or 'thumbnail_prompt' not in saved:
+    if 'thumbnail_contract' not in saved:
         saved.update(thumbnail_plan(root,story,identity));save_json(path,saved)
-    story['visuals']=saved['scenes']
-    story['thumbnail_scene']=saved['thumbnail_scene'];story['thumbnail_prompt']=saved['thumbnail_prompt']
+    install_visuals(story,saved['scenes'])
+    for field in ('thumbnail_scene','thumbnail_prompt','thumbnail_contract','thumbnail_question'):
+        story[field]=saved[field]

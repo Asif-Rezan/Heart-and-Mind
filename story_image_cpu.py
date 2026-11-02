@@ -42,11 +42,11 @@ GUIDANCE_SCALE = 7.0
 
 
 def negative_prompt():
-    return ('cartoon, caricature, oversized eyes, clay, doll, toy, flat 2D, anime, '
+    return ('cartoon, caricature, oversized eyes, clay, doll, flat 2D, anime, '
             'distorted face, crossed eyes, fused faces, extra fingers, '
             'text, letters, captions, typography, watermark, logo, '
             'waxy skin, plastic skin, orange skin, underexposed faces, silhouette, '
-            'extra people, duplicated face, cropped head, deformed hands, extra limbs, '
+            'duplicated face, cropped head, deformed hands, extra limbs, '
             'blur, low quality, horror, collage, split screen, border, '
             + os.getenv('IMAGE_NEGATIVE_PROMPT', ''))
 
@@ -56,7 +56,7 @@ def negative_prompt():
 _pipeline = None
 _reference_pipeline = None
 
-def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_path=None):
+def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_path=None, negative_extra=""):
     if allow_text:
         raise ValueError('Heart and Mind story artwork must be text-free')
     global _pipeline, _reference_pipeline
@@ -95,22 +95,22 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
     image = None
     initial_prompt = safer_prompt(prompt)
     rewritten = safer_prompt(prompt + ' Fully clothed, nonviolent scene, preserve the described action and setting.')
-    for attempt in range(10):
-        # Five seeds per composition; keep input sanitization and output checks.
-        candidate = initial_prompt if attempt < 5 else rewritten
-        if attempt == 5:
-            print('Five safety rejections; retrying a restrained story scene.', flush=True)
+    for attempt in range(2):
+        # One seed for each safe composition; avoid exhausting the image worker.
+        candidate = initial_prompt if attempt == 0 else rewritten
+        if attempt == 1:
+            print('Safety rejection; retrying a restrained story scene.', flush=True)
         reference_args=dict(image=reference,strength=.80) if reference is not None else {}
-        result = pipeline(**reference_args, prompt=candidate, negative_prompt=negative_prompt(), width=width, height=height,
+        result = pipeline(**reference_args, prompt=candidate, negative_prompt=negative_extra+", "+negative_prompt(), width=width, height=height,
             num_inference_steps=steps, guidance_scale=GUIDANCE_SCALE,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):
-            print(f'Image safety check rejected attempt {attempt+1}/10.', flush=True)
+            print(f'Image safety check rejected attempt {attempt+1}/2.', flush=True)
             continue
         image = result.images[0]
         break
     if image is None:
-        raise ImageSafetyBlocked('Image blocked after five initial and five rewritten-prompt attempts; preserve run for review')
+        raise ImageSafetyBlocked('Image blocked after two safety-checked attempts; use a neutral fallback')
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
     print(f'CPU image generated: {image.width}x{image.height}; {time.monotonic()-start:.1f}s', flush=True)

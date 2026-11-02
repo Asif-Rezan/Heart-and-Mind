@@ -341,3 +341,70 @@ Audio-mix recovery (2026-11-01): mix job 124900325814 in run 41321499778 produce
 
 
 Owned-image artifact recovery (2026-11-02): publish job 124942547630 failed during prepared-clip validation, before any YouTube upload. Resumed image workers inherited a full prior media snapshot and uploaded other workers' restored images/clip manifests. Parallel merged downloads could mix independently overwritten versions. Two downloaded production artifacts each contained 244 files; replaying a foreign worker's clip metadata over the owner's image reproduced a stale clip. Image workers now package only their own scene indices, manifest, clips and cast reference; only worker zero owns the thumbnail. Image downloads remain separate until an ownership-aware restore selects each scene from its worker. Legacy full-snapshot artifacts are recovered the same way, after other broad checkpoints. Render failures identify missing assets, stale scene indices or exact duration mismatches instead of a generic ValueError. The Publish saved Hindi story video workflow accepts assemble=true to join existing clips/audio and publish with existing duplicate-upload guards, without model generation. Ten actual owned clips from two failed-run artifacts passed validation after this restore.
+
+
+### Story-grounded artwork and visual acceptance
+
+New visual workers plan from the final spoken narration, retaining an exact source quote,
+scene index, separate event/cast/setting fields and open visual questions about required story objects
+or interactions. Code composes the event first. A separate narrow-scene planning review
+rejects invented props/actions, abstract portrait-only choices and unobservable checks, with one
+bounded replan. It also tests rejection of an actual invented-notebook plan. Thumbnail selection chooses a concrete unresolved conflict/discovery and
+records the viewer question; attractive faces are supporting details, not the composition.
+Preview generation now takes a completed story manifest (or its Actions run), rather than
+unrelated fixed chest/letter examples.
+
+Every new scene/thumbnail is checked on CPU with pinned public BLIP VQA weights
+(`Salesforce/blip-vqa-base`, revision `787b3d35d57e49572baabd22884b3d5a05acf072`).
+A missing story anchor causes a wider-composition retry with a different seed; two rejected
+candidates trigger an explicitly flagged best-candidate fallback so video production continues.
+Rejected candidates and answers are retained for review. All reports include a source-image hash; changed images, contracts or review
+versions invalidate the cache. Portrait references are no longer used as scene/thumbnail
+composition inputs. Image workers have a bounded 180-minute budget for the additional checks.
+
+Old visual planning checkpoints must be regenerated from the saved prose: the visual-contract
+version invalidates visual/thumbnail worker caches while SEO can still resume. Historical
+render/publication recovery remains available for already-created media. The preview workflow
+also tests rejection of an actual previous portrait that omitted its required letter.
+
+These checks screen for story adherence; they are not a measured CTR score or a guarantee of
+correct visual semantics. Review the accepted pixels against the saved evidence and viewer
+question before judging the thumbnail, and use real impressions/clicks to evaluate CTR.
+Thumbnail generation remains 1344×768 with a centered 16:9 crop and 1920×1080 JPEG export.
+
+
+Artwork recovery: planning, diffusion and VQA failures are isolated from narration/video production.
+A rejected plan is retried before a simple literal-translation recovery frame is used when it has a concrete anchor; if unavailable, a neutral canonical-setting composition is used; it is explicitly
+marked as a planning fallback, never as a passed review. Image generation/review has two bounded
+attempts. If neither passes, the generated candidate with the most successful checks is retained
+with `passed: false` and `fallback: best-candidate`. If no valid image exists, Pillow creates an
+offline, text-free neutral background. Manifests and `image-review/*/fallback.json` record these
+states; cached fallback images are hash-checked and reused on resume. They are usable recovery
+assets, not proof of story fidelity or thumbnail quality. Storage exhaustion, a killed runner or
+invalid narration still require restoring the underlying environment/input. Diagnostic regression
+audits run separately and cannot prevent preview image generation. Background slots change every
+four seconds for short stories, matched to the overlapping narrated beat.
+
+Preview background and thumbnail workers now plan and generate independently, so a slow thumbnail
+plan cannot hold back the background image. Literal translation recovery discards the rejected
+composition action and records an unapproved planning fallback; it is not a passed semantic audit.
+
+Thumbnail planning is restricted to the opening eight narrated beats before the payoff. Exact
+source quotes are decoder enums, preventing invented evidence. Literal recovery is allowed only
+when the proposed quote actually belongs to the selected scene; fabricated/mismatched evidence
+uses a neutral fallback instead. Translation recovery remains explicitly unapproved.
+
+Story diffusion preserves the model safety checker with two safe-composition attempts. A safety
+block uses the neutral offline asset immediately instead of repeating ten expensive blocked
+seeds and potentially consuming the whole worker timeout.
+
+Rendering now starts with a large, visible foreground story object and keeps event, cast and
+setting concise for CLIP. Spoken dialogue and optional hair detail cannot displace the object.
+A saved preview plan can be rerendered with `reuse_plan_run` without rerunning Qwen; the source
+quote is revalidated and the current rendering version is recorded separately from planning.
+
+Thumbnail scene selection now returns only an index/question. A separate production scene worker
+composes from exactly that one narration, preventing multi-beat context from contaminating the
+translation. Two rejected choices recover from opening scene zero with an explicit warning.
+Rerendering an unapproved saved thumbnail may reuse the same-story opening background contract;
+source identity, narration quote, native thumbnail dimensions and unapproved status are preserved.

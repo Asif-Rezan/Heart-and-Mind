@@ -111,6 +111,9 @@ def validate_story(story,require_planning=True):
                 not isinstance(story.get('thumbnail_prompt'),str) or not 80<=len(story['thumbnail_prompt'])<=360 or
                 type(story.get('thumbnail_scene')) is not int or not 0<=story['thumbnail_scene']<expected):
             raise ValueError('Short story requires a complete story-grounded visual plan and thumbnail scene')
+        if require_planning and story.get('visual_plan_version'):
+            from story_visual_contract import require_visuals
+            require_visuals(story)
         repeated = repeated_scenes(scenes)
         if repeated:
             raise StoryValidationError('repeated_story_lines', dict(scenes=repeated))
@@ -180,7 +183,7 @@ def planning_schema(schema):
             if not isinstance(node,dict):
                 return
             for field,spec in node.get('properties',{}).items():
-                if field in ('visual','instruction','thumbnail_prompt'):
+                if field in ('visual','instruction','thumbnail_prompt','prompt','event','people','setting','viewer_question') and spec.get('type')=='string':
                     spec.pop('maxLength',None)
                 else:
                     relax(spec)
@@ -203,7 +206,7 @@ def normalize_planning(data, schema):
                 for field,child in spec.get('properties',{}).items():
                     if field not in value:
                         continue
-                    if field in ('visual','instruction','thumbnail_prompt'):
+                    if field in ('visual','instruction','thumbnail_prompt','prompt','event','people','setting','viewer_question') and child.get('type')=='string' and isinstance(value[field],str):
                         value[field]=bound_prose(value[field],child)
                     else:
                         normalize(value[field],child)
@@ -228,7 +231,8 @@ def language_contract(schema):
                 'For example text: उसने दरवाजा खोलकर चिट्ठी पढ़ी। Keys named visual or instruction are English. '
                 'Preserve the supplied canonical story; return JSON only.')
     return ('Write original Hindi emotional fiction. Title and description are Hindi Devanagari. '
-            'English-only planning keys are summary, characters, world, chapters, visual and instruction. '
+            'English-only planning keys are summary, characters, world, chapters, visual, instruction, event, '
+            'people, setting, prompt, question, answers and viewer_question. Evidence alone copies the supplied Hindi quotation exactly. '
             'Use transliterated names in English planning, never translate spoken Hindi into English. Return JSON only.')
 
 

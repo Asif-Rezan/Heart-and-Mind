@@ -12,6 +12,7 @@ from story_writer import repeated_scenes, validate_story, save_json
 from story_video import visual_timeline, thumbnail_slot, generate_images
 from story_voice import synthesize_chunks, voice_identity
 from test_daily_story import example_story
+from test_visual_support import attach_contracts,record_for,passed_review,PLAN_VERDICT
 
 
 def short_story():
@@ -74,16 +75,16 @@ class ShortStoryContract(unittest.TestCase):
         self.assertNotEqual(index,0)
 
     def test_images_share_reference_and_use_time_aligned_story_prompts_and_cache(self):
-        story=short_story()
+        story=attach_contracts(short_story())
         def generate(prompt,path,**kwargs):
             Image.new('RGB',(64,36),'gold').save(path)
-        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=generate) as model:
+        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=generate) as model,patch('story_image_review.review_image',side_effect=passed_review):
             root=Path(folder);save_json(root/'timing.json',timeline())
             with patch.dict(os.environ,{'IMAGE_SHARD':'0','IMAGE_SHARDS':'18'}):
                 generate_images(root,story)
-                self.assertEqual(model.call_count,7)  # Reference, five timeline frames, separate thumbnail.
-                for call in model.call_args_list[1:]:
-                    self.assertEqual(call.kwargs['reference_path'],root/'cast-reference-00.png')
+                self.assertEqual(model.call_count,6)  # Five timeline frames and a separate thumbnail; no portrait reference.
+                for call in model.call_args_list:
+                    self.assertNotIn('reference_path',call.kwargs)
                 manifest=json.loads((root/'image-manifest-00.json').read_text())
                 self.assertIn(story['visuals']['0'],manifest['0']['prompt'])
                 self.assertEqual(manifest['18']['start'],72)
@@ -95,10 +96,12 @@ class ShortStoryContract(unittest.TestCase):
                 self.assertEqual((model.call_args.kwargs['width'],model.call_args.kwargs['height']),(1344,768))
                 self.assertNotEqual(thumb['seed'],manifest['0']['seed'])
                 generate_images(root,story)
-                self.assertEqual(model.call_count,7)
-                story['visuals']['0']='Ram in his blue kurta folds a letter inside his village shop.'
+                self.assertEqual(model.call_count,6)
+                record=record_for(story['scenes'][0],'Ram in his blue kurta folds a letter inside his village shop.')
+                story['visual_contracts']['0']=record
+                story['visuals']['0']=record['prompt']
                 generate_images(root,story)
-                self.assertEqual(model.call_count,8)
+                self.assertEqual(model.call_count,7)
 
     def test_voice_rejects_pipeline_text_echo_before_saving_audio(self):
         text='उसने खिड़की के पास बैठकर अपनी माँ को पहली चिट्ठी लिखी।'
@@ -127,18 +130,19 @@ class ShortStoryPlanning(unittest.TestCase):
         prompts=[]
         def ask(schema,prompt,*args,**kwargs):
             prompts.append(prompt)
+            if 'faithful' in schema['properties']:return PLAN_VERDICT.copy()
             if 'scene' in schema['properties']:
-                return dict(scene=31,thumbnail_prompt='Ram, blue kurta and black hair, holds the story parcel in the village shop, large expressive face, bright contrasting warm and cool colors, clean mobile composition.')
-            return {key:f'Ram, black hair and blue kurta, opens the exact story parcel in scene {key} inside the village shop.' for key in schema['properties']}
+                return dict(scene=5,visual=record_for(story['scenes'][5],'Ram in his blue kurta holds the story parcel before opening it at the counter inside his village shop.'),viewer_question='What will Ram discover inside the parcel?')
+            return {key:record_for(story['scenes'][int(key.split('_')[1])],f'Ram, black hair and blue kurta, opens the exact story parcel in scene {key} inside the village shop.') for key in schema['properties']}
         with tempfile.TemporaryDirectory() as folder,patch('story_plan.ask',side_effect=ask) as model:
             prepare_visuals(Path(folder),story)
-            self.assertEqual(model.call_count,7)
-            self.assertEqual(story['thumbnail_scene'],31)
+            self.assertEqual(model.call_count,58)
+            self.assertEqual(story['thumbnail_scene'],5)
             self.assertIn(story['scenes'][0]['text'],prompts[0])
             self.assertIn(story['characters'],prompts[0])
             fresh=short_story();fresh.pop('visuals');fresh.pop('thumbnail_scene');fresh.pop('thumbnail_prompt')
             prepare_visuals(Path(folder),fresh)
-            self.assertEqual(model.call_count,7)
+            self.assertEqual(model.call_count,58)
             self.assertEqual(fresh['visuals'],story['visuals'])
 
     def test_unfixed_repetitions_fail_before_narration(self):

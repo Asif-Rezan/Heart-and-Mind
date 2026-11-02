@@ -1,3 +1,4 @@
+from test_visual_support import attach_contracts,passed_review
 """Prove the workflow's critical path overlaps independent work within 20 jobs."""
 import itertools
 import json
@@ -35,7 +36,7 @@ class ParallelBudgetTests(unittest.TestCase):
         self.assertNotIn('images',lineage['mix'])
 
     def test_all_seventy_five_frames_render_once_as_their_images_become_ready(self):
-        story=short_story()
+        story=attach_contracts(short_story())
         owners=[]
         def draw(prompt,path,**kwargs):
             Image.new('RGB',(64,36),'gold').save(path)
@@ -47,12 +48,12 @@ class ParallelBudgetTests(unittest.TestCase):
                 self.assertTrue((root/f'scene-{index:03d}-source.png').exists())
                 self.assertEqual(index%17,kwargs['shard'])
                 owners.append(index)
-        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=draw) as generator,patch('story_video.render_clips',side_effect=render):
+        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=draw) as generator,patch('story_image_review.review_image',side_effect=passed_review),patch('story_video.render_clips',side_effect=render):
             root=Path(folder);save_json(root/'timing.json',timeline(300))
             for shard in range(17):
                 with patch.dict(os.environ,{'IMAGE_SHARD':str(shard),'IMAGE_SHARDS':'17'}):
                     generate_images(root,story,render_ready=True)
             self.assertEqual(sorted(owners),list(range(75)))
             self.assertEqual(len(set(owners)),75)
-            self.assertEqual(generator.call_count,75+17+1)  # Frames, references, dedicated thumbnail.
+            self.assertEqual(generator.call_count,75+1)  # Frames and a dedicated thumbnail, without portrait references.
             self.assertTrue((root/'thumbnail-source.png').exists())
