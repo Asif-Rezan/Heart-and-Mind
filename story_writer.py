@@ -131,6 +131,9 @@ class StoryValidationError(ValueError):
         self.code=code
         self.details=details or {}
         messages={
+            'duplicate_story':'This story repeats a previous title, plot or narration. Start a fresh run without restoring this story.',
+            'outline_novelty_exhausted':'Three outline concepts repeated earlier stories. No chapters were started; use a new story run ID.',
+            'duplicate_outline_checkpoint':'The restored outline repeats an earlier story. Start a new story run ID without prepared_run.',
             'render_clips_missing_or_stale':'Rendered scenes are missing or stale. Restore each scene from its owning image worker; inspect scene indices.',
             'render_assets_missing':'Video assembly is missing required source assets. Inspect the listed filenames.',
             'render_audio_duration_mismatch':'Mixed audio does not match the narration timeline. Inspect expected and actual seconds.',

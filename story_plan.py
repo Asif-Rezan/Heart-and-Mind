@@ -19,6 +19,28 @@ def outline_identity(draft):
     return hashlib.sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
 
+def outline_novelty_reason(outline, history):
+    """Apply final title/plot rules before spending CPU on chapter prose."""
+    return novelty_reason(dict(outline, lyrics='', scenes=[]), history)
+
+
+def ask_novel_outline(schema, prompt, seed, tokens, checkpoint, history):
+    rejected=[]
+    for attempt in range(3):
+        candidate=ask(schema, prompt + ('\nRejected duplicate concepts; change the conflict, actions and resolution: '
+            +json.dumps(rejected,ensure_ascii=False) if rejected else ''),
+            seed+attempt, tokens, checkpoint=checkpoint if attempt==0 else
+            checkpoint.with_name(f'outline-response-retry-{attempt}.json'))
+        reason=outline_novelty_reason(candidate,history)
+        if not reason:return candidate
+        rejected.append(dict(title=candidate['title'],summary=candidate['summary']))
+        save_json(checkpoint.with_name('outline-novelty.json'),dict(
+            code='duplicate_outline',reason=reason,attempts=attempt+1,max_attempts=3))
+        print(json.dumps(dict(phase='duplicate outline rejected',reason=reason,attempt=attempt+1)),flush=True)
+    raise StoryValidationError('outline_novelty_exhausted',dict(
+        reason=reason,attempts=3,recovery='Start a new story run ID; no chapters were generated.'))
+
+
 def prepare_outline(root, run_id, history):
     root=Path(root)
     if (root/'story.json').exists():
@@ -39,7 +61,7 @@ def prepare_outline(root, run_id, history):
         sample=requested_format==SAMPLE_FORMAT
         duration_text='one-minute' if sample else '4-6 minute'
         chapter_text=('Each chapter has TWO scenes, about 22-26 Hindi words total per chapter; 120-165 words in the whole story. ' if sample else 'Each chapter will have eight scenes with complete spoken Hindi sentences, aim about 110-120 words per chapter without padding. ')
-        outline=ask(OUTLINE,
+        outline=ask_novel_outline(OUTLINE,
             f'Create an ORIGINAL {duration_text} Hindi emotional motivational story for Heart and Mind. '
             'Credible everyday Indian family, work or study conflict; meaningful choice; earned hopeful ending. '
             'No instant riches, copied plots, sermons or nursery rhymes. One male narrator tells the entire story, including any quoted dialogue. All characters retain fixed names, relationships and appearance. '
@@ -59,9 +81,14 @@ def prepare_outline(root, run_id, history):
             'inviting viewers to comment. Keep both natural and short; no pressure, guilt or repeated requests. '
             +chapter_text+'Realistic cinematic 3D storytelling world with natural facial proportions. '
             'Avoid previous titles and plots: '+json.dumps(recent,ensure_ascii=False),
-            seed,2800,checkpoint=root/'outline-response.json')
+            seed,2800,checkpoint=root/'outline-response.json',
+            history=[h for h in history if h.get('run')!=run_id])
         draft=dict(run_id=run_id,version=VERSION,format=requested_format,outline=outline,chapters=[])
     else:
+        reason=outline_novelty_reason(draft['outline'],[h for h in history if h.get('run')!=run_id])
+        if reason:
+            raise StoryValidationError('duplicate_outline_checkpoint',dict(
+                reason=reason,recovery='Start a new story run ID without prepared_run.'))
         draft['run_id']=run_id
     save_json(path,draft)
 
@@ -392,6 +419,10 @@ def assemble_story(root,run_id,history,prose_only=False):
     draft=json.loads((root/'story-draft.json').read_text())
     if draft.get('run_id',run_id)!=run_id:
         raise StoryValidationError('draft_identity_mismatch')
+    reason=outline_novelty_reason(draft['outline'],[h for h in history if h.get('run')!=run_id])
+    if reason:
+        raise StoryValidationError('duplicate_outline_checkpoint',dict(
+            reason=reason,recovery='Start a new story run ID without prepared_run.'))
     identity=outline_identity(draft)
     chapters=[]
     for i in range(CHAPTERS):
