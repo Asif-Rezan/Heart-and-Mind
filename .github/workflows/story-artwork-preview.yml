@@ -1,7 +1,7 @@
 name: 3D storybook background and thumbnail preview
 on:
   push:
-    branches: [codex/storybook-artwork]
+    branches: [codex/storybook-artwork, codex/appearance-preview-gallery]
   workflow_dispatch:
     inputs:
       kind:
@@ -9,18 +9,24 @@ on:
         type: choice
         default: thumbnail
         options: [thumbnail, background, both]
+      scene:
+        description: Story scene to preview
+        type: choice
+        default: chest
+        options: [chest, letter, both]
 permissions:
   contents: read
   actions: read
 jobs:
   scenes:
-    name: Generate demo ${{ matrix.kind }}
+    name: Generate ${{ matrix.scene }} ${{ matrix.kind }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        kind: ${{ fromJSON(inputs.kind == 'both' && '["background","thumbnail"]' || inputs.kind == 'background' && '["background"]' || '["thumbnail"]') }}
+        kind: ${{ fromJSON(github.ref == 'refs/heads/codex/appearance-preview-gallery' && '["background","thumbnail"]' || inputs.kind == 'both' && '["background","thumbnail"]' || inputs.kind == 'background' && '["background"]' || '["thumbnail"]') }}
+        scene: ${{ fromJSON(github.ref == 'refs/heads/codex/appearance-preview-gallery' && '["chest","letter"]' || inputs.scene == 'both' && '["chest","letter"]' || inputs.scene == 'letter' && '["letter"]' || '["chest"]') }}
     env:
       CUDA_VISIBLE_DEVICES: ''
       OMP_NUM_THREADS: '4'
@@ -30,6 +36,7 @@ jobs:
       CPU_IMAGE_HEIGHT: '576'
       CPU_IMAGE_STEPS: '20'
       IMAGE_KIND: ${{ matrix.kind }}
+      PREVIEW_SCENE: ${{ matrix.scene }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,10 +57,10 @@ jobs:
           pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements.txt -r requirements-images-cpu.txt
       - name: Generate review scene
-        run: python -u preview_story_artwork.py --kind "$IMAGE_KIND"
+        run: python -u preview_story_artwork.py --kind "$IMAGE_KIND" --scene "$PREVIEW_SCENE"
       - uses: actions/upload-artifact@v4
         with:
-          name: storybook-${{ matrix.kind }}
-          path: output/story-artwork-preview/*
+          name: storybook-${{ matrix.scene }}-${{ matrix.kind }}
+          path: output/story-artwork-preview/
           if-no-files-found: error
           retention-days: 7
