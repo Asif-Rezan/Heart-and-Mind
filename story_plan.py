@@ -47,9 +47,13 @@ def prepare_outline(root, run_id, history):
             'setback, turning point, constructive action, resolution. Each beat must specify concrete actions '
             'and a distinct start/end so separate writers can continue the same plot without contradictions. '
             'Begin with a concrete high-stakes question/action in the first ten seconds, no greeting or intro. '
+            'Use a curiosity gap rooted in a specific dilemma so viewers want to learn what happens next. '
+            'Show a clear desire, obstacles, a costly setback, a meaningful decision and an earned hopeful payoff. '
+            'Make the full story engaging through actions, dialogue and consequences; convey motivation through the story itself. '
             'Seed one detail whose significance is paid off at the end. Escalate stakes through choices, '
-            'not artificial disasters. Reserve the final two scenes for one story-specific reflective comment '
-            'question and a brief optional follow invitation, AFTER the emotional resolution. '
+            'not artificial disasters. AFTER the emotional resolution, reserve the penultimate scene for a brief friendly '
+            'invitation to subscribe to Heart and Mind, and the final scene for one story-specific reflective question '
+            'inviting viewers to comment. Keep both natural and short; no pressure, guilt or repeated requests. '
             +chapter_text+'Pastel cute 3D storybook world. '
             'Avoid previous titles and plots: '+json.dumps(recent,ensure_ascii=False),
             seed,2800,checkpoint=root/'outline-response.json')

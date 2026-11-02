@@ -9,7 +9,8 @@ def chapter_direction(index):
     directions=(
         'Open scene 0 with an immediate concrete dilemma, unexpected action or unanswered question. '
         'Hook within the first two short scenes (about 10 seconds); no greeting, channel intro or lesson spoiler. '
-        'Quickly establish whose desire is at stake and why it matters.',
+        'Start inside the action with a specific risk and an unanswered question that makes viewers want the next beat. '
+        'Quickly establish whose desire is at stake and why it matters. Do not reveal the lesson or ending.',
         'Escalate the obstacle through visible choices and consequences. Give a new clue or emotional shift '
         'every two or three scenes; do not repeat chapter 1 exposition.',
         'Make the setback cost something believable. Keep the outcome uncertain; no artificial disaster '
@@ -17,11 +18,12 @@ def chapter_direction(index):
         'Reveal a credible discovery or changed perspective through action. Pay off an earlier detail '
         'and make the next decision feel earned, without revealing the whole ending.',
         'Show the protagonist act on that decision, meet resistance, and change the situation. '
-        'Use specific sensory details and reactions, not a list of motivational advice.',
+        'Use specific sensory details and reactions, not a list of motivational advice. '
+        'Let motivation emerge from a difficult choice, sustained effort and a believable consequence; earn the lesson through events.',
         'Resolve the central question and deliver the emotional payoff through a concrete consequence. '
         'Only AFTER the resolution, use the last one or two scenes for a brief natural narrator CTA: '
-        'one specific reflective question about this story inviting a comment, then an optional short invitation '
-        'to follow Heart and Mind for another story. No guilt, pressure, reward promise or repeated requests. '
+        'a short, friendly invitation to subscribe to Heart and Mind in the penultimate scene, then '
+        'one specific reflective question about this story inviting a comment in the final scene. No guilt, pressure, reward promise or repeated requests. '
         'The closing visual stays in the resolved story world; no invented on-screen text.'
     )
     return directions[index]
@@ -80,7 +82,9 @@ def polish_engagement(root,story):
                     'scene':{'type':'integer','minimum':0,'maximum':last},'instruction':string(10,240)})}})
             review=ask(schema,
                 'Make ONE actionable editorial plan for this Hindi story. Assess hook in the first two scenes, '
-                'causal progression, earned payoff and a brief reflective comment CTA only after the ending. '
+                'causal progression, motivational meaning earned through actions, and a brief closing CTA only after the ending. '
+                'The closing two scenes must include BOTH a friendly subscribe invitation and a story-specific viewer comment question. '
+                'If subscribe is missing, include a concrete repair for the penultimate scene. Keep the final scene for the comment question. '
                 'For every real problem give its exact scene index and a concrete correction based on the '
                 'canonical outline. Do not invent new characters, change relationships or impose new plot goals. '
                 'Keep instructions concise. Do not mark a criterion false for stylistic preference alone. '
