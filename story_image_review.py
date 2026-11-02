@@ -96,6 +96,7 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
         reports.append(report)
         save_json(work/'reviews.json', reports)
         print(json.dumps(dict(phase='story image review',kind=kind,attempt=attempt,passed=report['passed'],answers=report['answers'])),flush=True)
+        if report.get('error_type') == 'ImageSafetyBlocked':break
         if report['passed']:
             path.parent.mkdir(parents=True,exist_ok=True)
             candidate.replace(path)

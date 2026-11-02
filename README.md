@@ -393,3 +393,7 @@ Thumbnail planning is restricted to the opening eight narrated beats before the 
 source quotes are decoder enums, preventing invented evidence. Literal recovery is allowed only
 when the proposed quote actually belongs to the selected scene; fabricated/mismatched evidence
 uses a neutral fallback instead. Translation recovery remains explicitly unapproved.
+
+Story diffusion preserves the model safety checker with two safe-composition attempts. A safety
+block uses the neutral offline asset immediately instead of repeating ten expensive blocked
+seeds and potentially consuming the whole worker timeout.

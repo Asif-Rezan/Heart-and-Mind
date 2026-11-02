@@ -127,6 +127,16 @@ class StoryVisualChecks(unittest.TestCase):
             self.assertEqual(report['fallback'],'best-candidate')
             self.assertTrue(target.exists())
 
+    def test_safety_block_uses_neutral_asset_without_repeating_blocked_generation(self):
+        from story_image_cpu import ImageSafetyBlocked
+        contract=record_for(dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter.'))
+        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=ImageSafetyBlocked('blocked')) as model:
+            target=Path(folder)/'scene.png'
+            report=generate_reviewed('Read the letter.',target,42,contract,width=640,height=360)
+            self.assertEqual(model.call_count,1)
+            self.assertEqual(report['fallback'],'neutral-background')
+            self.assertTrue(target.exists())
+
     def test_planning_service_failure_returns_honest_neutral_contracts(self):
         from story_plan import visual_batch,thumbnail_plan
         from story_visual_contract import is_fallback
