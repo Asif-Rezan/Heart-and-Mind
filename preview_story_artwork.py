@@ -6,8 +6,8 @@ from story_art_style import art_prompt, VERSION
 from story_image_cpu import generate, MODEL, REVISION, negative_prompt, GUIDANCE_SCALE
 
 SCENES = {
-    'background': 'Adult Indian woman discovering a locked wooden chest in a cozy attic, holding a brass key, curious expression, turquoise sari, dark braid, warm sunset through round window.',
-    'thumbnail': 'Adult Indian woman raising a brass key beside her surprised face, mysterious glowing wooden chest in foreground, contents hidden, turquoise sari, dark braid, teal attic, warm golden light.',
+    'background': 'Beautiful adult Indian woman, long dark braid, turquoise sari, discovering a locked wooden chest in a sunlit attic, holding a brass key, curious expression, warm golden rays.',
+    'thumbnail': 'Beautiful adult Indian woman, long dark braid, turquoise sari, holding a brass key beside her face, intrigued expression, closed mysterious chest in foreground, teal and golden attic.',
 }
 
 

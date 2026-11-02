@@ -1,7 +1,7 @@
 """Compact shared art direction, placed before scene detail for CLIP encoders."""
-VERSION = 'storybook-3d-v4'
-STYLE = ('3D cartoon storybook illustration, stylized animated character, rounded sculpted face, '
-         'large expressive eyes, soft clay materials, cinematic lighting. ')
+VERSION = 'storybook-realistic-3d-v5'
+STYLE = ('Realistic cinematic 3D storybook render, lifelike facial proportions, beautiful expressive face, '
+         'natural skin, detailed fabrics, soft volumetric lighting. ')
 
 
 def art_prompt(scene, kind='background'):
