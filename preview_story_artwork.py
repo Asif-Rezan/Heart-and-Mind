@@ -17,6 +17,23 @@ def load_story(path):
     return json.loads(path.read_text())
 
 
+def opening_thumbnail_recovery(plan,background):
+    """Apply the production opening-scene fallback when rerendering an old failed plan."""
+    if plan['contract'].get('planning_review',{}).get('passed') is True:return plan
+    if background.get('story_sha256')!=plan.get('story_sha256') or background.get('story_scene')!=0:return plan
+    import copy
+    from story_visual_contract import REVIEW_VERSION
+    result=copy.deepcopy(plan);contract=copy.deepcopy(background['contract'])
+    validate_contract(contract,dict(text=background['narration']))
+    contract['fallback']=dict(mode='scene-recovery',literal_event=contract['event'],reason='thumbnail_planning_rejected')
+    contract['planning_review']=dict(version=REVIEW_VERSION,passed=False,issues=['Opening-scene thumbnail recovery; not approved by planning audit.'])
+    anchor=contract['checks'][0]['answers'][0]
+    result.update(story_scene=0,narration=background['narration'],contract=contract,
+        viewer_question='What will happen next to the '+anchor+'?',prompt=art_prompt(contract['prompt'],'thumbnail'),
+        width=SOURCE_SIZE[0],height=SOURCE_SIZE[1],export_size=EXPORT_SIZE,recovery_from_story_scene=0)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--stage', choices=['plan','generate','audit','audit-plan'], required=True)
@@ -75,6 +92,9 @@ def main():
         return
     from story_image_review import generate_reviewed
     plan=json.loads(plan_path.read_text())
+    background_plan=args.output/'background'/'plan.json'
+    if args.kind=='thumbnail' and background_plan.is_file():
+        plan=opening_thumbnail_recovery(plan,json.loads(background_plan.read_text()))
     validate_contract(plan['contract'],dict(text=plan['narration']))
     plan['planning_art_version']=plan.get('planning_art_version',plan['art_version'])
     plan['art_version']=VERSION

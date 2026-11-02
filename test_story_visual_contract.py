@@ -163,6 +163,30 @@ class StoryVisualChecks(unittest.TestCase):
             thumb=thumbnail_plan(Path(folder),story,'1234567')
             self.assertTrue(is_fallback(thumb['thumbnail_contract']))
 
+    def test_old_failed_thumbnail_recovers_from_same_story_opening_without_borrowing(self):
+        from preview_story_artwork import opening_thumbnail_recovery
+        record=record_for(dict(text='बारिश में खिलौना टूट गया।',visual='The toy is broken in the rain.'))
+        original=dict(story_sha256='same',story_scene=7,contract=dict(planning_review=dict(passed=False)),width=1344,height=768)
+        background=dict(story_sha256='same',story_scene=0,narration='बारिश में खिलौना टूट गया।',contract=record)
+        fixed=opening_thumbnail_recovery(original,background)
+        self.assertEqual(fixed['story_scene'],0)
+        self.assertIn('toy',fixed['contract']['event'])
+        self.assertFalse(fixed['contract']['planning_review']['passed'])
+        self.assertEqual(fixed['width'],1344);self.assertEqual(fixed['height'],768)
+        self.assertEqual(opening_thumbnail_recovery(original,dict(background,story_sha256='other')),original)
+
+    def test_thumbnail_composes_only_the_selected_narration_after_selection(self):
+        from story_plan import thumbnail_plan
+        story=short_story();record=record_for(story['scenes'][2],'A shopkeeper opens the story letter beside the counter.')
+        responses=[dict(scene=2,viewer_question='What will he learn from the letter?'),{'scene_2':record},PLAN_VERDICT.copy(),PLAN_VERDICT.copy()]
+        with tempfile.TemporaryDirectory() as folder,patch('story_plan.ask',side_effect=responses) as model:
+            result=thumbnail_plan(Path(folder),story,'1234567')
+            self.assertEqual(result['thumbnail_scene'],2)
+            self.assertNotIn('visual',model.call_args_list[0].args[0]['properties'])
+            composition_prompt=model.call_args_list[1].args[1]
+            self.assertIn(story['scenes'][2]['text'],composition_prompt)
+            self.assertNotIn(story['scenes'][7]['text'],composition_prompt)
+
     def test_source_quote_decoder_can_only_copy_the_actual_requested_narration(self):
         from story_plan import scene_composition_schema
         scene=dict(text='बारिश में निति का खिलौना टूट गया।')

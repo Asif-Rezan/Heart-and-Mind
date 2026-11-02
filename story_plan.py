@@ -578,48 +578,44 @@ def _visual_batch(root,story,slots,identity):
 
 
 def _thumbnail_plan(root,story,identity):
-    feedback=''
-    opening=list(range(min(8,len(story['scenes']))))
-    visual_schema=composition_schema()
-    visual_schema['properties']['evidence']['enum']=[story['scenes'][i]['text'][:360] for i in opening]
+    # Selection sees opening beats; composition sees exactly ONE selected beat.
+    opening=list(range(min(8,len(story['scenes']))));remaining=opening.copy()
+    feedback='';records={}
     for attempt in range(2):
         response=ask(object_schema({
-            'scene':{'type':'integer','enum':opening},
-            'visual':visual_schema, 'viewer_question':english_planning(10,180)}),
-            'Design a truthful story-driven YouTube thumbnail from these opening FINAL spoken beats, before the resolution. '
-            'Prioritize a concrete scene with TWO interacting/opposing characters and an important story object '
-            'over passive thinking, scenery or a solo portrait. Select the conflict/choice BEFORE its outcome. '
-            'A single character is allowed only when their visible action/object makes the stakes clear. '
-            'Reject abstract internal realizations as thumbnail choices. Do not borrow a notebook or any other '
-            'object/action from another scene. No unrelated woman, invented danger, magic glow, wealth or plot event. '
-            'Write viewer_question as the real unresolved question the composition raises; do not draw it '
-            'in the image or reveal its answer. '
-            +VISUAL_DIRECTION+CAST_DIRECTION+
-            'Keep faces attractive but secondary to foreground action and readable conflict. '
-            'Canonical cast: '+story['characters']+' World: '+story['world']+' '
-            'Title: '+story['title']+
-            '\nFinal spoken beats: '+json.dumps(scene_context(story,opening,neighbors=0),ensure_ascii=False)+feedback,
-            int(identity[:7],16)+attempt*1009,1200,checkpoint=Path(root)/f'thumbnail-selection-{attempt}.json')
+            'scene':{'type':'integer','enum':remaining},
+            'viewer_question':english_planning(10,180)}),
+            'Select ONE opening narrated beat for a truthful YouTube thumbnail BEFORE its outcome. '
+            'Choose a concrete visible conflict/discovery with an important object and interacting characters. '
+            'Reject abstract thoughts and passive portraits. Return only its index and a genuine unresolved '
+            'viewer question. Do not compose the image or add any facts. '
+            '\nFinal spoken beats: '+json.dumps(scene_context(story,remaining,neighbors=0),ensure_ascii=False)+feedback,
+            int(identity[:7],16)+attempt*1009,260,checkpoint=Path(root)/f'thumbnail-selection-{attempt}.json')
         scene=response['scene']
-        try:
-            record=validate_contract(compile_contract(response['visual']),story['scenes'][scene])
-            review=assess_plan(record,story['scenes'][scene],story['characters'],story['world'],
-                int(identity[:7],16)+scene+attempt*1009,Path(root)/f'thumbnail-review-{attempt}.json',response['viewer_question'],ask_fn=ask)
-            if not review['passed']:raise ValueError(json.dumps(review['verdict']['issues']))
+        if scene not in remaining:raise ValueError('thumbnail_selection_outside_opening')
+        record=visual_batch(Path(root)/'thumbnail-composition',story,[scene],identity)[str(scene)]
+        records[scene]=record
+        review=assess_plan(record,story['scenes'][scene],story['characters'],story['world'],
+            int(identity[:7],16)+scene+attempt*1009,Path(root)/f'thumbnail-review-{attempt}.json',response['viewer_question'],ask_fn=ask)
+        if review['passed'] and not record.get('fallback'):
             record['planning_review']=review
             return dict(thumbnail_scene=scene,thumbnail_prompt=record['prompt'],thumbnail_contract=record,
                         thumbnail_question=response['viewer_question'])
-        except ValueError as exc:
-            feedback='\nYour previous scene '+str(scene)+' composition was rejected: '+str(exc)[:800]+'. Choose an actual visible conflict and correct the facts.'
-            save_json(Path(root)/'thumbnail-plan-rejection.json',dict(scene=scene,reason=str(exc)))
-    from story_visual_contract import literal_recovery
-    recovered=literal_recovery(story['scenes'][scene],response['visual'],'thumbnail_planning_rejected')
-    if recovered:
-        save_json(Path(root)/'thumbnail-fallback.json',recovered)
-        print(json.dumps(dict(phase='thumbnail planning fallback',mode='literal-scene',scene=scene)),flush=True)
-        return dict(thumbnail_scene=scene,thumbnail_prompt=recovered['prompt'],thumbnail_contract=recovered,
-                    thumbnail_question=response['viewer_question'])
-    raise StoryValidationError('thumbnail_planning_rejected')
+        remaining.remove(scene)
+        feedback='\nRejected choice '+str(scene)+': '+json.dumps(review['verdict'].get('issues',[]))+'. Choose another concrete opening event.'
+        save_json(Path(root)/'thumbnail-plan-rejection.json',dict(scene=scene,reason=feedback))
+        if not remaining:break
+    # A single-scene opening recovery cannot borrow props from other selected beats.
+    record=records.get(0) or visual_batch(Path(root)/'thumbnail-opening-recovery',story,[0],identity)['0']
+    record=copy.deepcopy(record)
+    record['fallback']=dict(mode='scene-recovery',literal_event=record['event'],reason='thumbnail_planning_rejected')
+    from story_visual_contract import REVIEW_VERSION
+    record['planning_review']=dict(version=REVIEW_VERSION,passed=False,issues=['Opening scene recovery; thumbnail audit not approved.'])
+    anchor=record['checks'][0]['answers'][0]
+    question='What will happen next to the '+anchor+'?'
+    save_json(Path(root)/'thumbnail-fallback.json',record)
+    print(json.dumps(dict(phase='thumbnail planning fallback',mode='opening-scene',scene=0)),flush=True)
+    return dict(thumbnail_scene=0,thumbnail_prompt=record['prompt'],thumbnail_contract=record,thumbnail_question=question)
 
 
 def visual_batch(root,story,slots,identity):

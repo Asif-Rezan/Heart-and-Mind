@@ -88,6 +88,13 @@ jobs:
           run-id: ${{ inputs.reuse_plan_run }}
           github-token: ${{ github.token }}
           path: output/story-artwork-preview/
+      - uses: actions/download-artifact@v4
+        if: inputs.reuse_plan_run != '' && matrix.kind == 'thumbnail'
+        with:
+          name: story-artwork-plan-background
+          run-id: ${{ inputs.reuse_plan_run }}
+          github-token: ${{ github.token }}
+          path: output/story-artwork-preview/
       - name: Plan from final narration with exact evidence and visible-event checks
         if: inputs.reuse_plan_run == ''
         run: |

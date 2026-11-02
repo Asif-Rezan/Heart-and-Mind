@@ -96,7 +96,7 @@ class RepetitionRecovery(unittest.TestCase):
             prompts.append(prompt)
             if 'faithful' in schema['properties']:return PLAN_VERDICT.copy()
             if 'scene' in schema['properties']:
-                return dict(scene=30,visual=record_for(story['scenes'][30],'Ram in his fixed blue kurta holds the story letter in his actual village shop before making his decision.'),viewer_question='What will Ram decide after reading the letter?')
+                return dict(scene=5,visual=record_for(story['scenes'][5],'Ram in his fixed blue kurta holds the story letter in his actual village shop before making his decision.'),viewer_question='What will Ram decide after reading the letter?')
             return {key:record_for(story['scenes'][int(key.split('_')[1])],'Ram in his fixed blue kurta handles the actual story parcel inside his village shop.') for key in schema['properties']}
         with tempfile.TemporaryDirectory() as folder,patch('story_plan.ask',side_effect=model):prepare_visuals(Path(folder),story)
         self.assertIn(story['scenes'][0]['text'],prompts[0])

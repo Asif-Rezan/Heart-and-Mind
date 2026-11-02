@@ -1,7 +1,7 @@
 """Tie every composition and visual check to an exact spoken story scene."""
 import re
 
-VERSION = 'story-events-v5'
+VERSION = 'story-events-v6'
 ENGLISH_PATTERN = r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$'
 
 
@@ -178,7 +178,7 @@ FALLBACK_PEOPLE = 'No characters are shown in this establishing frame'
 
 
 def is_fallback(record):
-    if record.get('fallback',{}).get('mode') == 'literal-scene':
+    if record.get('fallback',{}).get('mode') in ('literal-scene','scene-recovery'):
         return record.get('event') == record['fallback'].get('literal_event') and record.get('planning_review',{}).get('passed') is False
     return (record.get('fallback',{}).get('mode') == 'setting-only' and
             record.get('event') == FALLBACK_EVENT and record.get('people') == FALLBACK_PEOPLE)

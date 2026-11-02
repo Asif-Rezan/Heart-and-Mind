@@ -132,17 +132,17 @@ class ShortStoryPlanning(unittest.TestCase):
             prompts.append(prompt)
             if 'faithful' in schema['properties']:return PLAN_VERDICT.copy()
             if 'scene' in schema['properties']:
-                return dict(scene=31,visual=record_for(story['scenes'][31],'Ram in his blue kurta holds the story parcel before opening it at the counter inside his village shop.'),viewer_question='What will Ram discover inside the parcel?')
+                return dict(scene=5,visual=record_for(story['scenes'][5],'Ram in his blue kurta holds the story parcel before opening it at the counter inside his village shop.'),viewer_question='What will Ram discover inside the parcel?')
             return {key:record_for(story['scenes'][int(key.split('_')[1])],f'Ram, black hair and blue kurta, opens the exact story parcel in scene {key} inside the village shop.') for key in schema['properties']}
         with tempfile.TemporaryDirectory() as folder,patch('story_plan.ask',side_effect=ask) as model:
             prepare_visuals(Path(folder),story)
-            self.assertEqual(model.call_count,56)
-            self.assertEqual(story['thumbnail_scene'],31)
+            self.assertEqual(model.call_count,58)
+            self.assertEqual(story['thumbnail_scene'],5)
             self.assertIn(story['scenes'][0]['text'],prompts[0])
             self.assertIn(story['characters'],prompts[0])
             fresh=short_story();fresh.pop('visuals');fresh.pop('thumbnail_scene');fresh.pop('thumbnail_prompt')
             prepare_visuals(Path(folder),fresh)
-            self.assertEqual(model.call_count,56)
+            self.assertEqual(model.call_count,58)
             self.assertEqual(fresh['visuals'],story['visuals'])
 
     def test_unfixed_repetitions_fail_before_narration(self):

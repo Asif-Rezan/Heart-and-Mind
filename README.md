@@ -402,3 +402,9 @@ Rendering now starts with a large, visible foreground story object and keeps eve
 setting concise for CLIP. Spoken dialogue and optional hair detail cannot displace the object.
 A saved preview plan can be rerendered with `reuse_plan_run` without rerunning Qwen; the source
 quote is revalidated and the current rendering version is recorded separately from planning.
+
+Thumbnail scene selection now returns only an index/question. A separate production scene worker
+composes from exactly that one narration, preventing multi-beat context from contaminating the
+translation. Two rejected choices recover from opening scene zero with an explicit warning.
+Rerendering an unapproved saved thumbnail may reuse the same-story opening background contract;
+source identity, narration quote, native thumbnail dimensions and unapproved status are preserved.
