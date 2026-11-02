@@ -7,8 +7,8 @@ from story_thumbnail import SOURCE_SIZE, EXPORT_SIZE, export_thumbnail
 from story_image_cpu import generate, MODEL, REVISION, negative_prompt, GUIDANCE_SCALE
 
 SCENES = {
-    'background': 'Beautiful adult Indian woman, long dark braid, turquoise sari, discovering a locked wooden chest in a sunlit attic, holding a brass key, curious expression, warm golden rays.',
-    'thumbnail': 'Large partly-open wooden chest in foreground, golden light through narrow lid gap, contents hidden. Beautiful adult Indian woman beside chest, turquoise sari, long dark braid, wide-eyed surprise, raising brass key.',
+    'background': 'Beautiful adult Indian woman with fair skin and refined features, long dark braid, turquoise sari, discovering a locked wooden chest in a sunlit attic, holding a brass key, curious expression, warm golden rays.',
+    'thumbnail': 'Large partly-open wooden chest in foreground, golden light through narrow lid gap, contents hidden. Beautiful adult Indian woman with fair skin and refined features beside chest, turquoise sari, long dark braid, wide-eyed surprise, raising brass key.',
 }
 
 

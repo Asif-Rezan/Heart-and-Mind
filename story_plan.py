@@ -1,4 +1,5 @@
 """Checkpointed outline, independent chapter workers, then one validated reservation."""
+from story_art_style import CAST_DIRECTION
 import copy
 import hashlib
 import json
@@ -41,6 +42,7 @@ def prepare_outline(root, run_id, history):
             f'Create an ORIGINAL {duration_text} Hindi emotional motivational story for Heart and Mind. '
             'Credible everyday Indian family, work or study conflict; meaningful choice; earned hopeful ending. '
             'No instant riches, copied plots, sermons or nursery rhymes. One male narrator tells the entire story, including any quoted dialogue. All characters retain fixed names, relationships and appearance. '
+            +CAST_DIRECTION+
             'Hindi Devanagari title/description. English planning prose: summary about 350 characters, '
             'character descriptions about 220 characters: name, exact age, hair, fixed clothing and colors for each person, world about 140 characters. '
             'Plan exactly SIX chronological chapter beats (about 120 characters each): beginning, struggle, '
@@ -54,7 +56,7 @@ def prepare_outline(root, run_id, history):
             'not artificial disasters. AFTER the emotional resolution, reserve the penultimate scene for a brief friendly '
             'invitation to subscribe to Heart and Mind, and the final scene for one story-specific reflective question '
             'inviting viewers to comment. Keep both natural and short; no pressure, guilt or repeated requests. '
-            +chapter_text+'Pastel cute 3D storybook world. '
+            +chapter_text+'Realistic cinematic 3D storytelling world with natural facial proportions. '
             'Avoid previous titles and plots: '+json.dumps(recent,ensure_ascii=False),
             seed,2800,checkpoint=root/'outline-response.json')
         draft=dict(run_id=run_id,version=VERSION,format=requested_format,outline=outline,chapters=[])
@@ -541,6 +543,7 @@ def visual_batch(root,story,slots,identity):
         'Use the canonical age, hair, clothing colors, props and architecture consistently. State visible appearance explicitly, '
         'not just a character name. At most two visible people. Never invent a new character or change clothes. '
         'One action per frame, main person and prop clear, same colorful 3D storybook style. '
+        +CAST_DIRECTION+
         'Keep each prompt under about 60 English words, put action and defining appearance first. '
         'Canonical cast: '+story['characters']+' World: '+story['world']+
         '\nCanonical plot: '+story['summary']+
@@ -561,7 +564,8 @@ def thumbnail_plan(root,story,identity):
         'strong subject/background contrast, bright face lighting, bold saturated complementary colors, '
         'uncluttered composition, instantly readable emotional stakes, no tiny details, no text or lettering. '
         'Create curiosity about the real conflict without inventing danger, wealth, tears or plot events. '
-        'Use polished 3D storybook graphics. A beautiful adult woman may be the focal character only when she is in the actual scene; preserve her canonical age and appearance. '
+        +CAST_DIRECTION+
+        'Use realistic cinematic 3D storybook graphics. A beautiful adult woman may be the focal character only when she is in the actual scene; preserve her canonical age and appearance. '
             'Show the moment before the real choice or reveal, leaving its outcome unseen to create a curiosity gap. '
             'Start with the large story object and its unresolved visual clue, then the character reacting beside it. '
         'Use a medium shot with face and object both clearly visible, not an isolated beauty portrait. '
