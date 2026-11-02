@@ -46,7 +46,7 @@ class StoryChecks(unittest.TestCase):
         self.assertTrue(prompt.startswith('3D storybook illustration'))
         self.assertIn(story['scenes'][0]['visual'],prompt)
         self.assertIn('balanced facial features',prompt)
-        self.assertIn('warm soft key light',prompt)
+        self.assertIn('soft lighting',prompt)
         self.assertIn(story['characters'],prompt)
 
     def test_music_covers_all_speech_without_tiny_or_overlong_requests(self):
