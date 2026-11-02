@@ -7,7 +7,7 @@ import re
 
 MODEL = 'Salesforce/blip-vqa-base'
 REVISION = '787b3d35d57e49572baabd22884b3d5a05acf072'
-VERSION = 'open-vqa-v1'
+VERSION = 'open-vqa-v2'
 _processor = _model = None
 
 
@@ -58,14 +58,14 @@ def cache_current(saved, plan, target):
     review = saved.get('review', {})
     return ({k:v for k,v in saved.items() if k != 'review'} == plan and
             review.get('version') == VERSION and review.get('model') == MODEL and
-            review.get('revision') == REVISION and review.get('passed') is True and
+            review.get('revision') == REVISION and (review.get('passed') is True or review.get('fallback') in ('best-candidate','neutral-background')) and
             review.get('source_sha256') == digest(target))
 
 
 def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs):
     from story_image_cpu import generate
     from story_thumbnail import export_thumbnail
-    from story_writer import save_json, StoryValidationError
+    from story_writer import save_json
     path = Path(path)
     work = path.parent/'image-review'/path.stem
     work.mkdir(parents=True, exist_ok=True)
@@ -75,14 +75,24 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
         composition = prompt if attempt == 0 else (
             'Wide narrative scene. '+contract['prompt']+
             ' Show the complete action and the important story object prominently. Cinematic 3D render.')
-        generate(composition, candidate, seed=seed+attempt*7919,
-                 negative_extra='headshot, beauty portrait, fashion editorial, isolated face', **kwargs)
-        checked = candidate
-        if kind == 'thumbnail':
-            checked = candidate.with_suffix('.jpg')
-            export_thumbnail(candidate, checked)
-        report = review_image(checked, contract['checks'])
-        report.update(attempt=attempt, prompt=composition, source_sha256=digest(candidate))
+        try:
+            generate(composition, candidate, seed=seed+attempt*7919,
+                     negative_extra='headshot, beauty portrait, fashion editorial, isolated face', **kwargs)
+            from PIL import Image
+            with Image.open(candidate) as image:image.verify()
+            checked = candidate
+            if kind == 'thumbnail':
+                checked = candidate.with_suffix('.jpg')
+                export_thumbnail(candidate, checked)
+            try:
+                report = review_image(checked, contract['checks'])
+            except Exception as exc:
+                report = dict(version=VERSION,model=MODEL,revision=REVISION,passed=False,
+                              answers=[],error_type=type(exc).__name__)
+            report.update(attempt=attempt, prompt=composition, source_sha256=digest(candidate))
+        except Exception as exc:
+            report = dict(version=VERSION,model=MODEL,revision=REVISION,passed=False,
+                          answers=[],attempt=attempt,error_type=type(exc).__name__)
         reports.append(report)
         save_json(work/'reviews.json', reports)
         print(json.dumps(dict(phase='story image review',kind=kind,attempt=attempt,passed=report['passed'],answers=report['answers'])),flush=True)
@@ -90,4 +100,31 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
             path.parent.mkdir(parents=True,exist_ok=True)
             candidate.replace(path)
             return report
-    raise StoryValidationError('image_story_mismatch',dict(kind=kind,attempts=2,reviews=str(work/'reviews.json')))
+    # A failed quality/service check must not discard narration or stop the video.
+    available=[r for r in reports if r.get('source_sha256')]
+    if available:
+        report=max(available,key=lambda r:sum(a.get('passed',False) for a in r['answers'])).copy()
+        (work/f"candidate-{report['attempt']}.png").replace(path)
+        report['fallback']='best-candidate'
+    else:
+        neutral_background(path,kwargs.get('width',1024),kwargs.get('height',576),seed)
+        report=dict(version=VERSION,model=MODEL,revision=REVISION,passed=False,answers=[],
+                    fallback='neutral-background',error_type='generation_unavailable')
+    report['source_sha256']=digest(path)
+    save_json(work/'fallback.json',report)
+    print(json.dumps(dict(phase='story image fallback',kind=kind,mode=report['fallback'])),flush=True)
+    return report
+
+
+def neutral_background(path,width,height,seed):
+    """Offline, text-free emergency asset; never pretends to depict a plot event."""
+    from PIL import Image, ImageDraw, ImageFilter
+    image=Image.new('RGB',(width,height))
+    draw=ImageDraw.Draw(image)
+    for y in range(height):
+        ratio=y/max(1,height-1)
+        draw.line((0,y,width,y),fill=(int(25+50*ratio),int(37+38*ratio),int(62+20*ratio)))
+    draw.ellipse((width*.55,-height*.3,width*1.3,height*.8),fill=(127,96,70))
+    image=image.filter(ImageFilter.GaussianBlur(max(1,width/18)))
+    Path(path).parent.mkdir(parents=True,exist_ok=True)
+    image.save(path)

@@ -108,7 +108,50 @@ class StoryVisualChecks(unittest.TestCase):
             Image.new('RGB',(1344,768),'green').save(target)
             self.assertFalse(cache_current(saved,plan,target))
 
-    def test_all_rejected_candidates_stop_without_a_portrait_fallback(self):
+    def test_generation_and_review_service_failures_do_not_stop_images(self):
+        contract=record_for(dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and begins reading beside the counter.'))
+        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=RuntimeError('offline')) as model:
+            target=Path(folder)/'scene.png'
+            report=generate_reviewed('Read the letter.',target,42,contract,width=640,height=360)
+            self.assertEqual(model.call_count,2)
+            self.assertEqual(report['fallback'],'neutral-background')
+            self.assertFalse(report['passed'])
+            with Image.open(target) as im:self.assertEqual(im.size,(640,360))
+            plan=dict(prompt='current composition',contract=contract)
+            self.assertTrue(cache_current(dict(plan,review=report),plan,target))
+        def draw(prompt,path,**kwargs):Image.new('RGB',(640,360),'blue').save(path)
+        with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=draw),patch('story_image_review.review_image',side_effect=RuntimeError('unavailable')):
+            target=Path(folder)/'scene.png'
+            report=generate_reviewed('Read the letter.',target,42,contract)
+            self.assertEqual(report['fallback'],'best-candidate')
+            self.assertTrue(target.exists())
+
+    def test_planning_service_failure_returns_honest_neutral_contracts(self):
+        from story_plan import visual_batch,thumbnail_plan
+        from story_visual_contract import is_fallback
+        story=short_story()
+        with tempfile.TemporaryDirectory() as folder,patch('story_plan.ask',side_effect=RuntimeError('offline')):
+            records=visual_batch(Path(folder),story,[0,1],'1234567')
+            self.assertEqual(set(records),{'0','1'})
+            self.assertTrue(all(is_fallback(r) and not r['planning_review']['passed'] for r in records.values()))
+            thumb=thumbnail_plan(Path(folder),story,'1234567')
+            self.assertTrue(is_fallback(thumb['thumbnail_contract']))
+
+    def test_fictional_name_in_vqa_is_rejected_without_model_review(self):
+        scene=dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and reads it.')
+        record=record_for(scene);record['people']='Arjun, 38, brown shirt'
+        record['prompt']=__import__('story_visual_contract').compile_contract(record)['prompt']
+        record['checks']=[dict(question='Who opens the letter?',answers=['Arjun'])]
+        with self.assertRaisesRegex(ValueError,'fictional_name'):validate_contract(record,scene)
+
+    def test_unsupported_details_override_positive_review_flags(self):
+        from story_visual_contract import assess_plan
+        record=record_for(dict(text='वह नाराज था।',visual='The man throws a broken toy into a pile.'))
+        verdict=dict(PLAN_VERDICT,source_translation='He was angry.',unsupported_details=['Throwing a toy is not narrated.'])
+        review=assess_plan(record,dict(text='वह नाराज था।'),'A man','Village',1,None,ask_fn=lambda *a,**kw:verdict)
+        self.assertFalse(review['passed'])
+
+    def test_all_rejected_candidates_keep_best_image_with_explicit_warning(self):
         def draw(prompt,path,**kwargs):Image.new('RGB',(64,36),'gold').save(path)
         def reject(path,checks):
             result=passed_review(path,checks);result['passed']=False
@@ -116,8 +159,10 @@ class StoryVisualChecks(unittest.TestCase):
         contract=record_for(dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and begins reading beside the counter.'))
         with tempfile.TemporaryDirectory() as folder,patch('story_image_cpu.generate',side_effect=draw) as model,patch('story_image_review.review_image',side_effect=reject):
             target=Path(folder)/'scene.png'
-            with self.assertRaisesRegex(ValueError,'image_story_mismatch'):generate_reviewed('Read the letter.',target,42,contract)
+            report=generate_reviewed('Read the letter.',target,42,contract)
+            self.assertFalse(report['passed'])
+            self.assertEqual(report['fallback'],'best-candidate')
             self.assertEqual(model.call_count,2)
-            self.assertFalse(target.exists())
+            self.assertTrue(target.exists())
             reports=json.loads((Path(folder)/'image-review'/'scene'/'reviews.json').read_text())
             self.assertEqual(len(reports),2)

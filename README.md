@@ -357,8 +357,8 @@ unrelated fixed chest/letter examples.
 Every new scene/thumbnail is checked on CPU with pinned public BLIP VQA weights
 (`Salesforce/blip-vqa-base`, revision `787b3d35d57e49572baabd22884b3d5a05acf072`).
 A missing story anchor causes a wider-composition retry with a different seed; two rejected
-candidates stop the worker before publication. Rejected candidates and answers are retained
-for review. Passing reports include a source-image hash; changed images, contracts or review
+candidates trigger an explicitly flagged best-candidate fallback so video production continues.
+Rejected candidates and answers are retained for review. All reports include a source-image hash; changed images, contracts or review
 versions invalidate the cache. Portrait references are no longer used as scene/thumbnail
 composition inputs. Image workers have a bounded 180-minute budget for the additional checks.
 
@@ -371,3 +371,16 @@ These checks screen for story adherence; they are not a measured CTR score or a 
 correct visual semantics. Review the accepted pixels against the saved evidence and viewer
 question before judging the thumbnail, and use real impressions/clicks to evaluate CTR.
 Thumbnail generation remains 1344×768 with a centered 16:9 crop and 1920×1080 JPEG export.
+
+
+Artwork recovery: planning, diffusion and VQA failures are isolated from narration/video production.
+A rejected plan is retried before a neutral, canonical-setting composition is used; it is explicitly
+marked as a planning fallback, never as a passed review. Image generation/review has two bounded
+attempts. If neither passes, the generated candidate with the most successful checks is retained
+with `passed: false` and `fallback: best-candidate`. If no valid image exists, Pillow creates an
+offline, text-free neutral background. Manifests and `image-review/*/fallback.json` record these
+states; cached fallback images are hash-checked and reused on resume. They are usable recovery
+assets, not proof of story fidelity or thumbnail quality. Storage exhaustion, a killed runner or
+invalid narration still require restoring the underlying environment/input. Diagnostic regression
+audits run separately and cannot prevent preview image generation. Background slots change every
+four seconds for short stories, matched to the overlapping narrated beat.

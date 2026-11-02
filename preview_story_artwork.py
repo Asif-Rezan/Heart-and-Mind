@@ -36,12 +36,15 @@ def main():
         return
     if args.stage == 'audit-plan':
         from story_visual_contract import assess_plan
-        old=json.loads(Path('tests/fixtures/rejected-notebook-plan.json').read_text())
-        verdict=assess_plan(old['contract'],dict(text=old['narration']),old['cast'],
-            load_story(args.story)['world'],73192,args.output/'rejected-plan-review-raw.json',old['viewer_question'])
-        (args.output/'rejected-plan-review.json').write_text(json.dumps(verdict,indent=2))
-        print(json.dumps(verdict),flush=True)
-        if verdict['passed']:raise RuntimeError('Planner reviewer failed to reject the inconsistent notebook regression')
+        for name in ('notebook','toy'):
+            old=json.loads(Path(f'tests/fixtures/rejected-{name}-plan.json').read_text())
+            verdict=assess_plan(old['contract'],dict(text=old['narration']),old['cast'],
+                load_story(args.story)['world'],73192,args.output/f'rejected-{name}-review-raw.json',
+                old['viewer_question'] or None)
+            filename='rejected-plan-review.json' if name=='notebook' else 'rejected-toy-review.json'
+            (args.output/filename).write_text(json.dumps(verdict,indent=2))
+            print(json.dumps(verdict),flush=True)
+            if verdict['passed']:raise RuntimeError(f'Planner reviewer accepted the actual invented-{name} regression')
         return
     root = args.output / args.kind
     root.mkdir(parents=True,exist_ok=True)

@@ -1,7 +1,7 @@
 """Tie every composition and visual check to an exact spoken story scene."""
 import re
 
-VERSION = 'story-events-v2'
+VERSION = 'story-events-v3'
 ENGLISH_PATTERN = r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$'
 
 
@@ -13,6 +13,7 @@ def contract_schema():
         'people': {'type':'string','minLength':10,'maxLength':130},
         'setting': {'type':'string','minLength':5,'maxLength':60},
         'planning_review': {'type':'object'},
+        'fallback': {'type':'object'},
         'evidence': {'type': 'string', 'minLength': 8, 'maxLength': 360},
         'checks': {'type': 'array', 'minItems': 1, 'maxItems': 3, 'items': {
             'type': 'object', 'additionalProperties': False,
@@ -61,7 +62,11 @@ def validate_contract(record, scene):
         raise ValueError('visual_evidence_not_in_scene')
     if re.search(r'[\u0900-\u097f]', record['prompt']):
         raise ValueError('visual_prompt_not_english')
+    names = re.findall(r'\b([A-Z][a-z]+),?\s+\d{1,3}\b', record['people'])
     for check in record['checks']:
+        checked = check['question'] + ' ' + ' '.join(check['answers'])
+        if any(re.search(r'\b'+re.escape(name)+r'\b', checked, flags=re.I) for name in names):
+            raise ValueError('visual_check_uses_fictional_name_use_visible_category')
         question = check['question'].strip().lower()
         if not re.match(r'^(what|who|where|how many)\b', question):
             raise ValueError('visual_question_not_open')
@@ -85,13 +90,13 @@ def require_visuals(story):
         raise ValueError('visual_contract_coverage')
     for key, record in records.items():
         validate_contract(record, story['scenes'][int(key)])
-        if record.get('planning_review',{}).get('passed') is not True or record['planning_review'].get('version')!=REVIEW_VERSION:
+        if not is_fallback(record) and (record.get('planning_review',{}).get('passed') is not True or record['planning_review'].get('version')!=REVIEW_VERSION):
             raise ValueError('visual_planning_review_missing')
         if record['prompt'] != story['visuals'][key]:
             raise ValueError('visual_prompt_contract_mismatch')
     selected = story['thumbnail_scene']
     record = validate_contract(story['thumbnail_contract'], story['scenes'][selected])
-    if record.get('planning_review',{}).get('passed') is not True or record['planning_review'].get('version')!=REVIEW_VERSION:
+    if not is_fallback(record) and (record.get('planning_review',{}).get('passed') is not True or record['planning_review'].get('version')!=REVIEW_VERSION):
         raise ValueError('thumbnail_planning_review_missing')
     if record['prompt'] != story['thumbnail_prompt']:
         raise ValueError('thumbnail_prompt_contract_mismatch')
@@ -114,11 +119,12 @@ def compile_contract(record):
     return result
 
 
-REVIEW_VERSION = 'literal-scene-review-v1'
+REVIEW_VERSION = 'literal-scene-review-v2'
 REVIEW_SCHEMA = {
     'type':'object','additionalProperties':False,
-    'required':['faithful','visible_event','checks_observable','story_conflict','outcome_hidden','issues'],
-    'properties':{**{key:{'type':'boolean'} for key in (
+    'required':['source_translation','unsupported_details','faithful','visible_event','checks_observable','story_conflict','outcome_hidden','issues'],
+    'properties':{'source_translation':{'type':'string','minLength':10,'maxLength':500,'pattern':ENGLISH_PATTERN},
+        'unsupported_details':{'type':'array','maxItems':6,'items':{'type':'string','minLength':3,'maxLength':180,'pattern':ENGLISH_PATTERN}}, **{key:{'type':'boolean'} for key in (
         'faithful','visible_event','checks_observable','story_conflict','outcome_hidden')},
         'issues':{'type':'array','maxItems':4,'items':{'type':'string','minLength':5,'maxLength':220}}}}
 
@@ -128,7 +134,12 @@ def assess_plan(record,scene,cast,world,seed,checkpoint,viewer_question=None,ask
         from story_writer import ask as ask_fn
     import json
     verdict=ask_fn(REVIEW_SCHEMA,
-        'Independently audit this proposed image against ONE final narrated scene. Be strict. '
+        'First translate ONLY FINAL NARRATION literally into source_translation, without adding actions. '
+        'Next enumerate in unsupported_details EVERY candidate action/prop/state absent from that translation. '
+        'Then independently audit the proposed image. Be strict: plausible additions still count as invented. '
+        'For example anger does not imply throwing, picking up, burning, hitting or discarding an object. '
+        'A broken object does not imply anyone broke it deliberately or is holding it. '
+        'If narration is ambiguous, preserve that ambiguity; do not complete a missing story event. '
         'Do not use events from neighboring scenes or assume missing props/actions. '
         'Canonical cast and world may supply appearance/location only. Ordinary camera staging is allowed, '
         'but inventing a notebook, making a person hold an unmentioned object, or contradictory object states is not. '
@@ -139,12 +150,34 @@ def assess_plan(record,scene,cast,world,seed,checkpoint,viewer_question=None,ask
         'like man, woman, girl, toy or notebook; an image reviewer cannot know fictional names. '
         'For a thumbnail require a clear concrete conflict/decision/discovery with a real unresolved '
         'viewer question and leave its outcome unseen; a quiet solo portrait is not a conflict. '
-        'Explain every failed criterion briefly in English issues. When all criteria pass use issues=[]. '
+        'For backgrounds, story_conflict and outcome_hidden are informational only; never add issues for those two fields. '
+        'Explain failures of applicable criteria briefly in English issues. When all applicable criteria pass use issues=[]. '
         'Any issue means the plan is rejected. Do not rewrite the script. '
         'FINAL NARRATION: '+scene['text']+'\nCAST: '+cast+'\nWORLD: '+world+
         '\nCANDIDATE: '+json.dumps(record,ensure_ascii=False)+
         '\nTHUMBNAIL VIEWER QUESTION: '+str(viewer_question or 'Not a thumbnail; judge fidelity and visibility.'),
         seed,700,checkpoint=checkpoint)
-    passed=all(verdict[key] for key in ('faithful','visible_event','checks_observable')) and not verdict['issues']
+    passed=not verdict.get('unsupported_details') and all(verdict[key] for key in ('faithful','visible_event','checks_observable')) and not verdict['issues']
     if viewer_question is not None:passed=passed and verdict['story_conflict'] and verdict['outcome_hidden']
     return dict(version=REVIEW_VERSION,passed=bool(passed),verdict=verdict)
+
+
+FALLBACK_EVENT = 'An atmospheric establishing view of the story setting without plot action'
+FALLBACK_PEOPLE = 'No characters are shown in this establishing frame'
+
+
+def is_fallback(record):
+    return (record.get('fallback',{}).get('mode') == 'setting-only' and
+            record.get('event') == FALLBACK_EVENT and record.get('people') == FALLBACK_PEOPLE)
+
+
+def fallback_contract(scene, world, reason):
+    # No guessed translation or invented action when the language model fails.
+    setting = ' '.join(str(world).split())[:60].rstrip(' ,.;')
+    if len(setting)<5 or re.search(r'[\u0900-\u097f]',setting): setting='A quiet storybook setting'
+    record=compile_contract(dict(event=FALLBACK_EVENT,people=FALLBACK_PEOPLE,
+        setting=setting,evidence=scene['text'][:300],
+        checks=[dict(question='What is shown in the scene?',answers=['landscape','building','room','village'])]))
+    record['fallback']=dict(mode='setting-only',reason=reason)
+    record['planning_review']=dict(version=REVIEW_VERSION,passed=False,issues=['Planning unavailable; neutral establishing frame.'])
+    return validate_contract(record,scene)

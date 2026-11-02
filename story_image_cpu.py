@@ -42,7 +42,7 @@ GUIDANCE_SCALE = 7.0
 
 
 def negative_prompt():
-    return ('cartoon, caricature, oversized eyes, clay, doll, toy, flat 2D, anime, '
+    return ('cartoon, caricature, oversized eyes, clay, doll, flat 2D, anime, '
             'distorted face, crossed eyes, fused faces, extra fingers, '
             'text, letters, captions, typography, watermark, logo, '
             'waxy skin, plastic skin, orange skin, underexposed faces, silhouette, '

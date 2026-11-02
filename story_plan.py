@@ -536,7 +536,7 @@ def repair_repetition(root, story):
             requests=saved['requests'],rejections=saved['rejections']))
 
 
-def visual_batch(root,story,slots,identity):
+def _visual_batch(root,story,slots,identity):
     accepted={};pending=list(slots);feedback=''
     for attempt in range(2):
         schema=object_schema({f'scene_{i}':composition_schema() for i in pending})
@@ -565,7 +565,7 @@ def visual_batch(root,story,slots,identity):
     raise StoryValidationError('visual_planning_rejected',dict(scenes=pending))
 
 
-def thumbnail_plan(root,story,identity):
+def _thumbnail_plan(root,story,identity):
     feedback=''
     for attempt in range(2):
         response=ask(object_schema({
@@ -598,6 +598,30 @@ def thumbnail_plan(root,story,identity):
             feedback='\nYour previous scene '+str(scene)+' composition was rejected: '+str(exc)[:800]+'. Choose an actual visible conflict and correct the facts.'
             save_json(Path(root)/'thumbnail-plan-rejection.json',dict(scene=scene,reason=str(exc)))
     raise StoryValidationError('thumbnail_planning_rejected')
+
+
+def visual_batch(root,story,slots,identity):
+    try:
+        return _visual_batch(root,story,slots,identity)
+    except Exception as exc:
+        from story_visual_contract import fallback_contract
+        reason=type(exc).__name__
+        records={str(i):fallback_contract(story['scenes'][i],story['world'],reason) for i in slots}
+        save_json(Path(root)/'visual-fallbacks'/f'{slots[0]}.json',dict(reason=reason,scenes=slots))
+        print(json.dumps(dict(phase='visual planning fallback',scenes=slots,error_type=reason)),flush=True)
+        return records
+
+
+def thumbnail_plan(root,story,identity):
+    try:
+        return _thumbnail_plan(root,story,identity)
+    except Exception as exc:
+        from story_visual_contract import fallback_contract
+        record=fallback_contract(story['scenes'][0],story['world'],type(exc).__name__)
+        save_json(Path(root)/'thumbnail-fallback.json',record)
+        print(json.dumps(dict(phase='thumbnail planning fallback',error_type=type(exc).__name__)),flush=True)
+        return dict(thumbnail_scene=0,thumbnail_prompt=record['prompt'],thumbnail_contract=record,
+                    thumbnail_question='What happens next in this story?')
 
 
 def prepare_visuals(root, story):
