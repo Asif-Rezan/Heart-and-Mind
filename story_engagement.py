@@ -95,8 +95,21 @@ def polish_engagement(root,story):
         saved=dict(version=EDITOR_VERSION,identity=identity,scenes=story['scenes'],review=review,
                    tasks={str(i):value for i,value in tasks.items()},complete=[],approved=False,requests=0)
         save_json(path,saved)
+    # Older accepted edits can already contain the mandatory closing invitation.
+    # Repair those beats first: otherwise every valid final CTA is rejected as a
+    # repeated sentence, and retrying only the final scene cannot make progress.
+    for i, scene in enumerate(story['scenes'][:-1]):
+        if has_closing_cta([scene]):
+            key=str(i)
+            saved['tasks'][key]=(
+                'Replace the premature viewer comment invitation with a concrete story-world action or consequence. '
+                'No viewer address, comment request or closing invitation; preserve the canonical resolution.')
+            saved['approved']=False
+            if key in saved['complete']:
+                saved['complete'].remove(key)
+    save_json(path,saved)
     saved.setdefault('rejections',{})
-    pending=[int(i) for i in saved['tasks'] if i not in saved['complete']]
+    pending=sorted(int(i) for i in saved['tasks'] if i not in saved['complete'])
     print(json.dumps(dict(phase='fixed editorial plan',pending_scenes=pending,completed_scenes=len(saved['complete']))),flush=True)
     for start in range(0,len(pending),2):
         slots=pending[start:start+2]
@@ -134,6 +147,7 @@ def polish_engagement(root,story):
                 if normalized(value['text'])==normalized(story['scenes'][i]['text']):reason='unchanged_text'
                 elif speech_issues(value['text']):reason='invalid_hindi'
                 elif i==last and not has_closing_cta([value]):reason='closing_cta_missing'
+                elif i!=last and has_closing_cta([value]):reason='premature_closing_cta'
                 proposed=[dict(s) for s in story['scenes']]
                 proposed[i]=dict(value,index=i,speaker='narrator')
                 total=sum(len(s['text'].split()) for s in proposed)

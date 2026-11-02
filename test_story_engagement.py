@@ -133,6 +133,51 @@ class EngagementTests(unittest.TestCase):
             self.assertLessEqual(len(story['lyrics'].split()),720)
             self.assertTrue(json.loads((root/'engagement-review.json').read_text())['approved'])
 
+    def test_production_repeated_closing_repairs_earlier_accepted_cta_first(self):
+        import hashlib
+        from story_writer import repeated_scenes
+        fixture=json.loads((Path(__file__).parent/'tests/fixtures/editorial-run-41382361736.json').read_text())
+        story=dict(fixture['story'],**fixture['story']['outline']);saved=fixture['checkpoint']
+        story['scenes']=copy.deepcopy(saved['scenes'])
+        story['lyrics']='\n'.join(s['text'] for s in story['scenes'])
+        saved['identity']=hashlib.sha256(json.dumps(story['scenes'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        original=copy.deepcopy(story['scenes'])
+        failed=copy.deepcopy(original);failed[47]=saved['rejected_candidates']['47']
+        self.assertIn(47,repeated_scenes(failed))
+        self.assertIn('45',saved['complete'])
+        fixed45=dict(text='बच्चों ने नोटबुक खोलकर अपने अगले कदम साथ तय किए।',visual=original[45]['visual'])
+        fixed47=dict(text='आप इन बच्चों की जगह क्या चुनते? टिप्पणी में बताइए।',visual=original[47]['visual'])
+        calls=[]
+        def edit(schema,*args,**kwargs):
+            calls.append(set(schema['properties']))
+            from jsonschema import Draft202012Validator
+            result={key:fixed45 if key=='scene_45' else fixed47 for key in schema['properties']}
+            Draft202012Validator(schema).validate(result)
+            return result
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);save_json(root/'engagement-review.json',saved)
+            with patch('story_engagement.ask',side_effect=edit):polish_engagement(root,story)
+            self.assertEqual(calls,[{'scene_45','scene_47'}])
+            self.assertEqual(repeated_scenes(story['scenes']),repeated_scenes(original))
+            for i in range(48):
+                if i not in (45,47):self.assertEqual(story['scenes'][i],original[i])
+            self.assertTrue(json.loads((root/'engagement-review.json').read_text())['approved'])
+            fresh=copy.deepcopy(fixture['story']);fresh['scenes']=original
+            with patch('story_engagement.ask') as model:polish_engagement(root,fresh)
+            model.assert_not_called()
+
+    def test_new_premature_comment_is_rejected_before_it_can_block_final_scene(self):
+        story=short_story()
+        review=dict(hook=False,progression=True,payoff=True,cta=True,repairs=[])
+        visual=story['scenes'][0]['visual']
+        premature=dict(text='आप इस फैसले पर क्या सोचते हैं? टिप्पणी में बताइए।',visual=visual)
+        fixed=dict(text='आज राम ने बंद दुकान के बाहर एक अनजानी चिट्ठी देखी।',visual=visual)
+        with tempfile.TemporaryDirectory() as folder,patch('story_engagement.ask',side_effect=[review,{'scene_0':premature},{'scene_0':fixed}]) as model:
+            polish_engagement(Path(folder),story)
+            self.assertEqual(model.call_count,3)
+            self.assertIn('premature_closing_cta',model.call_args.args[1])
+            self.assertEqual(story['scenes'][0]['text'],fixed['text'])
+
     def test_cli_mix_failure_reports_exact_duration_difference(self):
         import sys
         from daily_story import main
