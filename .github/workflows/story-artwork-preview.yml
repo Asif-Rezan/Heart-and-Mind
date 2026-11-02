@@ -44,7 +44,7 @@ jobs:
   plan:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip story preview]')
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -84,21 +84,6 @@ jobs:
           name: story-artwork-plan-${{ matrix.kind }}
           path: output/story-artwork-preview/
           if-no-files-found: error
-  generate:
-    needs: [plan]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      matrix:
-        kind: [background, thumbnail]
-    env:
-      IMAGE_KIND: ${{ matrix.kind }}
-    steps:
-      - uses: actions/checkout@v4
-        with: {persist-credentials: false}
-      - uses: actions/setup-python@v5
-        with: {python-version: '3.12', cache: pip}
       - name: Prepare CPU image memory
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
@@ -109,11 +94,7 @@ jobs:
       - run: |
           pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements.txt -r requirements-images-cpu.txt
-      - uses: actions/download-artifact@v4
-        with:
-          name: story-artwork-plan-${{ matrix.kind }}
-          path: output/story-artwork-preview/
-      - name: Generate and reject candidates missing the actual story event
+      - name: Generate and review story artwork with bounded recovery
         run: python -u preview_story_artwork.py --stage generate --kind "$IMAGE_KIND"
       - uses: actions/upload-artifact@v4
         if: always()

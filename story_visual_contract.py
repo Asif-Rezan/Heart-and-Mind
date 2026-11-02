@@ -1,7 +1,7 @@
 """Tie every composition and visual check to an exact spoken story scene."""
 import re
 
-VERSION = 'story-events-v3'
+VERSION = 'story-events-v4'
 ENGLISH_PATTERN = r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$'
 
 
@@ -124,7 +124,7 @@ def compile_contract(record):
     return result
 
 
-REVIEW_VERSION = 'literal-scene-review-v2'
+REVIEW_VERSION = 'literal-scene-review-v3'
 REVIEW_SCHEMA = {
     'type':'object','additionalProperties':False,
     'required':['source_translation','unsupported_details','faithful','visible_event','checks_observable','story_conflict','outcome_hidden','issues'],
@@ -177,13 +177,17 @@ FALLBACK_PEOPLE = 'No characters are shown in this establishing frame'
 
 
 def is_fallback(record):
+    if record.get('fallback',{}).get('mode') == 'literal-scene':
+        return record.get('event') == record['fallback'].get('literal_event') and record.get('planning_review',{}).get('passed') is False
     return (record.get('fallback',{}).get('mode') == 'setting-only' and
             record.get('event') == FALLBACK_EVENT and record.get('people') == FALLBACK_PEOPLE)
 
 
 def fallback_contract(scene, world, reason):
     # No guessed translation or invented action when the language model fails.
-    setting = ' '.join(str(world).split())[:60].rstrip(' ,.;')
+    setting = ' '.join(str(world).split())
+    if len(setting)>60:setting=setting[:61].rsplit(' ',1)[0]
+    setting=setting.rstrip(' ,.;')
     if len(setting)<5 or re.search(r'[\u0900-\u097f]',setting): setting='A quiet storybook setting'
     record=compile_contract(dict(event=FALLBACK_EVENT,people=FALLBACK_PEOPLE,
         setting=setting,evidence=scene['text'][:300],
@@ -191,3 +195,21 @@ def fallback_contract(scene, world, reason):
     record['fallback']=dict(mode='setting-only',reason=reason)
     record['planning_review']=dict(version=REVIEW_VERSION,passed=False,issues=['Planning unavailable; neutral establishing frame.'])
     return validate_contract(record,scene)
+
+
+def literal_recovery(scene, candidate, reason):
+    """Reuse the translation, never the rejected composition's invented action."""
+    literal=candidate.get('literal_scene','').strip()
+    if len(literal)<15 or not re.fullmatch(ENGLISH_PATTERN,literal):return None
+    nouns=('notebook','letter','toy','book','door','key','box','bag','photograph','phone','tree','house','school')
+    anchor=next((word for word in nouns if re.search(r'\b'+word+r's?\b',literal,re.I)),None)
+    if anchor is None:return None
+    event=literal if len(literal)<=160 else literal[:161].rsplit(' ',1)[0]
+    if not re.search(r'\b'+anchor+r's?\b',event,re.I):return None
+    record=compile_contract(dict(event=event,people=candidate['people'],setting=candidate['setting'],
+        evidence=scene['text'][:300],checks=[dict(question='What object or place is central to the scene?',answers=[anchor])]))
+    record['fallback']=dict(mode='literal-scene',reason=reason,literal_event=event)
+    record['planning_review']=dict(version=REVIEW_VERSION,passed=False,
+        issues=['Rejected composition replaced by literal translation; not independently approved.'])
+    try:return validate_contract(record,scene)
+    except ValueError:return None

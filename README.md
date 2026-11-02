@@ -374,7 +374,7 @@ Thumbnail generation remains 1344×768 with a centered 16:9 crop and 1920×1080 
 
 
 Artwork recovery: planning, diffusion and VQA failures are isolated from narration/video production.
-A rejected plan is retried before a neutral, canonical-setting composition is used; it is explicitly
+A rejected plan is retried before a simple literal-translation recovery frame is used when it has a concrete anchor; if unavailable, a neutral canonical-setting composition is used; it is explicitly
 marked as a planning fallback, never as a passed review. Image generation/review has two bounded
 attempts. If neither passes, the generated candidate with the most successful checks is retained
 with `passed: false` and `fallback: best-candidate`. If no valid image exists, Pillow creates an
@@ -384,3 +384,7 @@ assets, not proof of story fidelity or thumbnail quality. Storage exhaustion, a 
 invalid narration still require restoring the underlying environment/input. Diagnostic regression
 audits run separately and cannot prevent preview image generation. Background slots change every
 four seconds for short stories, matched to the overlapping narrated beat.
+
+Preview background and thumbnail workers now plan and generate independently, so a slow thumbnail
+plan cannot hold back the background image. Literal translation recovery discards the rejected
+composition action and records an unapproved planning fallback; it is not a passed semantic audit.

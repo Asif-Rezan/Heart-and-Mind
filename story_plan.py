@@ -562,7 +562,13 @@ def _visual_batch(root,story,slots,identity):
         pending=list(errors)
         feedback='\nPrevious compositions were rejected. Correct these issues without changing narration: '+json.dumps(errors)
         save_json(Path(root)/'visual-plan-rejections.json',errors)
-    raise StoryValidationError('visual_planning_rejected',dict(scenes=pending))
+    from story_visual_contract import literal_recovery, fallback_contract
+    for i in pending:
+        recovered=literal_recovery(story['scenes'][i],response[f'scene_{i}'],'visual_planning_rejected')
+        accepted[str(i)]=recovered or fallback_contract(story['scenes'][i],story['world'],'visual_planning_rejected')
+    save_json(Path(root)/'visual-fallbacks'/f'{slots[0]}.json',{str(i):accepted[str(i)]['fallback'] for i in pending})
+    print(json.dumps(dict(phase='visual planning fallback',scenes=pending)),flush=True)
+    return accepted
 
 
 def _thumbnail_plan(root,story,identity):
@@ -597,6 +603,13 @@ def _thumbnail_plan(root,story,identity):
         except ValueError as exc:
             feedback='\nYour previous scene '+str(scene)+' composition was rejected: '+str(exc)[:800]+'. Choose an actual visible conflict and correct the facts.'
             save_json(Path(root)/'thumbnail-plan-rejection.json',dict(scene=scene,reason=str(exc)))
+    from story_visual_contract import literal_recovery
+    recovered=literal_recovery(story['scenes'][scene],response['visual'],'thumbnail_planning_rejected')
+    if recovered:
+        save_json(Path(root)/'thumbnail-fallback.json',recovered)
+        print(json.dumps(dict(phase='thumbnail planning fallback',mode='literal-scene',scene=scene)),flush=True)
+        return dict(thumbnail_scene=scene,thumbnail_prompt=recovered['prompt'],thumbnail_contract=recovered,
+                    thumbnail_question=response['viewer_question'])
     raise StoryValidationError('thumbnail_planning_rejected')
 
 

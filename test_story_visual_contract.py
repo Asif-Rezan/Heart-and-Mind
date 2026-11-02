@@ -138,6 +138,19 @@ class StoryVisualChecks(unittest.TestCase):
             thumb=thumbnail_plan(Path(folder),story,'1234567')
             self.assertTrue(is_fallback(thumb['thumbnail_contract']))
 
+    def test_literal_recovery_discards_rejected_action_and_never_claims_approval(self):
+        from story_visual_contract import literal_recovery,is_fallback
+        scene=dict(text='बारिश में निति का खिलौना टूट गया।',visual='The toy is broken in the rain.')
+        raw=dict(literal_scene="Niti's toy is broken in the rain.",event='Father throws the toy away.',
+                 people='Arjun, 38, brown shirt; Niti, 10, red kurta',setting='A village porch')
+        record=literal_recovery(scene,raw,'rejected')
+        self.assertTrue(is_fallback(record))
+        self.assertNotIn('throws',record['prompt'])
+        self.assertFalse(record['planning_review']['passed'])
+        self.assertEqual(record['checks'][0]['answers'],['toy'])
+        validate_contract(record,scene)
+        self.assertIsNone(literal_recovery(scene,dict(raw,literal_scene='She silently considered her future.'),'rejected'))
+
     def test_fictional_name_in_vqa_is_rejected_without_model_review(self):
         scene=dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and reads it.')
         record=record_for(scene);record['people']='Arjun, 38, brown shirt'
