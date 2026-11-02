@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 from story_writer import (ask, OUTLINE, CHAPTER, VERSION, VOICES, save_json,
-                          validate_story, novelty_reason, text_hash, StoryValidationError, object_schema, string, speech_issues, normalize_planning)
+                          validate_story, novelty_reason, text_hash, StoryValidationError, object_schema, string, speech_issues, normalize_planning, english_planning)
 
 from story_engagement import chapter_direction
 from story_format import FORMAT, MIN_WORDS, MAX_WORDS, SAMPLE_FORMAT, is_short, is_sample, scenes_per_chapter, word_bounds
@@ -570,7 +570,7 @@ def thumbnail_plan(root,story,identity):
     for attempt in range(2):
         response=ask(object_schema({
             'scene':{'type':'integer','minimum':0,'maximum':len(story['scenes'])-1},
-            'visual':composition_schema(), 'viewer_question':string(10,180)}),
+            'visual':composition_schema(), 'viewer_question':english_planning(10,180)}),
             'Design a truthful story-driven YouTube thumbnail from the FINAL spoken script. '
             'Prioritize a concrete scene with TWO interacting/opposing characters and an important story object '
             'over passive thinking, scenery or a solo portrait. Select the conflict/choice BEFORE its outcome. '

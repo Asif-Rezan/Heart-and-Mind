@@ -40,6 +40,25 @@ class StoryVisualChecks(unittest.TestCase):
             self.assertTrue(result['0']['planning_review']['passed'])
             self.assertTrue(result['0']['prompt'].startswith(corrected['event']))
 
+    def test_composition_schema_enforces_english_and_count_answers_match_digits(self):
+        from jsonschema import Draft202012Validator
+        from story_visual_contract import composition_schema
+        record=record_for(dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and begins reading beside the counter.'))
+        raw={k:v for k,v in record.items() if k not in ('prompt','planning_review')}
+        schema=composition_schema();self.assertTrue(Draft202012Validator(schema).is_valid(raw))
+        raw['event']='उसने चिट्ठी खोलकर पढ़ना शुरू किया।'
+        self.assertFalse(Draft202012Validator(schema).is_valid(raw))
+        self.assertTrue(matches('2',['two']))
+        self.assertFalse(matches('3',['two']))
+
+    def test_plan_audit_accepts_rejection_even_if_one_individual_criterion_passes(self):
+        import sys
+        import preview_story_artwork
+        verdict=dict(version='test',passed=False,verdict=dict(faithful=True,checks_observable=False))
+        with tempfile.TemporaryDirectory() as folder,patch.object(sys,'argv',['preview','--stage','audit-plan','--output',folder]),patch('story_visual_contract.assess_plan',return_value=verdict):
+            preview_story_artwork.main()
+            self.assertFalse(json.loads((Path(folder)/'rejected-plan-review.json').read_text())['passed'])
+
     def test_paraphrased_or_other_scene_evidence_is_rejected(self):
         scene=dict(text='उसने चिट्ठी खोली और चुपचाप पढ़ने लगा।',visual='The man opens a letter and begins reading beside the counter.')
         record=record_for(scene)

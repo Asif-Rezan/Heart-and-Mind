@@ -41,7 +41,7 @@ def main():
             load_story(args.story)['world'],73192,args.output/'rejected-plan-review-raw.json',old['viewer_question'])
         (args.output/'rejected-plan-review.json').write_text(json.dumps(verdict,indent=2))
         print(json.dumps(verdict),flush=True)
-        if verdict['verdict']['faithful']:raise RuntimeError('Planner reviewer failed to reject the invented notebook regression')
+        if verdict['passed']:raise RuntimeError('Planner reviewer failed to reject the inconsistent notebook regression')
         return
     root = args.output / args.kind
     root.mkdir(parents=True,exist_ok=True)

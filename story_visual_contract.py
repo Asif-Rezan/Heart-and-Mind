@@ -2,10 +2,11 @@
 import re
 
 VERSION = 'story-events-v2'
+ENGLISH_PATTERN = r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$'
 
 
 def contract_schema():
-    return {'type': 'object', 'additionalProperties': False,
+    schema = {'type': 'object', 'additionalProperties': False,
             'required': ['prompt', 'event', 'people', 'setting', 'evidence', 'checks'], 'properties': {
         'prompt': {'type': 'string', 'minLength': 40, 'maxLength': 360},
         'event': {'type':'string','minLength':15,'maxLength':160},
@@ -19,6 +20,13 @@ def contract_schema():
                 'question': {'type': 'string', 'minLength': 8, 'maxLength': 140},
                 'answers': {'type': 'array', 'minItems': 1, 'maxItems': 8,
                             'items': {'type': 'string', 'minLength': 1, 'maxLength': 40}}}}}}}
+
+    for field in ('prompt','event','people','setting'):
+        schema['properties'][field]['pattern']=ENGLISH_PATTERN
+    check=schema['properties']['checks']['items']['properties']
+    check['question']['pattern']=ENGLISH_PATTERN
+    check['answers']['items']['pattern']=ENGLISH_PATTERN
+    return schema
 
 
 DIRECTION = (
@@ -34,7 +42,10 @@ DIRECTION = (
     'in questions/answers. Questions start What, Who, Where or How many; no yes/no questions, '
     'no expected-answer hints in the question, no beauty/skin/clothing checks. '
     'The checked action and object state must agree with the composition: an object cannot be held '
-    'and on the ground at the same time. Example: What is the girl holding? answers: notebook, book. '
+    'and on the ground at the same time. Answer alternatives are short visible category labels, '
+    'not sentences or guesses about unseen details; omit articles and size/material adjectives. '
+    'For counts use English number words. Every event/people/setting/question/answer field is English; '
+    'ONLY evidence copies the Hindi source. '
 )
 
 
@@ -128,11 +139,12 @@ def assess_plan(record,scene,cast,world,seed,checkpoint,viewer_question=None,ask
         'like man, woman, girl, toy or notebook; an image reviewer cannot know fictional names. '
         'For a thumbnail require a clear concrete conflict/decision/discovery with a real unresolved '
         'viewer question and leave its outcome unseen; a quiet solo portrait is not a conflict. '
-        'Explain every failed criterion briefly in English issues. Do not rewrite the script. '
+        'Explain every failed criterion briefly in English issues. When all criteria pass use issues=[]. '
+        'Any issue means the plan is rejected. Do not rewrite the script. '
         'FINAL NARRATION: '+scene['text']+'\nCAST: '+cast+'\nWORLD: '+world+
         '\nCANDIDATE: '+json.dumps(record,ensure_ascii=False)+
         '\nTHUMBNAIL VIEWER QUESTION: '+str(viewer_question or 'Not a thumbnail; judge fidelity and visibility.'),
         seed,700,checkpoint=checkpoint)
-    passed=all(verdict[key] for key in ('faithful','visible_event','checks_observable'))
+    passed=all(verdict[key] for key in ('faithful','visible_event','checks_observable')) and not verdict['issues']
     if viewer_question is not None:passed=passed and verdict['story_conflict'] and verdict['outcome_hidden']
     return dict(version=REVIEW_VERSION,passed=bool(passed),verdict=verdict)

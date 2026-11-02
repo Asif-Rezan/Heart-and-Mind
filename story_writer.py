@@ -231,7 +231,8 @@ def language_contract(schema):
                 'For example text: उसने दरवाजा खोलकर चिट्ठी पढ़ी। Keys named visual or instruction are English. '
                 'Preserve the supplied canonical story; return JSON only.')
     return ('Write original Hindi emotional fiction. Title and description are Hindi Devanagari. '
-            'English-only planning keys are summary, characters, world, chapters, visual and instruction. '
+            'English-only planning keys are summary, characters, world, chapters, visual, instruction, event, '
+            'people, setting, prompt, question, answers and viewer_question. Evidence alone copies the supplied Hindi quotation exactly. '
             'Use transliterated names in English planning, never translate spoken Hindi into English. Return JSON only.')
 
 

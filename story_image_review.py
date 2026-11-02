@@ -16,7 +16,8 @@ def digest(path):
 
 
 def normalized(text):
-    return ' '.join(re.findall(r'[a-z0-9]+', text.lower()))
+    counts=dict(one='1',two='2',three='3',four='4',five='5',six='6',seven='7',eight='8',nine='9',ten='10')
+    return ' '.join(counts.get(word,word) for word in re.findall(r'[a-z0-9]+', text.lower()))
 
 
 def matches(answer, expected):
