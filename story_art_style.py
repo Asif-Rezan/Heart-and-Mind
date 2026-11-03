@@ -66,8 +66,8 @@ def music_portrait_prompt(record, kind, token_count=None, max_tokens=77):
     """A single pair and neutral color survive the encoders' limited context."""
     import re
     couple = record['music_portrait']['couple']
-    subject = ('A man and a woman embracing, western casual shirts and jeans. '
-               if couple else 'Adult woman in western blouse and jeans, hopeful smile. ')
+    subject = ('A man in a T-shirt embracing a woman in a casual top, western clothing. '
+               if couple else 'Adult woman in a casual top, western clothing, hopeful smile. ')
     framing = 'Chest-up, faces large. ' if kind == 'thumbnail' else 'Waist-up. '
     pose = 'Both faces visible, gentle smiles. ' if couple else 'Face visible. '
     lead = subject + framing + pose + 'Neutral white balance, natural skin tones, daylight, sharp eyes. '

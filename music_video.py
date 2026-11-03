@@ -24,7 +24,7 @@ from story_writer import save_json
 
 FORMAT = 'hindi-music-storybook-5s-v1'
 VERSION = 'cinematic-music-edit-v1'
-MUSIC_ART_VERSION = 'romantic-couple-western-v5'
+MUSIC_ART_VERSION = 'romantic-couple-tshirt-top-v6'
 IMAGE_SECONDS = 5
 FPS = 25
 DISSOLVE = .4
@@ -79,8 +79,8 @@ def scene_contract(song, index, count, kind='background'):
     event='; '.join(clauses) or defaults[mood]
     if len(event)>160:event=event[:161].rsplit(' ',1)[0]
     if len(event)<15:event=defaults[mood]
-    people='woman, 28, Indian, casual blouse and jeans'
-    if mood!='healing':people+='; man, 30, Indian, casual shirt and jeans'
+    people='woman, 28, Indian, casual top'
+    if mood!='healing':people+='; man, 30, Indian, T-shirt'
     lines=[x.strip() for x in song['lyrics'].splitlines() if x.strip() and not x.lstrip().startswith('[')]
     evidence=(lines[min(len(lines)-1,int(index/max(1,count)*len(lines)))] if lines else song['lyrics'])[:300]
     checks=[dict(question='Who is shown in this scene?',answers=['woman'] if mood=='healing' else ['couple'])]

@@ -98,8 +98,9 @@ class MusicVideoTests(unittest.TestCase):
             for attempt in (0,1):
                 prompt=focused_prompt(plan['contract'],kind,attempt,
                                       token_count=lambda text:len(text.split())+30)
-                self.assertIn('A man and a woman embracing',prompt)
-                self.assertIn('western casual shirts and jeans',prompt)
+                self.assertIn('A man in a T-shirt embracing a woman in a casual top',prompt)
+                self.assertIn('western clothing',prompt)
+                self.assertNotIn('blouse',prompt)
                 self.assertNotIn('sari',prompt)
                 self.assertNotIn('kurta',prompt)
                 self.assertNotIn('An adult couple',prompt)
