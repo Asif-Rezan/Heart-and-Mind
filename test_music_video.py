@@ -98,10 +98,9 @@ class MusicVideoTests(unittest.TestCase):
             for attempt in (0,1):
                 prompt=focused_prompt(plan['contract'],kind,attempt,
                                       token_count=lambda text:len(text.split())+30)
-                self.assertIn('A man in a T-shirt embracing a woman in a casual top',prompt)
-                self.assertIn('western clothing',prompt)
+                self.assertIn('Adult man in a ',prompt)
+                self.assertIn('embracing an adult woman',prompt)
                 self.assertNotIn('blouse',prompt)
-                self.assertNotIn('sari',prompt)
                 self.assertNotIn('kurta',prompt)
                 self.assertNotIn('An adult couple',prompt)
                 self.assertNotIn('warm',prompt)
@@ -112,6 +111,16 @@ class MusicVideoTests(unittest.TestCase):
                 self.assertNotIn('Wide shot',prompt)
             self.assertIn(dict(question='How many faces are visible?',answers=['two']),
                           plan['contract']['checks'])
+
+    def test_music_outfits_choose_one_of_the_requested_options(self):
+        for index in range(12):
+            for kind in ('background','thumbnail'):
+                contract=mv.scene_contract(SONG,index,12,kind)
+                outfits=contract['music_portrait']
+                self.assertIn(outfits['male_outfit'],('shirt','T-shirt'))
+                self.assertIn(outfits['female_outfit'],('casual top','sari','stylish fitted dress'))
+                self.assertIn(outfits['female_outfit'],contract['people'])
+                self.assertEqual(outfits,mv.scene_contract(SONG,index,12,kind)['music_portrait'])
 
     def test_failed_music_review_cannot_publish_best_candidate(self):
         from story_image_review import generate_reviewed

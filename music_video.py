@@ -24,7 +24,7 @@ from story_writer import save_json
 
 FORMAT = 'hindi-music-storybook-5s-v1'
 VERSION = 'cinematic-music-edit-v1'
-MUSIC_ART_VERSION = 'romantic-couple-tshirt-top-v6'
+MUSIC_ART_VERSION = 'romantic-couple-outfits-v7'
 IMAGE_SECONDS = 5
 FPS = 25
 DISSOLVE = .4
@@ -79,8 +79,12 @@ def scene_contract(song, index, count, kind='background'):
     event='; '.join(clauses) or defaults[mood]
     if len(event)>160:event=event[:161].rsplit(' ',1)[0]
     if len(event)<15:event=defaults[mood]
-    people='woman, 28, Indian, casual top'
-    if mood!='healing':people+='; man, 30, Indian, T-shirt'
+    # Select one outfit per image rather than asking diffusion to draw alternatives.
+    outfit_key=int(hashlib.sha256((song_identity(song)+':outfit:'+kind+':'+str(index)).encode()).hexdigest()[:8],16)
+    male_outfit=('shirt','T-shirt')[outfit_key % 2]
+    female_outfit=('casual top','sari','stylish fitted dress')[(outfit_key // 2) % 3]
+    people='woman, 28, Indian, '+female_outfit
+    if mood!='healing':people+='; man, 30, Indian, '+male_outfit
     lines=[x.strip() for x in song['lyrics'].splitlines() if x.strip() and not x.lstrip().startswith('[')]
     evidence=(lines[min(len(lines)-1,int(index/max(1,count)*len(lines)))] if lines else song['lyrics'])[:300]
     checks=[dict(question='Who is shown in this scene?',answers=['woman'] if mood=='healing' else ['couple'])]
@@ -88,7 +92,8 @@ def scene_contract(song, index, count, kind='background'):
         checks.extend([dict(question='How many people are shown?',answers=['two']),
                        dict(question='How many faces are visible?',answers=['two'])])
     record=compile_contract(dict(event=event,people=people,setting='The lyric-specific music video setting',evidence=evidence,checks=checks))
-    record['music_portrait']=dict(version=MUSIC_ART_VERSION,couple=mood!='healing')
+    record['music_portrait']=dict(version=MUSIC_ART_VERSION,couple=mood!='healing',
+                                 male_outfit=male_outfit,female_outfit=female_outfit)
     record['fallback']=dict(mode='authored-scene',literal_event=event,reason='songwriter-visual-direction')
     record['planning_review']=dict(version=PLAN_REVIEW_VERSION,passed=False,
         issues=['Creative interpretation of the song; not independently verified lyric alignment.'])
