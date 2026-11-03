@@ -100,8 +100,9 @@ class MusicVideoTests(unittest.TestCase):
             for attempt in (0,1):
                 prompt=focused_prompt(plan['contract'],kind,attempt,
                                       token_count=lambda text:len(text.split())+30)
-                self.assertIn('Adult man in a ',prompt)
-                self.assertIn('embracing an adult woman',prompt)
+                if attempt == 0:self.assertIn('Adult man in a ',prompt)
+                if attempt == 0:self.assertIn('embracing an adult woman',prompt)
+                else:self.assertIn('woman in a ',prompt)
                 self.assertNotIn('blouse',prompt)
                 self.assertNotIn('kurta',prompt)
                 self.assertNotIn('An adult couple',prompt)
@@ -159,6 +160,51 @@ class MusicVideoTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'couple/face review failed'):
                 generate_reviewed('unused',target,1,contract)
             self.assertFalse(target.exists())
+
+    def test_couple_review_recovers_after_two_rejected_candidates(self):
+        from story_image_review import generate_reviewed
+        def draw(prompt,path,**kwargs):
+            Image.new('RGB',(256,256),'navy').save(path)
+        with tempfile.TemporaryDirectory() as folder, \
+                patch('story_image_cpu.generate',side_effect=draw) as model, \
+                patch('story_image_review.review_image',side_effect=[
+                    dict(passed=False,answers=[]),dict(passed=False,answers=[]),
+                    dict(passed=True,answers=[])]):
+            report=generate_reviewed('unused',Path(folder)/'scene.png',1,mv.scene_contract(SONG,0,1))
+            self.assertTrue(report['passed'])
+            self.assertEqual(model.call_count,3)
+            self.assertEqual(len({call.args[0] for call in model.call_args_list}),3)
+
+    def test_exhausted_retry_uses_new_seeds_on_next_invocation(self):
+        from story_image_review import generate_reviewed, ImageReviewFailed
+        def draw(prompt,path,**kwargs):
+            Image.new('RGB',(256,256),'navy').save(path)
+        with tempfile.TemporaryDirectory() as folder, \
+                patch('story_image_cpu.generate',side_effect=draw) as model, \
+                patch('story_image_review.review_image',return_value=dict(passed=False,answers=[])):
+            target=Path(folder)/'scene.png'
+            for _ in range(2):
+                with self.assertRaises(ImageReviewFailed):
+                    generate_reviewed('unused',target,1,mv.scene_contract(SONG,0,1))
+            self.assertEqual(len({call.kwargs['seed'] for call in model.call_args_list}),8)
+
+    def test_failed_scene_does_not_discard_other_scenes_and_retry_reuses_them(self):
+        from story_image_review import ImageReviewFailed
+        song=dict(SONG,duration=15,media_kind='shorts')
+        def draw(prompt,path,seed,contract,**kwargs):
+            if '001' in path.name:raise ImageReviewFailed('rejected')
+            Image.new('RGB',(256,256),'navy').save(path)
+            return dict(version=REVIEW_VERSION,model=MODEL,revision=REVISION,
+                        passed=True,source_sha256=digest(path),answers=[])
+        with tempfile.TemporaryDirectory() as folder,patch('music_video.generate_reviewed',side_effect=draw) as model:
+            root=Path(folder)
+            with self.assertRaisesRegex(ImageReviewFailed,'Completed scenes are saved'):
+                mv.generate_images(root,song)
+            records=json.loads((root/'music-image-manifest-00.json').read_text())
+            self.assertEqual(set(records),{'0','2'})
+            model.reset_mock()
+            with self.assertRaises(ImageReviewFailed):mv.generate_images(root,song)
+            self.assertEqual(model.call_count,1)
 
     def test_image_resume_and_packaging_keep_only_the_owner_files(self):
         def draw(prompt,path,seed,contract,**kwargs):

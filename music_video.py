@@ -15,7 +15,7 @@ import shutil
 from PIL import Image
 from artwork import visual_mood
 from story_art_style import VERSION as ART_VERSION, art_prompt
-from story_image_review import VERSION as REVIEW_VERSION, cache_current, generate_reviewed
+from story_image_review import VERSION as REVIEW_VERSION, cache_current, generate_reviewed, ImageReviewFailed
 from story_image_cpu import MODEL, REVISION
 from story_media import digest, run_ffmpeg
 from story_thumbnail import SOURCE_SIZE, export_thumbnail
@@ -126,7 +126,7 @@ def generate_images(root, song, shard=None, shards=None):
     shards=int(os.getenv('IMAGE_SHARDS','1')) if shards is None else shards
     if not 0<=shard<shards:raise ValueError('Invalid music image shard')
     path=root/f'music-image-manifest-{shard:02d}.json'
-    previous=json.loads(path.read_text()) if path.exists() else {};completed={}
+    previous=json.loads(path.read_text()) if path.exists() else {};completed={};failures=[]
     for slot in timing['slots']:
         i=slot['index']
         if i%shards!=shard:continue
@@ -134,10 +134,19 @@ def generate_images(root, song, shard=None, shards=None):
         if cache_current(previous.get(str(i)),plan,target):report=previous[str(i)]['review']
         else:
             temp=target.with_suffix('.tmp.png')
-            report=generate_reviewed(plan['prompt'],temp,plan['seed'],plan['contract'],width=plan['width'],height=plan['height'],steps=plan['steps'])
+            try:
+                report=generate_reviewed(plan['prompt'],temp,plan['seed'],plan['contract'],width=plan['width'],height=plan['height'],steps=plan['steps'])
+            except ImageReviewFailed as exc:
+                failures.append(dict(index=i,error=str(exc)))
+                save_json(root/f'music-image-failures-{shard:02d}.json',failures)
+                continue
             with Image.open(temp) as image:image.verify()
             temp.replace(target)
         completed[str(i)]=dict(plan,review=report);save_json(path,completed)
+    save_json(root/f'music-image-failures-{shard:02d}.json',failures)
+    if failures:
+        raise ImageReviewFailed(f'{len(failures)} music scenes failed review on shard {shard}: '
+                                f'{[item["index"] for item in failures]}. Completed scenes are saved; retry images.')
     if shard==0:
         shutil.copyfile(root/'music-scene-000-source.png',root/'background-source.png')
         if song.get('media_kind')=='shorts':
@@ -155,6 +164,15 @@ def generate_images(root, song, shard=None, shards=None):
 def package_images(root, destination, shard, shards):
     root=Path(root);target=Path(destination)/root.name;target.mkdir(parents=True,exist_ok=True)
     manifest=root/f'music-image-manifest-{shard:02d}.json'
+    failures=root/f'music-image-failures-{shard:02d}.json'
+    if failures.is_file():shutil.copyfile(failures,target/failures.name)
+    for state in (root/'image-review').glob('*/retry-state.json'):
+        scene=re.fullmatch(r'music-scene-(\d+)-source\.tmp',state.parent.name)
+        if not ((scene and int(scene[1])%shards==shard) or
+                (shard==0 and state.parent.name=='thumbnail-source.tmp')):continue
+        destination_state=target/state.relative_to(root)
+        destination_state.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copyfile(state,destination_state)
     if not manifest.is_file():return
     records=json.loads(manifest.read_text());owned={k:v for k,v in records.items() if int(k)%shards==shard}
     save_json(target/manifest.name,owned)
