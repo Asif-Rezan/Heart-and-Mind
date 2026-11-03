@@ -6,8 +6,9 @@ from unittest.mock import patch
 from jsonschema import Draft202012Validator
 
 from pipeline import make_song
+from lyric_quality import parse_sections, render_sections
 
-CORE = {'title': 'नई सुबह | Nayi Subah | Hindi Soulful Song', 'lyrics': (Path(__file__).parent/'tests/fixtures/romantic_lyrics.txt').read_text().strip(),
+CORE = {'title': 'नई सुबह | Nayi Subah | Hindi Soulful Song', 'lyrics': render_sections(parse_sections((Path(__file__).parent/'tests/fixtures/romantic_lyrics.txt').read_text())),
         'prompt': 'Hindi cinematic soulful pop with piano and warm expressive vocals', 'duration': 240}
 PACKAGE = {'description': 'A hopeful original Hindi song about starting again. #HindiMusic',
            'tags': ['Nayi Subah', 'नई सुबह', 'Hindi song', 'Hindi soul', 'hopeful song', 'Hindi pop', 'original music', 'Heart and Mind'],
@@ -16,7 +17,17 @@ PACKAGE = {'description': 'A hopeful original Hindi song about starting again. #
            'thumbnail_prompt': 'Close portrait of a hopeful South Asian adult, glowing sunrise on the right, dark empty left, cinematic photography.'}
 
 
+def wire_value(value):
+    value = dict(value)
+    if 'title' in value:
+        value = {key: value[key] for key in ('title','lyrics','duration') if key in value}
+    if isinstance(value.get('lyrics'), str):
+        value['lyrics'] = parse_sections(value['lyrics'])
+    return value
+
+
 def response(value):
+    value = wire_value(value)
     return {'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps(value)}}]}
 
 
@@ -32,7 +43,7 @@ class SongGenerationTests(unittest.TestCase):
             schema = payload['response_format']['json_schema']['schema']
             value = ({k: v for k, v in CORE.items() if k != 'prompt'} if 'title' in schema['properties']
                      else {'lyrics': CORE['lyrics']}) if 'lyrics' in schema['properties'] else PACKAGE
-            Draft202012Validator(schema).validate(value)
+            Draft202012Validator(schema).validate(wire_value(value))
             requests.append(payload)
             return response(value)
         with patch('lyrics_cpu.request_story', side_effect=request):
@@ -71,7 +82,7 @@ class SongGenerationTests(unittest.TestCase):
                 schema = payload['response_format']['json_schema']['schema']
                 value = (({k: v for k, v in CORE.items() if k != 'prompt'} if 'title' in schema['properties']
                           else {'lyrics': CORE['lyrics']}) if 'lyrics' in schema['properties'] else PACKAGE)
-                Draft202012Validator(schema).validate(value)
+                Draft202012Validator(schema).validate(wire_value(value))
                 return response(value)
             with patch('lyrics_cpu.request_story', side_effect=request):
                 song = make_song(day, [])

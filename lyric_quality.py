@@ -7,7 +7,11 @@ import hashlib
 import re
 import unicodedata
 
-VERSION = 2
+class LyricQualityError(ValueError):
+    pass
+
+
+VERSION = 3
 ORDER = ['Verse 1', 'Pre-Chorus', 'Chorus', 'Verse 2', 'Chorus', 'Bridge', 'Final Chorus', 'Outro']
 COUNTS = [4, 2, 4, 4, 4, 2, 4, 2]
 GUIDE = '''Write a romantic/emotional Hindi album song about affection, longing,
@@ -51,9 +55,11 @@ def vowel_weight(line):
 
 
 def assess(text):
+    # Older completions place the first sung line beside its section label.
+    text_layout = re.sub(r'(?m)^[ \t]*(\[[^\]\n]+\])[ \t]+([^\n]+)$', r'\1\n\2', text)
     sections = []
     issues = []
-    for raw in text.splitlines():
+    for raw in text_layout.splitlines():
         line = raw.strip()
         if not line: continue
         if re.fullmatch(r'\[[^\]]+\]', line):
@@ -114,3 +120,43 @@ def review(request, lyrics, genre, bpm, voice, attempt=0):
     result = request(prompt, schema, 1600, 200+attempt)
     return dict(passed=all(result[key] for key in criteria) and not result['issues'],
                 **result, reviewer='same-model-critique-not-human-or-audio-verification')
+
+
+SECTION_KEYS = [('verse_1',4), ('pre_chorus',2), ('chorus',4), ('verse_2',4), ('bridge',2), ('outro',2)]
+
+
+def section_schema():
+    """Constrain unique stanzas during decoding; chorus copies are rendered locally."""
+    return dict(type='object', additionalProperties=False,
+        required=[key for key,_ in SECTION_KEYS],
+        properties={key:dict(type='array',minItems=count,maxItems=count,
+            items=dict(type='string',minLength=12,maxLength=110,
+                       pattern=r'^[^\r\n\[\]]*[\u0900-\u097f][^\r\n\[\]]*$'))
+                    for key,count in SECTION_KEYS})
+
+
+def parse_sections(text):
+    """Read historical drafts without losing lyrics beside an inline heading."""
+    result = {}
+    names = dict(zip(['Verse 1','Pre-Chorus','Chorus','Verse 2','Bridge','Outro'],
+                     [key for key,_ in SECTION_KEYS]))
+    key = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line: continue
+        label = re.match(r'^\[([^\]]+)\]\s*(.*)$', line)
+        if label:
+            name, line = label.groups()
+            key = names.get(name)
+            # Only the first chorus is needed; subsequent repetitions are canonical.
+            if key in result: key = None
+            if key: result[key] = []
+        if key and line: result[key].append(line)
+    return result
+
+
+def render_sections(sections):
+    order = [('Verse 1','verse_1'),('Pre-Chorus','pre_chorus'),('Chorus','chorus'),
+             ('Verse 2','verse_2'),('Chorus','chorus'),('Bridge','bridge'),
+             ('Final Chorus','chorus'),('Outro','outro')]
+    return '\n\n'.join('['+label+']\n'+'\n'.join(sections[key]) for label,key in order)

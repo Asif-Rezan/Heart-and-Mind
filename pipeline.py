@@ -17,6 +17,10 @@ class DuplicateSongError(RuntimeError):
 
 
 def pipeline_failure_message(error):
+    from lyric_quality import LyricQualityError
+    if isinstance(error, LyricQualityError):
+        return ('Pipeline failed [lyrics_quality_rejected]: bounded lyric revisions did not pass. '
+                'Saved draft and lyrics-quality.json contain recovery diagnostics; music was not started.')
     if isinstance(error, DuplicateSongError):
         return ('Pipeline failed [duplicate_song]: lyrics or title already published. '
                 'Create a fresh song with a new run ID; do not retry duplicate media.')
@@ -147,50 +151,19 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                'a handwritten note', 'a train ticket', 'a pressed flower', 'a familiar scarf')
     scene = f'{places[seed % len(places)]}, with {objects[(seed // len(places)) % len(objects)]}'
     from lyric_quality import GUIDE, VERSION as LYRIC_VERSION, assess, review
-    prompt = f'''Write an ORIGINAL Hindi song for Heart and Mind on {day}.
-    Today's direction: {genre}. Emotional story: {story}.
-    Musical arrangement: {arrangement}. Visual mood: {mood}.
-    Write for a solo {vocal_gender} singer, using consistent first-person Hindi grammar
-    appropriate to that narrator. Do not add singer labels to sung lines.
-    Unique creative brief {identity}: set the story around {scene}.
-    Use this brief as inspiration only; never include its identifier in public text.
-    Develop a specific original scene, characters and emotional progression in this direction.
-    Do not recycle a generic love song. Use concrete sensory details, conversational poetic
-    Hindi, fresh metaphors, natural breath-length phrases and consistent viewpoint.
-    Plan a clear beginning, emotional turn in verse 2, and resolution in the bridge/outro.
-    Write a memorable 2-4 line chorus with one distinctive central phrase; repeat that chorus
-    consistently. Verses should advance the story, not paraphrase the chorus. Keep a singable
-    syllable pattern within each section; avoid forced rhyme, filler and unrelated imagery.
-    Structure: [Verse 1] (4 lines),
-    [Pre-Chorus] (2), [Chorus] (4), [Verse 2] (4), [Chorus] (same 4),
-    [Bridge] (2), [Final Chorus] (same 4), [Outro] (2).
-    Target 180-220 sung words for a focused 3 to 3.5 minute album song.
-    Keep most lines 5-8 words, with balanced lengths that fit one melodic phrase.
-    The chorus must say something specific and emotionally meaningful, not repeat only
-    a two-word title. Establish a clear melodic hook and repeat its wording exactly.
-    Verse 1 shows one moment; verse 2 changes the situation; the bridge reveals a decision.
-    Use idiomatic everyday Hindi, correct verb agreement and consistent तू/तुम/आप usage.
-    Never translate English phrases literally or insert words such as फोल्ड लेटर or लाइट्स.
-    Prefer familiar natural Hindi over ornate vocabulary and vague philosophical filler.
-    Read every line as spoken Hindi first: if it sounds unnatural, rewrite it before singing.
-    पूरा गीत हिंदी की देवनागरी लिपि में लिखो। रोमन लिपि में हिंदी मत लिखो।
-    Every sung line must use Devanagari, never English transliteration; bracket labels in English.
-    Never copy existing lyrics, melodies, titles, or imitate a named singer.
-    Avoid these previous titles: {json.dumps([entry['title'] for entry in history if entry.get('title')], ensure_ascii=False)}.
-    Return JSON only with these fields:
-    title: original Hindi song name first, a short Romanized Hindi name, then the accurate
-      search phrase "{search_term} {year}". Keep the whole title <=100 characters, ideally 65-90.
-      Format example ONLY: तेरे बिना | Tere Bina | Hindi Sad Song {year}.
-      Use the supplied mood's search phrase; do not label a hopeful song sad or a ballad dance.
-      Never claim a film connection, famous singer, official release, viral hit or chart success.
-    lyrics: complete song as above. Musical production directions are supplied separately;
-      do not return a prompt field.
-    duration: integer seconds 180-210, aim 195.
-    No spoken CTA. Keep the song focused: 180-220 sung words, including repeated choruses.
-    Do not add metadata, descriptions, tags or image prompts to this response.
-    Mandatory songwriting brief (takes priority over general suggestions): {GUIDE}
-    Privately speak/sing every line at the supplied tempo and revise before returning.'''
-    prompt += f"\nMusical meter: {genre}, steady 4/4; use two-bar phrases."
+    prompt = f'''Write an original romantic/emotional Hindi album song.
+    Genre: {genre}. Feeling: {story}. Setting inspiration: {scene}.
+    Unique brief {identity}; do not sing this identifier. Write for a solo {vocal_gender} singer.
+    सरल, स्वाभाविक हिंदी में प्रेम और रिश्ते की बात लिखो। हर पंक्ति का साफ़ अर्थ हो।
+    प्यार, इंतज़ार, दूरी, मिलने की चाह या मन की अनकही बात चुनो। उपदेश मत लिखो।
+    {GUIDE}
+    Return title, lyrics and duration only. lyrics is an OBJECT of line arrays:
+    verse_1 (4), pre_chorus (2), chorus (4), verse_2 (4), bridge (2), outro (2).
+    Each array item is ONE sung Hindi line, no heading or newline. Write the chorus
+    once; the editor repeats it automatically. The final repeated song has 26 lines.
+    title: original Hindi name | short Romanized name | {search_term} {year}, <=100 characters.
+    duration: 195. No famous singer/film claims, no translations or copied lyrics.
+    Avoid previous titles: {json.dumps([entry['title'] for entry in history if entry.get('title')], ensure_ascii=False)}.'''
     from lyrics_cpu import MODEL_ID, request_story
     core_schema = {'type': 'object', 'additionalProperties': False,
         'required': ['title', 'lyrics', 'prompt', 'duration'],
@@ -218,12 +191,29 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
         properties={key: value for key, value in core_schema['properties'].items()
                     if key in ('title', 'lyrics', 'duration')})
     def request(instructions, schema, tokens, seed_offset=0):
+        from copy import deepcopy
+        from lyric_quality import section_schema, render_sections
+        from jsonschema import Draft202012Validator
+        wire_schema = deepcopy(schema)
+        structured_lyrics = 'lyrics' in wire_schema.get('properties', {})
+        if structured_lyrics:
+            wire_schema['properties']['lyrics'] = section_schema()
+            instructions += ('\nReturn lyrics as an object of six line arrays: verse_1 (4), '
+                'pre_chorus (2), chorus (4), verse_2 (4), bridge (2), outro (2). '
+                'Each item is one sung Devanagari line without headings or newlines. '
+                'Write chorus once; repeated choruses are inserted locally.')
         result = request_story('chat/completions', {'model': MODEL_ID,
-            'messages': [{'role': 'system', 'content': 'You are an original Hindi songwriter and truthful music editor. Write natural, singable Hindi in Devanagari.'},
+            'messages': [{'role': 'system', 'content': 'तुम मौलिक हिंदी प्रेमगीत लिखने वाले गीतकार और सख़्त संपादक हो। स्वाभाविक, अर्थपूर्ण और गाने योग्य हिंदी लिखो।'},
                          {'role': 'user', 'content': instructions}],
-            'response_format': {'type': 'json_schema', 'json_schema': {'schema': schema}},
+            'response_format': {'type': 'json_schema', 'json_schema': {'schema': wire_schema}},
             'max_completion_tokens': tokens, 'seed': (seed + seed_offset) % (2**31 - 3)})
-        return json.loads(result['choices'][0]['message']['content'])
+        value = json.loads(result['choices'][0]['message']['content'])
+        # Validate at this boundary too: a malformed transport response must never
+        # become a cacheable song, even when request_story is replaced by a client.
+        Draft202012Validator(wire_schema).validate(value)
+        if structured_lyrics:
+            value['lyrics'] = render_sections(value['lyrics'])
+        return value
 
     # Keep the full song and packaging out of the same completion. Small CPU models
     # otherwise have to satisfy many tight text bounds while writing long Hindi lyrics.
@@ -269,8 +259,9 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
             if quality_path is not None:
                 quality_path.write_text(json.dumps(dict(report, passed=False), ensure_ascii=False, indent=2))
             edit_prompt = f'''Act as a native Hindi romantic lyricist and vocal arranger.
-            Polish this song for {genre}, {bpm} BPM in 4/4. Preserve its specific
-            relationship, viewpoint, emotional turn and memorable central hook.
+            Polish this song for {genre}, {bpm} BPM in 4/4. Keep usable romantic ideas and the narrator.
+            Replace nonsensical imagery or broken Hindi entirely; do not preserve a bad hook.
+            Relationship direction: {story}. Setting inspiration: {scene}.
             {narrator_instruction}
             {GUIDE}
             Read/sing each phrase aloud privately. Check idiomatic meaning, grammar,
@@ -289,6 +280,9 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                 report['issues'] += critique['issues']
                 if not critique['passed'] and not report['issues']:
                     report['issues'].append('Editorial critique failed; revise meaning, Hindi, rhyme and phrasing')
+            print(json.dumps({'phase':'lyric revision checked','attempt':attempt+1,
+                'passed':report['passed'],'word_count':report['word_count'],
+                'issue_count':len(report['issues'])}),flush=True)
             if draft_path is not None:
                 temporary = draft_path.with_suffix('.tmp')
                 temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
@@ -300,7 +294,8 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                 quality = report
                 break
         else:
-            raise ValueError('Lyrics need revision before music generation: ' + '; '.join(report['issues']))
+            from lyric_quality import LyricQualityError
+            raise LyricQualityError('Lyrics need revision before music generation: ' + '; '.join(report['issues']))
     # Check saved cores too: resumed artifacts may predate the current history.
     # A title-only correction keeps good lyrics instead of regenerating the music.
     if song_duplicate_reason(song, history) == 'lyrics':

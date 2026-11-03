@@ -34,9 +34,9 @@ Implementation checkpoint: [`checkpoint/music-return-3d-5s-2026-11-03`](https://
 
 ## Lyrics and phrasing revision — 2026-11-03
 
-Music automation is **manually disabled in GitHub Actions** at the user’s request.
-Do not enable it or start a song until the lyrics changes have been reviewed. The
-first return run failed before songwriting: regression tests needed `ffprobe`.
+The user paused music automation for lyrics work, then authorized a new generation.
+The first revised run (`41592294627`) stopped at lyric quality review before music. The
+earlier return run failed before songwriting: regression tests needed `ffprobe`.
 The lyrics job now installs FFmpeg before tests; no song was generated or published.
 
 New lyrics focus on romance, longing, separation, reunion, tenderness and healing
@@ -60,6 +60,22 @@ revision. The previous music-return implementation remains saved at commit
 [`77c2f23`](https://github.com/Asif-Rezan/Heart-and-Mind/commit/77c2f236157ccca2efcd50cc7d0a9ad0ef292e89)
 and its existing checkpoint tag. The test lyric in `tests/fixtures/romantic_lyrics.txt` exercises the checks;
 it is not hardcoded as the generator’s song.
+
+
+### Production lyric recovery — 2026-11-03
+
+Run `41592294627` produced inline section headings and only two chorus lines, plus
+awkward Hindi, so review rejected it. The old parser incorrectly reported zero
+words for inline headings. It now reads that layout without losing the first line,
+but missing lines or weak wording still cannot pass.
+
+New model responses use six structured line arrays with exact section lengths.
+The program renders section headings and repeats the four-line chorus locally;
+the model no longer has to reproduce the full eight-section text layout. Creative
+instructions are shorter, and revisions can discard nonsensical imagery rather
+than being told to preserve a defective hook. Review reports use version 3 and
+emit static, useful failure diagnostics without dumping the song into job logs.
+Existing failed draft artifacts can be supplied as `prepared_run` for recovery.
 
 ## Daily automation and manual runs
 
