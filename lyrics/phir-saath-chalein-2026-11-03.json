@@ -1,0 +1,31 @@
+{
+  "song": {
+    "title": "फिर साथ चलें | Phir Saath Chalein | Hindi Romantic Song 2026",
+    "lyrics": "[Verse 1]\nउसी बस अड्डे पर आज फिर आया\nजहाँ तुमने हँसकर था हाथ मेरा थामा\nबारिश की बूँदों में वो शाम मिली\nचाय की खुशबू में तेरी याद घुली\n\n[Pre-Chorus]\nजो बात अधूरी थी अब कहने दो\nइस बार मुझे अपने पास रहने दो\n\n[Chorus]\nआओ फिर साथ चलें उस मोड़ से\nजहाँ छूटे थे हाथ किसी बात से\nतुम सुन लो मेरी मैं तुम्हारी सुनूँ\nहर सुबह तुम्हारे संग फिर से चुनूँ\n\n[Verse 2]\nतुम आईं तो मैंने नज़रें नहीं चुराईं\nदिल की सारी उलझन तुमको खुलकर बताई\nतुमने भी धीरे से अपना दर्द सुनाया\nभीगी सी उस शाम ने फिर मिलवाया\n\n[Chorus]\nआओ फिर साथ चलें उस मोड़ से\nजहाँ छूटे थे हाथ किसी बात से\nतुम सुन लो मेरी मैं तुम्हारी सुनूँ\nहर सुबह तुम्हारे संग फिर से चुनूँ\n\n[Bridge]\nइस बार न ख़ामोशी दीवार बनेगी कभी\nकह देंगे जो दिल में होगी बात छिपी\n\n[Final Chorus]\nआओ फिर साथ चलें उस मोड़ से\nजहाँ छूटे थे हाथ किसी बात से\nतुम सुन लो मेरी मैं तुम्हारी सुनूँ\nहर सुबह तुम्हारे संग फिर से चुनूँ\n\n[Outro]\nदो प्यालों की चाय फिर गर्म हुई\nहम साथ चले तो बारिश थम गई",
+    "duration": 195,
+    "vocal_gender": "male",
+    "song_date": "2026-11-03",
+    "visual_mood": "romance",
+    "prompt": "Solo male lead vocal; no female singer or duet. Hindi romantic acoustic pop, piano, acoustic guitar, gentle drums, 86 BPM, 4/4. Natural Hindi diction, melodic legato phrases with breath gaps. Vocal entry within 8s, chorus by 40s. Intimate verses, lifted chorus, sparse bridge, resolved ending. Vocal-forward balanced mix; no speech or long solos.",
+    "description": "An original Hindi romantic song about meeting again at a rainy bus stop, listening honestly and choosing to walk together.",
+    "tags": [
+      "Hindi Romantic Song",
+      "Original Hindi Song",
+      "Heart and Mind"
+    ],
+    "thumbnail_text": "PHIR SAATH CHALEIN",
+    "background_prompt": "An adult romantic couple share a quiet conversation beside a rain-streaked bus stop window, soft neutral daylight and natural skin tones.",
+    "thumbnail_prompt": "An adult romantic couple lean close with hopeful smiles beside a rain-streaked window, clear faces in soft neutral daylight.",
+    "visual_scenes": [
+      "An adult man and woman meet at a quiet bus stop beside a rain-streaked window.",
+      "The couple listen to each other with gentle expressions beside a small tea stall.",
+      "The couple stand close beside two tea cups, sharing hopeful smiles.",
+      "The couple walk together after the rain under soft natural daylight."
+    ]
+  },
+  "editorial_review": {
+    "status": "reviewed",
+    "reviewer": "Codex authored editorial pass",
+    "notes": "Rewritten original recovery song after rejected Qwen draft: bus-stop reunion, honest conversation and reconciliation. Checked Hindi meaning, male narrator with female addressee, repeated hook, section structure and phrase lengths. Automated structural checks pass; this is not human or audio approval."
+  }
+}

@@ -272,8 +272,21 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
             {json.dumps(report['sections'], ensure_ascii=False)}
             Return only JSON lyrics, never commentary, translations or credits.
             Original lyrics: {song['lyrics']}'''
-            song['lyrics'] = normalize_lyrics(request(edit_prompt, edit_schema, 5000, 100+attempt)['lyrics'])
+            from lyric_quality import length_repair_schema, parse_sections, render_sections
+            repair = length_repair_schema(song['lyrics'], report) if attempt else None
+            if repair:
+                sections = parse_sections(song['lyrics'])
+                repair_prompt = (edit_prompt + '\nRepair ONLY the requested stanza arrays. '
+                    'Every line MUST contain exactly 7 or 8 Hindi words with single spaces. '
+                    'Use no commas or punctuation except an optional final danda. '
+                    'Rewrite naturally; never cut words off the original line. '
+                    'Return only the requested stanza keys: '+', '.join(repair['required']))
+                sections.update(request(repair_prompt, repair, 3500, 150+attempt))
+                song['lyrics'] = normalize_lyrics(render_sections(sections))
+            else:
+                song['lyrics'] = normalize_lyrics(request(edit_prompt, edit_schema, 5000, 100+attempt)['lyrics'])
             report = assess(song['lyrics'])
+            structural_issues = list(report['issues'])
             if report['passed']:
                 critique = review(request, song['lyrics'], genre, bpm, editorial_voice, attempt,
                     phrasing_warnings=report.get('warnings',[]))
@@ -284,7 +297,10 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                     report['issues'].append('Editorial critique failed; revise meaning, Hindi, rhyme and phrasing')
             print(json.dumps({'phase':'lyric revision checked','attempt':attempt+1,
                 'passed':report['passed'],'word_count':report['word_count'],
-                'issue_count':len(report['issues'])}),flush=True)
+                'issue_count':len(report['issues']), 'structural_issues':structural_issues,
+                'repair_mode':'stanza-length' if repair else 'full-editorial',
+                'semantic_passed':report.get('semantic_review',{}).get('passed'),
+                'checkpoint':'song-draft.json', 'diagnostics':'lyrics-quality.json'}),flush=True)
             if draft_path is not None:
                 temporary = draft_path.with_suffix('.tmp')
                 temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))

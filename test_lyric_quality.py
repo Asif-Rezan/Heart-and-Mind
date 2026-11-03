@@ -56,6 +56,34 @@ class LyricQualityTests(unittest.TestCase):
             self.assertEqual(model.call_count, 2)
             self.assertTrue(song['lyric_quality']['passed'])
 
+    def test_overloaded_production_draft_gets_constrained_stanza_repair(self):
+        from jsonschema import Draft202012Validator
+        from lyric_quality import length_repair_schema
+        sections=parse_sections(GOOD)
+        overloaded=render_sections({key:[line+' तुम्हारा नाम तुम्हारा नाम' for line in lines]
+                                   for key,lines in sections.items()})
+        schema=length_repair_schema(overloaded,assess(overloaded))
+        self.assertFalse(Draft202012Validator(schema).is_valid(parse_sections(overloaded)))
+        Draft202012Validator(schema).validate(sections)
+        with tempfile.TemporaryDirectory() as directory:
+            draft=Path(directory)/'song-draft.json'
+            with patch('lyrics_cpu.request_story',side_effect=[response(dict(CORE,lyrics=overloaded)),
+                    response({'lyrics':overloaded}),response(sections),response(PACKAGE)]) as model:
+                song=make_song('2026-11-03',[],draft)
+            self.assertEqual(song['lyrics'],GOOD)
+            self.assertTrue(song['lyric_quality']['passed'])
+            wire=model.call_args_list[2].args[1]['response_format']['json_schema']['schema']
+            self.assertIn('{6,7}',wire['properties']['chorus']['items']['pattern'])
+
+    def test_length_repair_preserves_valid_stanzas(self):
+        from lyric_quality import length_repair_schema
+        sections=parse_sections(GOOD)
+        sections['bridge'][0]+=' तुम्हारा नाम तुम्हारा नाम'
+        lyrics=render_sections(sections)
+        schema=length_repair_schema(lyrics,assess(lyrics))
+        self.assertEqual(schema['required'],['bridge'])
+        self.assertIsNone(length_repair_schema(GOOD,assess(GOOD)))
+
     def test_semantic_failure_cannot_pass_on_balanced_counts_alone(self):
         critique = {'passed':False, 'issues':['Verse 2: imagery has no relationship meaning']}
         with patch('lyric_quality.review', side_effect=[critique, {'passed':True,'issues':[]}]) as reviewer:

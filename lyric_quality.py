@@ -163,3 +163,22 @@ def render_sections(sections):
              ('Verse 2','verse_2'),('Chorus','chorus'),('Bridge','bridge'),
              ('Final Chorus','chorus'),('Outro','outro')]
     return '\n\n'.join('['+label+']\n'+'\n'.join(sections[key]) for label,key in order)
+
+
+def length_repair_schema(lyrics, report):
+    """Constrain only stanzas needing length repair; never truncate sung text."""
+    sections = parse_sections(lyrics)
+    if set(sections) != {key for key, _ in SECTION_KEYS}:
+        return None
+    total_bad = any(issue.startswith('Total sung words ') for issue in report['issues'])
+    selected = [key for key, _ in SECTION_KEYS if total_bad or any(
+        not 4 <= len(re.findall(r'[\u0900-\u097f]+', line)) <= 10
+        for line in sections[key])]
+    if not selected:
+        return None
+    # 26 performed lines at 7–8 words gives 182–208 words including choruses.
+    line = dict(type='string', pattern=r'^[\u0900-\u097f]+(?: [\u0900-\u097f]+){6,7}[।!?]?$',
+                minLength=12, maxLength=110)
+    return dict(type='object', additionalProperties=False, required=selected,
+                properties={key:dict(type='array',minItems=count,maxItems=count,items=line)
+                            for key,count in SECTION_KEYS if key in selected})

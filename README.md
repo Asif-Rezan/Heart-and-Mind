@@ -230,3 +230,21 @@ portrait music Short** with `source_run` (the numeric GitHub run ID containing
 `music-input-<source_run>`) and `parent_run` (its saved song identity). Use the same
 values to retry; never change the parent source under a published companion ID.
 Long parent IDs receive a stable shortened companion identity.
+
+### Lyric length failure recovery
+
+After a full editorial revision still leaves overloaded phrases or an invalid total,
+remaining bounded revisions use a stanza-only schema with 7–8 Hindi words per line.
+Repeated choruses are rendered locally. Unaffected stanzas are preserved unless the
+whole-song word count needs repair. Meaning, Hindi and rhyme still undergo the
+editorial critique; length repair never automatically approves a song.
+
+Rejected runs save the draft and quality report, log structural issues, and publish
+a job summary plus `lyrics-recovery.json` with the original run ID and checkpoint
+run. Dispatch the updated branch with that `run_id` and `prepared_run` to resume;
+GitHub's re-run button uses the old commit and cannot apply a code fix.
+
+For the rejected bus-stop draft from run `41628990806`, the new original recovery
+song is `phir-saath-chalein-2026-11-03` in `lyrics/`. It has 183 sung words and passes
+written checks. Use a fresh run ID with this authored source; never replace a
+saved draft or audio under the previous identity. Listening review remains pending.

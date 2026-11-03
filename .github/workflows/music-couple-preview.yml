@@ -2,6 +2,7 @@ name: Romantic couple image test
 on:
   push:
     branches: [codex/romantic-couple-faces]
+    paths: [music_video.py, story_art_style.py, story_image_cpu.py, story_image_review.py, preview_music_couple.py]
   workflow_dispatch:
 permissions:
   contents: read

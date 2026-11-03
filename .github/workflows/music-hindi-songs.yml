@@ -119,6 +119,34 @@ jobs:
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
       run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage lyrics --check-history --vocal-gender "$REQUESTED_VOCAL_GENDER"
         --motion-video --authored-song "$REQUESTED_AUTHORED_SONG"
+    - name: Explain rejected lyrics and checkpoint recovery
+      if: failure()
+      env:
+        SONG_RUN_ID: ${{ steps.identity.outputs.run_id }}
+      run: |
+        python - <<'PYTHON'
+        import json, os
+        from pathlib import Path
+        from lyric_quality import assess
+        root = Path('output') / os.environ['SONG_RUN_ID']
+        draft = root / 'song-draft.json'
+        if draft.exists():
+            report = assess(json.loads(draft.read_text())['lyrics'])
+            diagnostics = dict(code='lyrics_quality_rejected', word_count=report['word_count'],
+                               structural_issues=report['issues'], music_started=False,
+                               run_id=os.environ['SONG_RUN_ID'], prepared_run=os.environ['GITHUB_RUN_ID'])
+            (root / 'lyrics-recovery.json').write_text(json.dumps(diagnostics, indent=2))
+            print(json.dumps(diagnostics), flush=True)
+            with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                summary.write('Lyrics require revision; music was not started.\n\n')
+                summary.write(f"Sung words: {report['word_count']}; accepted range: 160–235.\n\n")
+                for issue in report['issues']:
+                    summary.write('- ' + issue + '\n')
+                summary.write('\nInspect lyrics-quality.json for editorial checks. '
+                              'Resume after fixing the cause with the same run_id and '
+                              'prepared_run=' + os.environ['GITHUB_RUN_ID'] +
+                              '; do not rerun the old commit to apply a code fix.\n')
+        PYTHON
     - uses: actions/upload-artifact@v4
       if: always()
       with:
