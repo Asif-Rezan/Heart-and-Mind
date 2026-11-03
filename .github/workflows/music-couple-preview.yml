@@ -1,0 +1,42 @@
+name: Romantic couple image test
+on:
+  push:
+    branches: [codex/romantic-couple-faces]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [background, thumbnail]
+    env:
+      IMAGE_KIND: ${{ matrix.kind }}
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+      OMP_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare CPU image memory
+        run: |
+          sudo fallocate -l 12G /swapfile-images
+          sudo chmod 600 /swapfile-images
+          sudo mkswap /swapfile-images
+          sudo swapon /swapfile-images
+      - run: |
+          pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements-images-cpu.txt pillow
+      - name: Generate with production model and corrected couple prompt
+        run: python -u preview_music_couple.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: romantic-couple-${{ matrix.kind }}
+          path: output/romantic-couple-test/
+          retention-days: 7

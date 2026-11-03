@@ -76,7 +76,9 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
         composition = focused_prompt(contract,kind,attempt)
         try:
             used_prompt=generate(composition, candidate, seed=seed+attempt*7919,
-                     negative_extra='headshot, beauty portrait, fashion editorial, isolated face',
+                     negative_extra=('distant people, back view, hidden face, profile, crowd, overlapping faces'
+                                     if contract.get('music_portrait') else
+                                     'headshot, beauty portrait, fashion editorial, isolated face'),
                      story_contract=contract,kind=kind,composition_attempt=attempt,**kwargs)
             if isinstance(used_prompt,str):composition=used_prompt
             from PIL import Image
@@ -104,6 +106,8 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
             path.parent.mkdir(parents=True,exist_ok=True)
             candidate.replace(path)
             return report
+    if contract.get('music_portrait'):
+        raise RuntimeError('Music couple/face review failed; inspect image-review candidates before publishing')
     # A failed quality/service check must not discard narration or stop the video.
     available=[r for r in reports if r.get('source_sha256')]
     if available:

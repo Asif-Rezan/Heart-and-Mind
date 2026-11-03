@@ -23,6 +23,8 @@ def art_prompt(scene, kind='background'):
 def focused_prompt(record, kind='background', attempt=0, token_count=None, max_tokens=77):
     """Put visible story nouns inside the short CLIP context, before cast detail."""
     import re
+    if record.get('music_portrait'):
+        return music_portrait_prompt(record,kind,token_count,max_tokens)
     text=record['event']
     nouns=('notebook','letter','toy','book','door','key','box','bag','photograph','phone','drawing','tree','house','school')
     answers=' '.join(a for check in record['checks'] for a in check['answers'])
@@ -58,3 +60,21 @@ def focused_prompt(record, kind='background', attempt=0, token_count=None, max_t
     prompt=foreground+RENDER_STYLE+' '.join(event.split()[:4])+'. '+'; '.join(people)+'.'
     if token_count(prompt)>max_tokens:raise ValueError('story_prompt_encoder_budget')
     return prompt
+
+
+def music_portrait_prompt(record, kind, token_count=None, max_tokens=77):
+    """Keep both romantic leads and face lighting ahead of optional scene detail."""
+    couple = record['music_portrait']['couple']
+    subject = ('Romantic Indian couple, one woman in sari, one man in ivory kurta. '
+               if couple else 'Indian woman in teal sari, hopeful smile. ')
+    framing = 'Close chest-up shot. ' if kind == 'thumbnail' else 'Medium waist-up shot. '
+    faces = ('Two separate faces, both facing camera, tender smiles. ' if couple
+             else 'Face facing camera. ')
+    lead = subject + framing + faces + 'Sharp eyes, natural faces, soft frontal light. '
+    # The real dual-tokenizer budget includes the backend safety suffix.
+    for words in (16, 10, 6, 0):
+        scene = ' '.join(record['event'].split()[:words]).rstrip(' ,.;')
+        prompt = lead + (scene + '. ' if scene else '') + 'Cinematic 3D render, no text.'
+        if token_count is None or token_count(prompt) <= max_tokens:
+            return prompt
+    raise ValueError('music_prompt_encoder_budget')

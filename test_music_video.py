@@ -90,6 +90,34 @@ class MusicVideoTests(unittest.TestCase):
         self.assertNotIn('; man',healing['contract']['people'])
         self.assertNotIn('man',healing['contract']['checks'][0]['answers'])
 
+    def test_music_face_direction_survives_retries_and_short_token_budget(self):
+        from story_art_style import focused_prompt
+        timing=dict(slots=mv.visual_timeline(10))
+        for kind in ('background','thumbnail'):
+            plan=mv.image_plan(SONG,timing,0,kind)
+            for attempt in (0,1):
+                prompt=focused_prompt(plan['contract'],kind,attempt,
+                                      token_count=lambda text:len(text.split())+30)
+                self.assertIn('one woman in sari, one man in ivory kurta',prompt)
+                self.assertIn('Two separate faces',prompt)
+                self.assertIn('soft frontal light',prompt)
+                self.assertNotIn('Wide shot',prompt)
+            self.assertIn(dict(question='How many faces are visible?',answers=['two']),
+                          plan['contract']['checks'])
+
+    def test_failed_music_review_cannot_publish_best_candidate(self):
+        from story_image_review import generate_reviewed
+        contract=mv.scene_contract(SONG,0,1)
+        def draw(prompt,path,**kwargs):
+            Image.new('RGB',(256,256),'navy').save(path)
+        with tempfile.TemporaryDirectory() as folder, \
+                patch('story_image_cpu.generate',side_effect=draw), \
+                patch('story_image_review.review_image',return_value=dict(passed=False,answers=[])):
+            target=Path(folder)/'scene.png'
+            with self.assertRaisesRegex(RuntimeError,'couple/face review failed'):
+                generate_reviewed('unused',target,1,contract)
+            self.assertFalse(target.exists())
+
     def test_image_resume_and_packaging_keep_only_the_owner_files(self):
         def draw(prompt,path,seed,contract,**kwargs):
             Image.new('RGB',(kwargs['width'],kwargs['height']),'navy').save(path)

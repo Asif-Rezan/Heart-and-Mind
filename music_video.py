@@ -24,6 +24,7 @@ from story_writer import save_json
 
 FORMAT = 'hindi-music-storybook-5s-v1'
 VERSION = 'cinematic-music-edit-v1'
+MUSIC_ART_VERSION = 'romantic-couple-faces-v1'
 IMAGE_SECONDS = 5
 FPS = 25
 DISSOLVE = .4
@@ -82,9 +83,12 @@ def scene_contract(song, index, count, kind='background'):
     if mood!='healing':people+='; man, 30, Indian, ivory kurta dark jacket'
     lines=[x.strip() for x in song['lyrics'].splitlines() if x.strip() and not x.lstrip().startswith('[')]
     evidence=(lines[min(len(lines)-1,int(index/max(1,count)*len(lines)))] if lines else song['lyrics'])[:300]
-    checks=[dict(question='Who is shown in this scene?',answers=['woman','girl'] if mood=='healing' else ['woman','man','couple','people'])]
-    if kind=='thumbnail' and mood!='healing':checks.append(dict(question='How many people are shown?',answers=['two']))
+    checks=[dict(question='Who is shown in this scene?',answers=['woman'] if mood=='healing' else ['couple'])]
+    if mood!='healing':
+        checks.extend([dict(question='How many people are shown?',answers=['two']),
+                       dict(question='How many faces are visible?',answers=['two'])])
     record=compile_contract(dict(event=event,people=people,setting='The lyric-specific music video setting',evidence=evidence,checks=checks))
+    record['music_portrait']=dict(version=MUSIC_ART_VERSION,couple=mood!='healing')
     record['fallback']=dict(mode='authored-scene',literal_event=event,reason='songwriter-visual-direction')
     record['planning_review']=dict(version=PLAN_REVIEW_VERSION,passed=False,
         issues=['Creative interpretation of the song; not independently verified lyric alignment.'])
@@ -96,7 +100,7 @@ def image_plan(song, timing, index, kind='background'):
     width,height=SOURCE_SIZE if kind=='thumbnail' else (1024,576)
     plan=dict(kind=kind,contract=contract,prompt=art_prompt(contract['prompt'],kind),
               model=MODEL,revision=REVISION,art_version=ART_VERSION,review_version=REVIEW_VERSION,
-              music_format=FORMAT,song_identity=song_identity(song),width=width,height=height,steps=20,
+              music_art_version=MUSIC_ART_VERSION,music_format=FORMAT,song_identity=song_identity(song),width=width,height=height,steps=20,
               seed=int(hashlib.sha256((song_identity(song)+':'+kind+':'+str(index)).encode()).hexdigest()[:8],16))
     if kind=='background':plan.update(timing['slots'][index])
     return plan
