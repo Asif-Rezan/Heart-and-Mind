@@ -70,14 +70,14 @@ def music_portrait_prompt(record, kind, token_count=None, max_tokens=77):
                if couple else 'Indian woman in blue sari, hopeful smile. ')
     framing = 'Chest-up, faces large. ' if kind == 'thumbnail' else 'Waist-up. '
     pose = 'Both faces visible, gentle smiles. ' if couple else 'Face visible. '
-    lead = subject + framing + pose + 'Neutral daylight, natural skin, sharp eyes. '
+    lead = subject + framing + pose + 'Neutral white balance, natural skin tones, daylight, sharp eyes. '
     # Repeating the event's actors made the small model invent a third person.
     # Use only environmental anchors after the pair; never copy warm-light cues.
     anchors = [word for word in ('rain', 'window', 'door', 'courtyard', 'bookshop', 'river', 'platform')
                if re.search(r'\b'+word+r'\b', record['event'], re.I)]
     scene = ', '.join(anchors[:2])
     for detail in (scene, ''):
-        prompt = lead + (detail + '. ' if detail else '') + 'Soft grey background, cinematic photograph, no text.'
+        prompt = lead + (detail + '. ' if detail else '') + 'Natural colors, cinematic photograph, no text.'
         if token_count is None or token_count(prompt) <= max_tokens:
             return prompt
     raise ValueError('music_prompt_encoder_budget')

@@ -102,8 +102,9 @@ class MusicVideoTests(unittest.TestCase):
                 self.assertNotIn('An adult couple',prompt)
                 self.assertNotIn('warm',prompt)
                 self.assertIn('both faces visible',prompt.lower())
-                self.assertIn('Neutral daylight',prompt)
-                self.assertIn('Soft grey background',prompt)
+                self.assertIn('Neutral white balance',prompt)
+                self.assertIn('Natural colors',prompt)
+                self.assertNotIn('Cool blue',prompt)
                 self.assertNotIn('Wide shot',prompt)
             self.assertIn(dict(question='How many faces are visible?',answers=['two']),
                           plan['contract']['checks'])
