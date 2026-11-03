@@ -56,7 +56,7 @@ def negative_prompt():
 _pipeline = None
 _reference_pipeline = None
 
-def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_path=None, negative_extra=""):
+def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_path=None, negative_extra="", story_contract=None, kind="background", composition_attempt=0):
     if allow_text:
         raise ValueError('Heart and Mind story artwork must be text-free')
     global _pipeline, _reference_pipeline
@@ -93,10 +93,23 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
             reference=source.convert('RGB').resize((width,height))
     start = time.monotonic()
     image = None
+    rewrite_suffix=' Fully clothed, nonviolent scene, preserve the described action and setting.'
+    if story_contract is not None:
+        from story_art_style import focused_prompt
+        tokenizers=[pipeline.tokenizer,getattr(pipeline,'tokenizer_2',None)]
+        def token_count(value):
+            return max(len(t(safer_prompt(value),truncation=False,verbose=False)['input_ids']) for t in tokenizers if t is not None)
+        prompt=focused_prompt(story_contract,kind,composition_attempt,token_count=token_count)
     initial_prompt = safer_prompt(prompt)
-    rewritten = safer_prompt(prompt + ' Fully clothed, nonviolent scene, preserve the described action and setting.')
+    rewritten = None
     for attempt in range(2):
         # One seed for each safe composition; avoid exhausting the image worker.
+        if attempt == 1:
+            rewritten_base=prompt
+            if story_contract is not None:
+                rewritten_base=focused_prompt(story_contract,kind,composition_attempt,
+                    token_count=lambda value:token_count(value+rewrite_suffix))
+            rewritten=safer_prompt(rewritten_base+rewrite_suffix)
         candidate = initial_prompt if attempt == 0 else rewritten
         if attempt == 1:
             print('Safety rejection; retrying a restrained story scene.', flush=True)
@@ -114,6 +127,7 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
     print(f'CPU image generated: {image.width}x{image.height}; {time.monotonic()-start:.1f}s', flush=True)
+    return candidate
 
 
 if __name__ == '__main__':

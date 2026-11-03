@@ -408,3 +408,29 @@ composes from exactly that one narration, preventing multi-beat context from con
 translation. Two rejected choices recover from opening scene zero with an explicit warning.
 Rerendering an unapproved saved thumbnail may reuse the same-story opening background contract;
 source identity, narration quote, native thumbnail dimensions and unapproved status are preserved.
+
+Production artwork consistency recovery (2026-11-03): completed run 41466882818
+contained 56 setting-only frames out of 71, and a setting-only thumbnail. The VQA
+check accepted a village while the planner had removed the story actors. A failed
+planning batch could also discard scenes already accepted earlier in that batch.
+Recovery now retains the same beat's authored English visual and selected canonical
+appearances. Possessive references such as Niti's notebook do not add an unseen
+actor. Mixed-language legacy visuals retain recoverable English details and known
+narrated objects, explicitly marked as partial/unapproved; new authored visual
+fields are English-constrained during decoding. Only missing scene plans recover;
+already accepted plans survive later request failures. Thumbnail recovery prefers
+an actual opening interaction with a story object and multiple visible actors.
+
+All rendering paths now share a protected cinematic 3D/CGI style prefix. Both CLIP
+tokenizers measure the complete prompt including safety suffixes; location and
+optional appearance detail shrink before the style, actor ages and core action.
+The actual prompt used is recorded in the image review. A passed object check on a
+planning fallback has `story_verified=false` and records its `planning_fallback`.
+It must not be called a passed whole-story/CTR assessment.
+
+`Actual production artwork recovery review` replays the frozen completed-video
+scene/seed with the same production recovery, SSD-1B generator, VQA, 20 steps and
+thumbnail exporter. It does not use a separate image service or a handcrafted demo
+prompt. The public fictional regression snapshot covers all 48 authored scenes;
+background scene 28/frame 44 and opening notebook interaction scene 5 provide
+visual before/after checks without regenerating voice or publishing a duplicate.

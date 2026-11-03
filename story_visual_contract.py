@@ -1,7 +1,7 @@
 """Tie every composition and visual check to an exact spoken story scene."""
 import re
 
-VERSION = 'story-events-v6'
+VERSION = 'story-events-v7'
 ENGLISH_PATTERN = r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$'
 
 
@@ -178,14 +178,61 @@ FALLBACK_PEOPLE = 'No characters are shown in this establishing frame'
 
 
 def is_fallback(record):
-    if record.get('fallback',{}).get('mode') in ('literal-scene','scene-recovery'):
+    if record.get('fallback',{}).get('mode') in ('literal-scene','scene-recovery','authored-scene'):
         return record.get('event') == record['fallback'].get('literal_event') and record.get('planning_review',{}).get('passed') is False
     return (record.get('fallback',{}).get('mode') == 'setting-only' and
             record.get('event') == FALLBACK_EVENT and record.get('people') == FALLBACK_PEOPLE)
 
 
-def fallback_contract(scene, world, reason):
-    # No guessed translation or invented action when the language model fails.
+def fallback_contract(scene, world, reason, cast=''):
+    # The writer already paired this exact spoken beat with an English visual.
+    # Keep that scene when a later planning request fails; never erase its actors.
+    visual=' '.join(str(scene.get('visual','')).split())
+    mixed=bool(re.search(r'[\u0900-\u097f]',visual))
+    if mixed:
+        visual=' '.join(re.sub(r'[^ -~]',' ',visual).split()).strip(' ,.;')
+        # Preserve only recoverable English details; never invent a translated action.
+        for noun,pattern in (('notebook',r'नोटबुक'),('letter',r'चिट्ठी|पत्र'),('toy',r'खिलौन'),('book',r'किताब|पुस्तक'),('drawing',r'चित्र')):
+            if re.search(pattern,scene['text']) and not re.search(r'\b'+noun+r'\b',visual,re.I):visual+=', '+noun
+    if 15<=len(visual) and re.fullmatch(ENGLISH_PATTERN,visual):
+        # The writer often puts outfit clauses before the action. Move appearance
+        # into people so token compaction cannot remove the actual narrated action.
+        clauses=[part.strip() for part in visual.split(',') if part.strip()]
+        appearance=r'\b(?:shirt|kurta|sari|vest|chunni|hair|borders|wearing|wears)\b'
+        action=r'\b(?:standing|sitting|looking|holding|carrying|drawing|listening|smiling|opening|picks|reads|points)\b'
+        kept=[part for i,part in enumerate(clauses) if i==0 or not (part.isdigit() or (re.search(appearance,part,re.I) and not re.search(action,part,re.I)))]
+        event=', '.join(kept)
+        if len(event)<15:event+=' in the established story scene'
+        if len(event)>160:event=event[:161].rsplit(' ',1)[0]
+        profiles=[]
+        for profile in cast.split(';'):
+            name=profile.strip().split(',')[0].strip().split(' ')[0] if profile.strip() else ''
+            if name and re.search(r'\b'+re.escape(name)+r"\b(?!['’]s\b)",visual,re.I):
+                profile=re.sub(r',?\s*(?:short|curly|long)?\s*(?:black|grey|gray|white)?\s*hair\b.*','',profile,flags=re.I)
+                profile=re.sub(r',?\s*(?:always carries|walks with).*','',profile,flags=re.I)
+                profiles.append(profile.strip())
+        if profiles:
+            cap=max(16,126//len(profiles))
+            people='; '.join(p if len(p)<=cap else p[:cap+1].rsplit(' ',1)[0] for p in profiles)
+        else:
+            descriptors=[part for i,part in enumerate(clauses) if i==0 or (re.search(appearance,part,re.I) and not re.search(action,part,re.I))]
+            people=', '.join(descriptors)
+            if len(people)>130:people=people[:131].rsplit(' ',1)[0]
+            if len(people)<10:people='The people described in this scene, with their established appearance'
+        anchors=('notebook','letter','toy','book','door','key','box','bag','photograph','phone','drawing','tree','house','school')
+        anchor=next((w for w in anchors if re.search(r'\b'+w+r's?\b',event,re.I)),None)
+        checks=[dict(question='What object is being shown?',answers=['notebook','book'] if anchor=='notebook' else [anchor])] if anchor else [dict(
+            question='Who is shown in this scene?',answers=['person','people','man','woman','child','girl','boy'])]
+        setting=' '.join(str(world).split())
+        if len(setting)>60:setting=setting[:61].rsplit(' ',1)[0]
+        if len(setting)<5 or re.search(r'[\u0900-\u097f]',setting):setting='The established story location'
+        record=compile_contract(dict(event=event,people=people,setting=setting,
+            evidence=scene['text'][:300],checks=checks))
+        record['fallback']=dict(mode='authored-scene',reason=reason,literal_event=event,partial_english=mixed)
+        record['planning_review']=dict(version=REVIEW_VERSION,passed=False,
+            issues=['Using this scene original writer visual; secondary planning was unavailable.'])
+        return validate_contract(record,scene)
+    # A neutral setting is the last resort only when no usable authored visual exists.
     setting = ' '.join(str(world).split())
     if len(setting)>60:setting=setting[:61].rsplit(' ',1)[0]
     setting=setting.rstrip(' ,.;')
@@ -216,3 +263,19 @@ def literal_recovery(scene, candidate, reason):
         issues=['Rejected composition replaced by literal translation; not independently approved.'])
     try:return validate_contract(record,scene)
     except ValueError:return None
+
+
+def thumbnail_recovery(story, reason):
+    """Choose an actual early authored interaction, never a generic landscape."""
+    names=[p.strip().split(',')[0].split(' ')[0] for p in story['characters'].split(';') if p.strip()]
+    objects=('notebook','letter','toy','book','key','box','bag','photograph','phone','drawing')
+    def score(scene):
+        visual=scene.get('visual','')
+        actors=sum(bool(re.search(r'\b'+re.escape(name)+r"\b(?!['’]s\b)",visual,re.I)) for name in names)
+        anchor=any(re.search(r'\b'+word+r's?\b',visual,re.I) for word in objects)
+        return (anchor and actors>=2,anchor,actors,-scene['index'])
+    scene=max(story['scenes'][:8],key=score)
+    record=fallback_contract(scene,story['world'],reason,story['characters'])
+    anchor=next((w for w in objects if re.search(r'\b'+w+r's?\b',record['event'],re.I)),None)
+    question='What happens next with this '+anchor+'?' if anchor else 'What happens next in this story?'
+    return dict(thumbnail_scene=scene['index'],thumbnail_prompt=record['prompt'],thumbnail_contract=record,thumbnail_question=question)

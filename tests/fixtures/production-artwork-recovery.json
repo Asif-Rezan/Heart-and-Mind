@@ -1,0 +1,307 @@
+{
+  "run_id": "story-2026-11-02-novelty-fix-01",
+  "title": "बरसात के बाद पानी में स्कूल, एमोशनल हिंदी कहानी",
+  "characters": "Rajeshwari, 42, wears a white kurta with blue borders and grey chunni, black hair tied in a bun; Arjun, 38, wears a brown shirt with yellow vest, short black hair, walks with quiet intensity; Niti, 10, wears a red cotton kurta with green sari, curly black hair, always carries a small notebook.",
+  "world": "A quiet village in northern India with muddy paths, rain-fed fields, and a single school that closed due to lack of students. The community lives in close-knit households, where traditions and daily routines shape life.",
+  "scenes": [
+    {
+      "text": "बरसात ने गाँव की रस्सी पर पानी बरसाया, सड़क खिंच गई। आरजून दरवाजे के पास खड़ा था, नीति के नोटबुक को देख रहा था।",
+      "visual": "Arjun, brown shirt with yellow vest, standing by the gate, looking at Niti's notebook, muddy path flooded",
+      "speaker": "narrator",
+      "index": 0
+    },
+    {
+      "text": "पानी ने सड़क को बंद कर दिया, शिक्षा का रास्ता खत्म हो गया। आरजून चुपचाप नीति के नोटबुक को खोला।",
+      "visual": "Arjun, brown shirt with yellow vest, opening Niti's notebook on the ground, water spreading on the path",
+      "speaker": "narrator",
+      "index": 1
+    },
+    {
+      "text": "उन्हें पानी में एक क्लास के चित्र देखा, उसमें बच्चों की आवाज थी। आरजून के चेहरे पर चिंता छाई।",
+      "visual": "Arjun, brown shirt with yellow vest, staring at a drawing of classroom on water in Niti's notebook",
+      "speaker": "narrator",
+      "index": 2
+    },
+    {
+      "text": "क्या हम बच्चों के लिए कुछ कर सकते हैं? उस प्रश्न के बाद खामोशी छा गई।",
+      "visual": "Arjun, brown shirt with yellow vest, looking at Niti's notebook, rainwater dripping on the ground",
+      "speaker": "narrator",
+      "index": 3
+    },
+    {
+      "text": "बच्चों के दिमाग में एक नया विचार उत्पन्न हुआ था। पानी में शिक्षा का अनुभव बन सकता था।",
+      "visual": "Niti, red cotton kurta with green sari, drawing a floating classroom in her notebook, rain on the roof",
+      "speaker": "narrator",
+      "index": 4
+    },
+    {
+      "text": "आरजून ने नोटबुक को बंद किया और उसे राजेश्वरी के पास ले गया। उन्होंने चुपचुप सवाल किया।",
+      "visual": "Arjun, brown shirt with yellow vest, carrying Niti's notebook to Rajeshwari, raindrops on the wooden porch",
+      "speaker": "narrator",
+      "index": 5
+    },
+    {
+      "text": "राजेश्वरी ने उस प्रश्न को देखा और चुपचुप समझा। बच्चों के दिमाग में उम्मीद थी।",
+      "visual": "Rajeshwari, white kurta with blue borders and grey chunni, sitting on porch, looking at Arjun and notebook",
+      "speaker": "narrator",
+      "index": 6
+    },
+    {
+      "text": "उनके दिल में सवाल बचा हुआ था — क्या पानी में शिक्षा को बदल सकती है?",
+      "visual": "Arjun, brown shirt with yellow vest, standing near Rajeshwari, rainwater pooling near the house",
+      "speaker": "narrator",
+      "index": 7
+    },
+    {
+      "text": "बारिश के बाद पानी गाँव के रास्ते पर फैला रहा था। बच्चों के लिए नया रास्ता खुलने वाला था।",
+      "visual": "Niti, red cotton kurta और green sari, notebook को ध्यान से देखते हुए, घर के बाहर पानी के निकलने वाले रास्ते पर।",
+      "speaker": "narrator",
+      "index": 8
+    },
+    {
+      "text": "पानी पर एक क्लास का आविष्कार हो गया था। बच्चे इस खास विचार में भर गए थे।",
+      "visual": "Niti, red cotton kurta और green sari, पानी पर डूबी हुई क्लास की खुद की खुद के बच्चों के साथ बैठी हुई है।",
+      "speaker": "narrator",
+      "index": 9
+    },
+    {
+      "text": "अरजुन निति के नोटबुक में खुद का चित्र देखता है और राजेश्वरी से बात करता है।",
+      "visual": "Arjun, brown shirt और yellow vest, निति के नोटबुक पर देख रहा है, उनकी चार बच्चों के सामने।",
+      "speaker": "narrator",
+      "index": 10
+    },
+    {
+      "text": "राजेश्वरी ने देखा कि पानी में भी शिक्षा हो सकती है। इस बात को एक नई उम्मीद बना दिया गया।",
+      "visual": "Rajeshwari, white kurta और blue borders, grey chunni, बच्चों के आसपास पानी में उछलते हुए एक क्लास की खुद के चित्र पर देख रही है।",
+      "speaker": "narrator",
+      "index": 11
+    },
+    {
+      "text": "बच्चे निति के चित्र पर नजर डालते हैं और उसकी बात में भर गए।",
+      "visual": "Niti, red cotton kurta और green sari, पानी पर डूबी हुई क्लास के चित्र पर बच्चों के सामने खड़ी है।",
+      "speaker": "narrator",
+      "index": 12
+    },
+    {
+      "text": "अरजुन ने देखा कि पानी में शिक्षा की विचार बढ़ रही है। उसने इसके लिए एक नया योजना बनाई।",
+      "visual": "Arjun, brown shirt और yellow vest, गाँव के बाहर पानी में डूबी हुई क्लास के चित्र पर खड़ा है।",
+      "speaker": "narrator",
+      "index": 13
+    },
+    {
+      "text": "पानी में शिक्षा का विचार अब गाँव के सभी में फैल गया था।",
+      "visual": "Rajeshwari, white kurta और blue borders, grey chunni, पानी में डूबी हुई क्लास के चित्र पर खड़ी है।",
+      "speaker": "narrator",
+      "index": 14
+    },
+    {
+      "text": "निति अपने नोटबुक में एक नया चित्र बनाती है, जहाँ पानी पर क्लास है।",
+      "visual": "Niti, red cotton kurta और green sari, अपने notebook में पानी पर डूबी हुई क्लास का चित्र बना रही है।",
+      "speaker": "narrator",
+      "index": 15
+    },
+    {
+      "text": "अगले दिन गाँव के मेहमान घर पहुंचते हैं। बच्चे निति के चित्र पर देखते हैं।",
+      "visual": "Niti, red cotton kurta with green sari, curly black hair, pointing to a drawing of classroom on water in village hall",
+      "speaker": "narrator",
+      "index": 16
+    },
+    {
+      "text": "एक लड़का बोलता है, 'मैं पानी में किसी भी क्लास में आऊंगा।'",
+      "visual": "Boy, brown shirt with yellow vest, short black hair, pointing at Niti's notebook",
+      "speaker": "narrator",
+      "index": 17
+    },
+    {
+      "text": "राजेश्वरी हँसती हैं और कहती हैं, 'तो हमें उनकी ख्वाहिश को ढूंढना होगा।'",
+      "visual": "Rajeshwari, white kurta with blue borders and grey chunni, black hair tied in bun, smiling at the children",
+      "speaker": "narrator",
+      "index": 18
+    },
+    {
+      "text": "कुछ बच्चे निति के आसपास खड़े हैं। उनकी ख्वाहिशों का सही मतलब अभी नहीं पता है।",
+      "visual": "Children, all in school uniforms, clustered around Niti's notebook on a low table",
+      "speaker": "narrator",
+      "index": 19
+    },
+    {
+      "text": "एक लड़की कहती है, 'मुझे खिड़की से बाहर निकलना चाहिए।'",
+      "visual": "Girl, red cotton kurta with green sari, curly black hair, looking out the window of village hall",
+      "speaker": "narrator",
+      "index": 20
+    },
+    {
+      "text": "कुछ लोग सोचते हैं कि पानी में क्लास असंभव है।",
+      "visual": "Arjun, brown shirt with yellow vest, short black hair, walking slowly near a water puddle",
+      "speaker": "narrator",
+      "index": 21
+    },
+    {
+      "text": "राजेश्वरी कहती हैं, 'क्या हम उनके सपनों को बल देंगे? या उन्हें अपने घर पर रखेंगे?'",
+      "visual": "Rajeshwari, white kurta with blue borders and grey chunni, black hair tied in bun, standing by a wooden table",
+      "speaker": "narrator",
+      "index": 22
+    },
+    {
+      "text": "अब निर्णय का समय है। गाँव में बच्चों के लिए पानी में क्लास शुरू होगी या नहीं, यह अभी निर्धारित नहीं है।",
+      "visual": "Niti, red cotton kurta with green sari, curly black hair, writing in notebook near a puddle",
+      "speaker": "narrator",
+      "index": 23
+    },
+    {
+      "text": "एक हफ्ता बाद, आरजुन घर के छत पर चला गया। उसने टूटे ढाल खोजे और उन्हें जमीन पर रखा।",
+      "visual": "Arjun, 38, brown shirt with yellow vest, picks up broken roof tiles on the porch, pastel-colored house with painted yellow doors",
+      "speaker": "narrator",
+      "index": 24
+    },
+    {
+      "text": "उन पैन के टूटे हुए ढालों को देखकर उसने समझा कि पानी हर बार आता है।",
+      "visual": "Arjun, 38, brown shirt with yellow vest, standing near broken roof tiles, muddy ground behind him",
+      "speaker": "narrator",
+      "index": 25
+    },
+    {
+      "text": "उसने सोचा कि पानी में एक बार फिर क्लास बना सकते हैं।",
+      "visual": "Arjun, 38, brown shirt with yellow vest, holding a broken tile, looking at the flooded path",
+      "speaker": "narrator",
+      "index": 26
+    },
+    {
+      "text": "राजेश्वरी के सामने उसने बोला, 'हम पानी में एक क्लास बना सकते हैं।'",
+      "visual": "Arjun, 38, brown shirt with yellow vest, speaking to Rajeshwari, white kurta with blue borders and grey chunni",
+      "speaker": "narrator",
+      "index": 27
+    },
+    {
+      "text": "राजेश्वरी ने मुस्कुराते हुए कहा, 'ठीक है, हम उसे बनाएंगे।'",
+      "visual": "Rajeshwari, 42, white kurta with blue borders and grey chunni, smiling while listening to Arjun",
+      "speaker": "narrator",
+      "index": 28
+    },
+    {
+      "text": "उनका फैसला पहले बार के बारिश के अनुभव पर निर्भर करता है।",
+      "visual": "Arjun and Rajeshwari, standing together on the porch, looking at the flooded road",
+      "speaker": "narrator",
+      "index": 29
+    },
+    {
+      "text": "पानी में एक बार फिर क्लास बनने का सामना करने के लिए वे तैयार हैं।",
+      "visual": "Rajeshwari, 42, white kurta with blue borders and grey chunni, Arjun, 38, brown shirt with yellow vest, standing at the edge of flooded path",
+      "speaker": "narrator",
+      "index": 30
+    },
+    {
+      "text": "पानी में बने क्लास का विचार अब एक सामान्य विचार नहीं है।",
+      "visual": "Arjun and Rajeshwari, 42, standing near the edge of flooded path, looking at the water with determination",
+      "speaker": "narrator",
+      "index": 31
+    },
+    {
+      "text": "पहली बार सुबह 7 बजे, बच्चों का खिलौना गरम पानी में डूबा हुआ था।",
+      "visual": "Niti, red cotton kurta with green sari, sitting on mat, drawing on wet ground, village path",
+      "speaker": "narrator",
+      "index": 32
+    },
+    {
+      "text": "बच्चे अपने नोटबुक से पढ़ते हैं, गरम पानी में खिलवाड़ा देखते हैं।",
+      "visual": "Children, wearing simple clothes, reading from Niti's notebook, sitting on mats",
+      "speaker": "narrator",
+      "index": 33
+    },
+    {
+      "text": "अरजुन धातु की छड़ियों से गणित पढ़ाता है, बच्चों की ओर देखता है।",
+      "visual": "Arjun, brown shirt with yellow vest, teaching math using sticks, children listening",
+      "speaker": "narrator",
+      "index": 34
+    },
+    {
+      "text": "राजेश्वरी गरम भोजन बांटती है, बच्चों के सामने बैठी है।",
+      "visual": "Rajeshwari, white kurta with blue borders and grey chunni, sharing lunch on mat",
+      "speaker": "narrator",
+      "index": 35
+    },
+    {
+      "text": "एक बच्चा खिलवाड़े के पानी में एक शिक्षक देखकर हंसता है।",
+      "visual": "A boy, wearing blue shirt, laughing, pointing at wet ground drawing",
+      "speaker": "narrator",
+      "index": 36
+    },
+    {
+      "text": "अरजुन अपनी छड़ियों को थोड़ा उलटता है, बच्चों के मन में आशा लगती है।",
+      "visual": "Arjun, brown shirt with yellow vest, adjusting sticks, children watching",
+      "speaker": "narrator",
+      "index": 37
+    },
+    {
+      "text": "राजेश्वरी नोटबुक के प्रति दृष्टिकोण में एक बार फिर खुश हो जाती है।",
+      "visual": "Rajeshwari, white kurta with blue borders and grey chunni, smiling at notebook",
+      "speaker": "narrator",
+      "index": 38
+    },
+    {
+      "text": "सूरज की धूप में बच्चे खिलवाड़ा पर नए आदि खुलते हैं।",
+      "visual": "Children, wearing simple clothes, drawing on wet ground, sunlight shining",
+      "speaker": "narrator",
+      "index": 39
+    },
+    {
+      "text": "एक महीना बाद, घर के बाहर पानी के स्कूल का नाम लगा दिया गया।",
+      "visual": "Arjun, brown shirt with yellow vest, picks up a signboard, reads 'पानी में स्कूल' on the wooden porch",
+      "speaker": "narrator",
+      "index": 40
+    },
+    {
+      "text": "सभी बच्चे हर दिन वहाँ पहुँचते हैं, खुश और उत्साहित।",
+      "visual": "Niti, red cotton kurta with green sari, draws on wet ground, notebook open on her lap",
+      "speaker": "narrator",
+      "index": 41
+    },
+    {
+      "text": "प्रत्येक बच्चा अपने ख्याल के साथ आता है, जैसे वह लगाता है।",
+      "visual": "A boy, short black hair, points to a drawing of a floating classroom in the mud",
+      "speaker": "narrator",
+      "index": 42
+    },
+    {
+      "text": "राजेश्वरी खुश होती हैं, क्योंकि बच्चे अब निश्चित रूप से आगे बढ़ रहे हैं।",
+      "visual": "Rajeshwari, white kurta with blue borders, smiles while sitting on a mat",
+      "speaker": "narrator",
+      "index": 43
+    },
+    {
+      "text": "अरजुन घर में आता है, निति के नोटबुक में लिखते हुए देखता है।",
+      "visual": "Arjun, brown shirt with yellow vest, stands near Niti, notebook open on wooden floor",
+      "speaker": "narrator",
+      "index": 44
+    },
+    {
+      "text": "उन्होंने बच्चों के सपनों को देखा, और उन्हें सच में लाया।",
+      "visual": "Children sit on mats, drawing on wet ground, Arjun teaching with sticks",
+      "speaker": "narrator",
+      "index": 45
+    },
+    {
+      "text": "प्रत्येक दिन एक नई उम्मीद खुलती है, स्कूल का महत्व बढ़ता है।",
+      "visual": "Niti, curly black hair, writes in her notebook, sunlight on the red kurta",
+      "speaker": "narrator",
+      "index": 46
+    },
+    {
+      "text": "आप क्या सोचते हैं कि बच्चों के सपने वास्तविक निर्माण में भाग ले सकते हैं? टिप्पणी में बताइए।",
+      "visual": "Arjun walks in, sees Niti writing, sunlight through yellow door",
+      "index": 47,
+      "speaker": "narrator"
+    }
+  ],
+  "source_run": 41466882818,
+  "render_cases": {
+    "background": {
+      "scene": 28,
+      "video_frame": 44,
+      "seed": 3706157685
+    },
+    "thumbnail": {
+      "seed": 1442063922
+    }
+  }
+}

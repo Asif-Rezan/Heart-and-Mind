@@ -127,6 +127,61 @@ class StoryVisualChecks(unittest.TestCase):
             self.assertEqual(report['fallback'],'best-candidate')
             self.assertTrue(target.exists())
 
+    def test_actual_production_planner_failure_retains_all_48_authored_scenes(self):
+        from story_visual_contract import fallback_contract,is_fallback,thumbnail_recovery
+        story=json.loads(Path('tests/fixtures/production-artwork-recovery.json').read_text())
+        recovered=[fallback_contract(scene,story['world'],'StoryGenerationError',story['characters']) for scene in story['scenes']]
+        self.assertEqual(len(recovered),48)
+        for scene,record in zip(story['scenes'],recovered):
+            self.assertTrue(is_fallback(record))
+            self.assertEqual(record['fallback']['mode'],'authored-scene')
+            self.assertNotIn('No characters',record['people'])
+            self.assertFalse(record['planning_review']['passed'])
+            validate_contract(record,scene)
+        self.assertIn('Rajeshwari',recovered[28]['event'])
+        self.assertIn('smiling',recovered[28]['event'])
+        self.assertIn('listening to Arjun',recovered[28]['event'])
+        self.assertIn('carrying',recovered[5]['event'])
+        self.assertIn('notebook to Rajeshwari',recovered[5]['event'])
+        self.assertIn('42',recovered[28]['people'])
+        self.assertTrue(recovered[11]['fallback']['partial_english'])
+        self.assertIn('Rajeshwari',recovered[11]['event'])
+        thumbnail=thumbnail_recovery(story,'StoryGenerationError')
+        self.assertEqual(thumbnail['thumbnail_scene'],5)
+        self.assertIn('Arjun',thumbnail['thumbnail_contract']['people'])
+        self.assertIn('Rajeshwari',thumbnail['thumbnail_contract']['people'])
+        self.assertNotIn('Niti',thumbnail['thumbnail_contract']['people'])  # Notebook owner is not an extra actor.
+        self.assertEqual(thumbnail['thumbnail_contract']['checks'][0]['answers'],['notebook','book'])
+
+    def test_later_batch_exception_does_not_erase_already_accepted_scene(self):
+        from story_plan import visual_batch
+        story=short_story();a=record_for(story['scenes'][0]);b=record_for(story['scenes'][1])
+        rejected=dict(PLAN_VERDICT,faithful=False,issues=['Wrong action.'])
+        with tempfile.TemporaryDirectory() as folder,patch('story_plan.ask',side_effect=[{'scene_0':a,'scene_1':b},PLAN_VERDICT.copy(),rejected,RuntimeError('offline')]):
+            records=visual_batch(Path(folder),story,[0,1],'1234567')
+            self.assertTrue(records['0']['planning_review']['passed'])
+            self.assertNotIn('fallback',records['0'])
+            self.assertEqual(records['1']['fallback']['mode'],'authored-scene')
+
+    def test_new_authored_visual_schema_requires_english(self):
+        from story_plan import scene_schema
+        from story_writer import ROW
+        from story_visual_contract import ENGLISH_PATTERN
+        self.assertEqual(scene_schema([0])['properties']['scene_0']['properties']['visual']['pattern'],ENGLISH_PATTERN)
+        self.assertEqual(ROW['properties']['visual']['pattern'],ENGLISH_PATTERN)
+
+    def test_style_survives_objectless_scenes_and_actual_encoder_budget_callback(self):
+        from story_art_style import focused_prompt
+        scene=dict(text='वह अपने बच्चे से बात करती है।',visual='A woman speaks with her child beside the porch.')
+        record=record_for(scene)
+        # This scene has no object from the fixed noun list: style still comes first.
+        record['checks']=[dict(question='Who is shown?',answers=['woman','child'])]
+        prompt=focused_prompt(record,token_count=lambda p:len(p.split())+12,max_tokens=50)
+        self.assertLessEqual(len(prompt.split())+12,50)
+        self.assertTrue(prompt.startswith('Cinematic 3D storybook render'))
+        self.assertIn('realistic beautiful faces',prompt)
+        self.assertIn('fair skin',prompt)
+
     def test_render_prompt_foregrounds_the_story_object_within_short_encoder_context(self):
         from story_art_style import focused_prompt
         from story_visual_contract import compile_contract

@@ -1,0 +1,54 @@
+name: Actual production artwork recovery review
+on:
+  push:
+    branches: [codex/production-artwork-consistency]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CUDA_VISIBLE_DEVICES: ''
+  OMP_NUM_THREADS: '4'
+  HF_HUB_DISABLE_XET: '1'
+  HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+jobs:
+  artwork:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [background, thumbnail]
+    env:
+      IMAGE_KIND: ${{ matrix.kind }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12', cache: pip}
+      - run: pip install -r requirements.txt -r requirements-test.txt
+      - name: Check production recovery regressions
+        run: python -m unittest -q test_story_visual_contract
+      - name: Replay the completed video scene, seed and production recovery function
+        run: python preview_production_artwork.py --kind "$IMAGE_KIND"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: actual-production-plan-${{ matrix.kind }}
+          path: output/production-artwork-review/
+      - name: Prepare CPU image memory
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo fallocate -l 12G /swapfile-images
+          sudo chmod 600 /swapfile-images
+          sudo mkswap /swapfile-images
+          sudo swapon /swapfile-images
+      - run: |
+          pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements-images-cpu.txt
+      - name: Generate through the exact production image and review functions
+        run: python -u preview_story_artwork.py --stage generate --kind "$IMAGE_KIND" --output output/production-artwork-review
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actual-production-render-${{ matrix.kind }}
+          path: output/production-artwork-review/
+          retention-days: 7

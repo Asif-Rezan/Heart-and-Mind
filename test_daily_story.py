@@ -43,9 +43,9 @@ class StoryChecks(unittest.TestCase):
     def test_reference_style_and_scene_action_are_included(self):
         story=example_story()
         prompt=scene_prompt(story,story['scenes'][0])
-        self.assertTrue(prompt.startswith('Realistic 3D narrative scene.'))
+        self.assertTrue(prompt.startswith('Cinematic 3D storybook render'))
         self.assertIn(story['scenes'][0]['visual'],prompt)
-        self.assertIn('Realistic cinematic 3D storybook',prompt)
+        self.assertIn('polished CGI',prompt)
         self.assertIn('soft light',prompt)
         self.assertIn(story['characters'],prompt)
 

@@ -133,7 +133,7 @@ def chapter_issues(data,expected_count=8):
 def scene_schema(indices):
     # Speakers/scene positions are author-controlled before writing. The model
     # only supplies prose for required named slots, so it cannot miscount roles.
-    return object_schema({f'scene_{i}':object_schema({'text':dict(string(1,400),description='Spoken narration in Hindi Devanagari only; never English.'),'visual':string(20,360)})
+    return object_schema({f'scene_{i}':object_schema({'text':dict(string(1,400),description='Spoken narration in Hindi Devanagari only; never English.'),'visual':english_planning(20,360)})
                           for i in indices})
 
 
@@ -209,7 +209,7 @@ def write_chapter(root,run_id,index):
             candidate=dict(value,speaker=roles[i])
             candidate=normalize_planning({'scene':candidate},
                 object_schema({'scene':object_schema({'speaker':{'type':'string'},
-                    'text':dict(string(1,400),description='Spoken narration in Hindi Devanagari only; never English.'),'visual':string(20,360)})}))['scene']
+                    'text':dict(string(1,400),description='Spoken narration in Hindi Devanagari only; never English.'),'visual':english_planning(20,360)})}))['scene']
             progress['drafts'][str(i)]=candidate
             if not scene_issues(candidate,roles[i]):
                 accepted[str(i)]=candidate
@@ -573,8 +573,9 @@ def scene_composition_schema(scene):
     return schema
 
 
-def _visual_batch(root,story,slots,identity):
-    accepted={};pending=list(slots);feedback=''
+def _visual_batch(root,story,slots,identity,accepted=None):
+    accepted={} if accepted is None else accepted
+    pending=list(slots);feedback=''
     for attempt in range(2):
         schema=object_schema({f'scene_{i}':scene_composition_schema(story['scenes'][i]) for i in pending})
         response=ask(schema,
@@ -602,7 +603,7 @@ def _visual_batch(root,story,slots,identity):
     from story_visual_contract import literal_recovery, fallback_contract
     for i in pending:
         recovered=literal_recovery(story['scenes'][i],response[f'scene_{i}'],'visual_planning_rejected')
-        accepted[str(i)]=recovered or fallback_contract(story['scenes'][i],story['world'],'visual_planning_rejected')
+        accepted[str(i)]=recovered or fallback_contract(story['scenes'][i],story['world'],'visual_planning_rejected',story['characters'])
     save_json(Path(root)/'visual-fallbacks'/f'{slots[0]}.json',{str(i):accepted[str(i)]['fallback'] for i in pending})
     print(json.dumps(dict(phase='visual planning fallback',scenes=pending)),flush=True)
     return accepted
@@ -636,26 +637,21 @@ def _thumbnail_plan(root,story,identity):
         feedback='\nRejected choice '+str(scene)+': '+json.dumps(review['verdict'].get('issues',[]))+'. Choose another concrete opening event.'
         save_json(Path(root)/'thumbnail-plan-rejection.json',dict(scene=scene,reason=feedback))
         if not remaining:break
-    # A single-scene opening recovery cannot borrow props from other selected beats.
-    record=records.get(0) or visual_batch(Path(root)/'thumbnail-opening-recovery',story,[0],identity)['0']
-    record=copy.deepcopy(record)
-    record['fallback']=dict(mode='scene-recovery',literal_event=record['event'],reason='thumbnail_planning_rejected')
-    from story_visual_contract import REVIEW_VERSION
-    record['planning_review']=dict(version=REVIEW_VERSION,passed=False,issues=['Opening scene recovery; thumbnail audit not approved.'])
-    anchor=record['checks'][0]['answers'][0]
-    question='What will happen next to the '+anchor+'?'
-    save_json(Path(root)/'thumbnail-fallback.json',record)
-    print(json.dumps(dict(phase='thumbnail planning fallback',mode='opening-scene',scene=0)),flush=True)
-    return dict(thumbnail_scene=0,thumbnail_prompt=record['prompt'],thumbnail_contract=record,thumbnail_question=question)
+    from story_visual_contract import thumbnail_recovery
+    recovered=thumbnail_recovery(story,'thumbnail_planning_rejected')
+    save_json(Path(root)/'thumbnail-fallback.json',recovered['thumbnail_contract'])
+    print(json.dumps(dict(phase='thumbnail planning fallback',mode='authored-scene',scene=recovered['thumbnail_scene'])),flush=True)
+    return recovered
 
 
 def visual_batch(root,story,slots,identity):
+    accepted={}
     try:
-        return _visual_batch(root,story,slots,identity)
+        return _visual_batch(root,story,slots,identity,accepted)
     except Exception as exc:
         from story_visual_contract import fallback_contract
         reason=type(exc).__name__
-        records={str(i):fallback_contract(story['scenes'][i],story['world'],reason) for i in slots}
+        records={str(i):accepted.get(str(i)) or fallback_contract(story['scenes'][i],story['world'],reason,story['characters']) for i in slots}
         save_json(Path(root)/'visual-fallbacks'/f'{slots[0]}.json',dict(reason=reason,scenes=slots))
         print(json.dumps(dict(phase='visual planning fallback',scenes=slots,error_type=reason)),flush=True)
         return records
@@ -665,12 +661,11 @@ def thumbnail_plan(root,story,identity):
     try:
         return _thumbnail_plan(root,story,identity)
     except Exception as exc:
-        from story_visual_contract import fallback_contract
-        record=fallback_contract(story['scenes'][0],story['world'],type(exc).__name__)
-        save_json(Path(root)/'thumbnail-fallback.json',record)
+        from story_visual_contract import thumbnail_recovery
+        recovered=thumbnail_recovery(story,type(exc).__name__)
+        save_json(Path(root)/'thumbnail-fallback.json',recovered['thumbnail_contract'])
         print(json.dumps(dict(phase='thumbnail planning fallback',error_type=type(exc).__name__)),flush=True)
-        return dict(thumbnail_scene=0,thumbnail_prompt=record['prompt'],thumbnail_contract=record,
-                    thumbnail_question='What happens next in this story?')
+        return recovered
 
 
 def prepare_visuals(root, story):

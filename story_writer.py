@@ -288,7 +288,7 @@ OUTLINE = object_schema({
     'characters': english_planning(60, 350), 'world': english_planning(30, 220),
     'chapters': {'type': 'array', 'minItems': 6, 'maxItems': 6, 'items': english_planning(40, 220)}})
 ROW = object_schema({'speaker': {'type': 'string', 'enum': list(VOICES)},
-                     'text': string(40, 400), 'visual': string(20, 360)})
+                     'text': string(40, 400), 'visual': english_planning(20, 360)})
 CHAPTER = object_schema({'scenes': {'type': 'array', 'minItems': 8, 'maxItems': 8, 'items': ROW}})
 
 

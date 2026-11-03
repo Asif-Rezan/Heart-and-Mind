@@ -7,7 +7,7 @@ import re
 
 MODEL = 'Salesforce/blip-vqa-base'
 REVISION = '787b3d35d57e49572baabd22884b3d5a05acf072'
-VERSION = 'open-vqa-v3'
+VERSION = 'open-vqa-v4'
 _processor = _model = None
 
 
@@ -75,8 +75,10 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
         from story_art_style import focused_prompt
         composition = focused_prompt(contract,kind,attempt)
         try:
-            generate(composition, candidate, seed=seed+attempt*7919,
-                     negative_extra='headshot, beauty portrait, fashion editorial, isolated face', **kwargs)
+            used_prompt=generate(composition, candidate, seed=seed+attempt*7919,
+                     negative_extra='headshot, beauty portrait, fashion editorial, isolated face',
+                     story_contract=contract,kind=kind,composition_attempt=attempt,**kwargs)
+            if isinstance(used_prompt,str):composition=used_prompt
             from PIL import Image
             with Image.open(candidate) as image:image.verify()
             checked = candidate
@@ -92,6 +94,8 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
         except Exception as exc:
             report = dict(version=VERSION,model=MODEL,revision=REVISION,passed=False,
                           answers=[],attempt=attempt,error_type=type(exc).__name__)
+        report['planning_fallback']=contract.get('fallback',{}).get('mode')
+        report['story_verified']=bool(report['passed'] and contract.get('planning_review',{}).get('passed') and not report['planning_fallback'])
         reports.append(report)
         save_json(work/'reviews.json', reports)
         print(json.dumps(dict(phase='story image review',kind=kind,attempt=attempt,passed=report['passed'],answers=report['answers'])),flush=True)
@@ -111,6 +115,8 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
         report=dict(version=VERSION,model=MODEL,revision=REVISION,passed=False,answers=[],
                     fallback='neutral-background',error_type='generation_unavailable')
     report['source_sha256']=digest(path)
+    report['planning_fallback']=contract.get('fallback',{}).get('mode')
+    report['story_verified']=False
     save_json(work/'fallback.json',report)
     print(json.dumps(dict(phase='story image fallback',kind=kind,mode=report['fallback'])),flush=True)
     return report
