@@ -18,6 +18,10 @@ class DuplicateSongError(RuntimeError):
 
 def pipeline_failure_message(error):
     from lyric_quality import LyricQualityError
+    from lyric_recovery import ReviewedSongUnavailable
+    if isinstance(error, ReviewedSongUnavailable):
+        return ('Pipeline stopped [reviewed_song_unavailable]: no safe reviewed replacement is available. '
+                'Keep saved media and diagnostics; add an unpublished reviewed original matching the voice.')
     if isinstance(error, LyricQualityError):
         return ('Pipeline failed [lyrics_quality_rejected]: bounded lyric revisions did not pass. '
                 'Saved draft and lyrics-quality.json contain recovery diagnostics; music was not started.')

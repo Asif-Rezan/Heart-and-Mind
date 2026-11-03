@@ -51,10 +51,21 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
                     if key in existing}
             (root/'song-draft.json').write_text(json.dumps(core, ensure_ascii=False))
             (root/'song.json').unlink()
+    from lyric_quality import LyricQualityError
     if (root/'song.json').exists():
         song = validate_song(json.loads((root/'song.json').read_text()))
     else:
-        song = selected or make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
+        try:
+            song = selected or make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
+        except LyricQualityError:
+            if not check_history:raise
+            # Quality rejection is recoverable content failure, not permission to
+            # publish the rejected lyrics or retry the same model indefinitely.
+            from lyric_recovery import recover_reviewed_song
+            draft = json.loads((root/'song-draft.json').read_text())
+            voice = draft.get('vocal_gender')
+            if voice not in ('male','female'):raise
+            song = recover_reviewed_song(root, history, voice)
         (root/'song.json').write_text(json.dumps(song, ensure_ascii=False, indent=2))
         if selected:
             (root/'lyrics-quality.json').write_text(json.dumps(song['lyric_quality'],ensure_ascii=False,indent=2))

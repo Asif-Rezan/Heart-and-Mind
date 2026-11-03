@@ -1,6 +1,12 @@
 name: Romantic couple image test
 on:
   workflow_dispatch:
+    inputs:
+      authored_song:
+        description: Reviewed original to test with the actual production model
+        required: true
+        default: ab-baat-karein-2026-11-03
+        type: string
 permissions:
   contents: read
 jobs:
@@ -10,9 +16,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kind: [background, thumbnail]
+        kind: [background, thumbnail, portrait]
     env:
       IMAGE_KIND: ${{ matrix.kind }}
+      AUTHORED_SONG: ${{ inputs.authored_song }}
       HF_HUB_DISABLE_XET: '1'
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
       OMP_NUM_THREADS: '4'
@@ -30,6 +37,8 @@ jobs:
       - run: |
           pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements-images-cpu.txt pillow
+      - name: Verify every production prompt with the real pinned tokenizers
+        run: python -u verify_music_prompt_budget.py
       - name: Generate with production model and corrected couple prompt
         run: python -u preview_music_couple.py
       - uses: actions/upload-artifact@v4

@@ -115,6 +115,18 @@ class MusicVideoTests(unittest.TestCase):
             self.assertIn(dict(question='How many faces are visible?',answers=['two']),
                           plan['contract']['checks'])
 
+    def test_tight_encoder_budget_keeps_both_actors_instead_of_losing_retry(self):
+        from story_art_style import focused_prompt
+        contract=mv.scene_contract(SONG,0,1)
+        contract['music_portrait'].update(male_outfit='T-shirt',female_outfit='stylish fitted dress')
+        # A suffix-heavy encoder budget reproduces the live thumbnail failure:
+        # scenery and aesthetic details must give way before either subject.
+        prompt=focused_prompt(contract,'thumbnail',1,token_count=lambda p:len(p.split())+44)
+        self.assertLessEqual(len(prompt.split())+44,77)
+        self.assertIn('adult woman in a stylish fitted dress',prompt)
+        self.assertIn('man in a T-shirt',prompt)
+        self.assertIn('Both faces visible',prompt)
+
     def test_music_outfits_choose_one_of_the_requested_options(self):
         for index in range(12):
             for kind in ('background','thumbnail'):
