@@ -1,23 +1,29 @@
-import sys,json
-from pathlib import Path
-sys.path.insert(0,str(Path(__file__).resolve().parent))
-from music_video import scene_contract
-from story_art_style import focused_prompt
-from story_image_review import generate_reviewed
-import hashlib
-song=json.loads(Path('lyrics/tum-laut-aao-2026-11-03.json').read_text())
-print(song.keys(),flush=True)
-if 'song' in song:song=song['song']
+"""Exercise real production artwork plans before spending hours on music synthesis."""
+import json
 import os
-kind=os.environ.get('IMAGE_KIND','thumbnail')
-contract=scene_contract(song,0,1,kind)
-prompt=focused_prompt(contract,kind)
-out=Path('output/romantic-couple-test')/kind;out.mkdir(parents=True,exist_ok=True)
-(out/'plan.json').write_text(json.dumps(dict(contract=contract,prompt=prompt),ensure_ascii=False,indent=2))
-print(prompt,flush=True)
-seed=int(hashlib.sha256(('couple-v3:'+kind).encode()).hexdigest()[:8],16)
-report=generate_reviewed(prompt,out/(kind+'.png'),seed=seed,contract=contract,
-                         kind=kind,width=1344,height=768,steps=20)
-(out/'review.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
-(out/'used-prompt.txt').write_text(report['prompt']+'\n')
-print('SAVED VERIFIED',out/(kind+'.png'),flush=True)
+from pathlib import Path
+
+from authored_song import load_authored_song
+from music_short import companion
+from music_video import image_plan
+from story_image_review import generate_reviewed
+from story_writer import save_json
+
+
+def main():
+    kind=os.getenv('IMAGE_KIND','thumbnail')
+    if kind not in ('background','thumbnail','portrait'):
+        raise ValueError('Unsupported preview kind')
+    song=load_authored_song(os.getenv('AUTHORED_SONG','ab-baat-karein-2026-11-03'))
+    if kind=='portrait':song=companion(song,'artwork-readiness')
+    plan=image_plan(song,{},0,'thumbnail' if kind=='thumbnail' else 'background')
+    out=Path('output/romantic-couple-test')/kind;out.mkdir(parents=True,exist_ok=True)
+    save_json(out/'plan.json',plan)
+    report=generate_reviewed(plan['prompt'],out/(kind+'.png'),seed=plan['seed'],
+        contract=plan['contract'],kind=plan['kind'],width=plan['width'],height=plan['height'],steps=plan['steps'])
+    save_json(out/'review.json',report)
+    print(json.dumps(dict(phase='production artwork readiness',kind=kind,
+        passed=report['passed'],width=plan['width'],height=plan['height'])),flush=True)
+
+
+if __name__=='__main__':main()

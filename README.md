@@ -248,3 +248,38 @@ For the rejected bus-stop draft from run `41628990806`, the new original recover
 song is `phir-saath-chalein-2026-11-03` in `lyrics/`. It has 183 sung words and passes
 written checks. Use a fresh run ID with this authored source; never replace a
 saved draft or audio under the previous identity. Listening review remains pending.
+
+
+### Bounded lyric recovery after run 41669888401
+
+A small CPU text model can return valid JSON and structurally correct lyrics whose
+Hindi or rhyme still fails editorial review. Passing unit tests is not proof of
+live creative quality. The three editorial attempts remain bounded and rejected
+lyrics never become approved merely to keep a workflow green.
+
+When `--check-history` is active and editorial attempts fail, preparation can use
+an unpublished, voice-matched original explicitly opted into automatic recovery
+in `lyrics/`. The reviewed source must include a matching `song_sha256`; edits
+invalidate its review. Historical explicitly selected authored songs are not part
+of this pool unless opted in. Title and lyric hashes are checked against the
+loaded publication history. Restoring a hash-matched, already rejected editorial
+checkpoint selects recovery directly instead of replaying another long model repair
+loop. Replacement is forbidden if saved audio/video
+already exists. A successful replacement saves `lyrics-recovery.json` with source
+identity and digest while preserving `song-draft.json` and `lyrics-quality.json`
+as the rejected model checkpoint. It does not regenerate packaging with the model.
+
+The initial recovery original is `ab-baat-karein-2026-11-03` (male narrator).
+The reviewed catalog is finite: once no unpublished voice-matched song remains,
+preparation stops with `reviewed_song_unavailable` and requests a new reviewed
+original. It never relabels or republishes an old song. Temporary model/runtime
+errors outside lyric quality rejection are not silently converted to new content.
+
+
+Artwork readiness now checks landscape, thumbnail and independent portrait plans
+with the exact production song identities, seeds, dimensions and model revisions.
+`verify_music_prompt_budget.py` measures every planned retry with both real CLIP
+tokenizers, including the safety rewrite suffix; this caught an overflowing
+thumbnail retry that word-count approximations missed. Run the manual Romantic
+couple image test on the release branch before treating new art direction as
+validated. It generates test artifacts only and does not publish a video.

@@ -17,9 +17,15 @@ def load_authored_song(identity):
         raise ValueError('Authored song must be a tracked file in lyrics/')
     data = source.read_bytes()
     record = json.loads(data)
+    if not isinstance(record,dict) or not isinstance(record.get('song'),dict):
+        raise ValueError('Authored song must contain a song object')
     review = record.get('editorial_review', {})
+    if not isinstance(review,dict):raise ValueError('Invalid editorial review record')
     if review.get('status') != 'reviewed' or not review.get('reviewer') or not review.get('notes'):
         raise ValueError('Authored song needs an explicit editorial review record')
+    expected = review.get('song_sha256')
+    if expected and expected != hashlib.sha256(json.dumps(record['song'],ensure_ascii=False,sort_keys=True).encode()).hexdigest():
+        raise ValueError('Authored song changed after editorial review')
     song = validate_song(record['song'])
     if song.get('vocal_gender') not in ('male','female'):
         raise ValueError('Authored song must specify its narrator voice')

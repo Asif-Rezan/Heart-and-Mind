@@ -1,0 +1,157 @@
+{
+  "song": {
+    "title": "बस स्टॉप पर तुम्हारा नाम | Bus Stop Par Tumhari Naam | Heart Touching Hindi Song 2026",
+    "lyrics": "[Verse 1]\nरेल प्लेटफॉर्म पर चुपचुप बैठा हूँ\nतुम्हारी चुप के जैसे हवा में फैल रही है\nअंधेरे में तुम्हारा नाम खास लगता है\nबात करने के लिए इंतज़ार कर रहा हूँ\n\n[Pre-Chorus]\nदूरी बिखरी है, पर तुम्हारी आवाज़ लगी\nअब मैं तुम्हारे पास बैठने के लिए तैयार हूँ\n\n[Chorus]\nतुम्हारी ओर से बात करो, मैं तुम्हारा चाहता हूँ\nबारिश आए तो तुम्हारा नाम लेंगा\nहवा में तुम्हारी आवाज़ बची रहे\nतुम्हारे पास बैठने के लिए तैयार हूँ\n\n[Verse 2]\nबस ने लाया तुम्हें, जैसे अपने घर के बच्चे\nतुम्हारी आवाज़ में खुशी छा गई\nअब दूरी बस एक झिलमिलाहट है\nतुम्हारे पास लौट गया वो जान जो खो गई\n\n[Chorus]\nतुम्हारी ओर से बात करो, मैं तुम्हारा चाहता हूँ\nबारिश आए तो तुम्हारा नाम लेंगा\nहवा में तुम्हारी आवाज़ बची रहे\nतुम्हारे पास बैठने के लिए तैयार हूँ\n\n[Bridge]\nचुपचुप करूँगा, तुम्हारे पास बैठने के लिए\nअब मैं तुम्हारी ओर से बात करूँगा\n\n[Final Chorus]\nतुम्हारी ओर से बात करो, मैं तुम्हारा चाहता हूँ\nबारिश आए तो तुम्हारा नाम लेंगा\nहवा में तुम्हारी आवाज़ बची रहे\nतुम्हारे पास बैठने के लिए तैयार हूँ\n\n[Outro]\nतुम्हारी ओर से बात करो, मैं तुम्हारे पास बैठ गया\nबारिश आए तो तुम्हारा नाम लेंगा",
+    "duration": 195,
+    "prompt": "Solo male lead vocal; no female singer or duet. Hindi uplifting folk pop; grounded hopeful vocal, acoustic guitar, flute, warm percussion; 96 BPM, 4/4. Warm melodic tone, natural Hindi diction, legato phrasing. Two-bar vocal phrases; match melody to Hindi word stress, never rush syllables. Repeat the chorus melody; leave breath gaps between lines. Vocal entry within 8s; catchy chorus by 40s. Intimate verses, lifted chorus, sparse bridge, final chorus, resolved ending. Vocal-forward balanced mix, warm bass, restrained reverb; no speech or long solos.",
+    "vocal_gender": "male",
+    "song_date": "2026-11-03"
+  },
+  "quality": {
+    "version": 5,
+    "lyrics_hash": "b62a31d687d59c21bc31f7d61f90ba03a61a4f1022cbbe8ece4ac1cb0b7903f6",
+    "passed": false,
+    "issues": [
+      "Chorus: uneven estimated vowel lengths [30, 22, 21, 25]; inspect spoken phrasing",
+      "Final Chorus: uneven estimated vowel lengths [30, 22, 21, 25]; inspect spoken phrasing",
+      "Outro: uneven estimated vowel lengths [32, 22]; inspect spoken phrasing",
+      "Chorus line 'हवा में तुम्हारी आवाज़ बची रहे' lacks natural end-rhyme with adjacent lines; near-rhyme feels forced",
+      "Verse 2 line 'बस ने लाया तुम्हें, जैसे अपने घर के बच्चे' uses metaphor without clear emotional progression or situation",
+      "Bridge phrase 'चुपचुप करूँगा' repeats earlier structure without narrative advancement or emotional depth"
+    ],
+    "warnings": [
+      "Chorus: uneven estimated vowel lengths [30, 22, 21, 25]; inspect spoken phrasing",
+      "Chorus: uneven estimated vowel lengths [30, 22, 21, 25]; inspect spoken phrasing",
+      "Final Chorus: uneven estimated vowel lengths [30, 22, 21, 25]; inspect spoken phrasing",
+      "Outro: uneven estimated vowel lengths [32, 22]; inspect spoken phrasing"
+    ],
+    "word_count": 190,
+    "sections": [
+      {
+        "section": "Verse 1",
+        "words": [
+          6,
+          9,
+          7,
+          8
+        ],
+        "estimated_vowel_units": [
+          20,
+          26,
+          24,
+          24
+        ]
+      },
+      {
+        "section": "Pre-Chorus",
+        "words": [
+          7,
+          9
+        ],
+        "estimated_vowel_units": [
+          25,
+          29
+        ]
+      },
+      {
+        "section": "Chorus",
+        "words": [
+          9,
+          6,
+          6,
+          7
+        ],
+        "estimated_vowel_units": [
+          30,
+          22,
+          21,
+          25
+        ]
+      },
+      {
+        "section": "Verse 2",
+        "words": [
+          9,
+          6,
+          6,
+          9
+        ],
+        "estimated_vowel_units": [
+          26,
+          20,
+          20,
+          26
+        ]
+      },
+      {
+        "section": "Chorus",
+        "words": [
+          9,
+          6,
+          6,
+          7
+        ],
+        "estimated_vowel_units": [
+          30,
+          22,
+          21,
+          25
+        ]
+      },
+      {
+        "section": "Bridge",
+        "words": [
+          7,
+          7
+        ],
+        "estimated_vowel_units": [
+          27,
+          22
+        ]
+      },
+      {
+        "section": "Final Chorus",
+        "words": [
+          9,
+          6,
+          6,
+          7
+        ],
+        "estimated_vowel_units": [
+          30,
+          22,
+          21,
+          25
+        ]
+      },
+      {
+        "section": "Outro",
+        "words": [
+          10,
+          6
+        ],
+        "estimated_vowel_units": [
+          32,
+          22
+        ]
+      }
+    ],
+    "limitation": "Written phrasing heuristic; melody, pronunciation and perceived emotion require listening review.",
+    "semantic_review": {
+      "passed": false,
+      "coherent_relationship": true,
+      "natural_hindi": true,
+      "natural_rhyme": false,
+      "singable_phrasing": false,
+      "issues": [
+        "Chorus: uneven estimated vowel lengths [30, 22, 21, 25]; inspect spoken phrasing",
+        "Final Chorus: uneven estimated vowel lengths [30, 22, 21, 25]; inspect spoken phrasing",
+        "Outro: uneven estimated vowel lengths [32, 22]; inspect spoken phrasing",
+        "Chorus line 'हवा में तुम्हारी आवाज़ बची रहे' lacks natural end-rhyme with adjacent lines; near-rhyme feels forced",
+        "Verse 2 line 'बस ने लाया तुम्हें, जैसे अपने घर के बच्चे' uses metaphor without clear emotional progression or situation",
+        "Bridge phrase 'चुपचुप करूँगा' repeats earlier structure without narrative advancement or emotional depth"
+      ],
+      "reviewer": "same-model-critique-not-human-or-audio-verification"
+    }
+  }
+}

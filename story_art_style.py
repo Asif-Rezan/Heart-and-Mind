@@ -88,4 +88,11 @@ def music_portrait_prompt(record, kind, token_count=None, max_tokens=77, attempt
         prompt = lead + (detail + '. ' if detail else '') + 'Natural colors, cinematic photograph, no text.'
         if token_count is None or token_count(prompt) <= max_tokens:
             return prompt
+    # Real CLIP tokenizers also count the safety suffix and, after a safety
+    # rejection, a rewrite suffix. Drop scenery/style before either actor.
+    compact = (f'Adult man in a {male} beside an adult woman in a {female}. '
+               if couple else f'Adult woman in a {female}. ')
+    prompt = compact + ('Both faces visible. ' if couple else 'Face visible. ') + \
+        'Neutral white balance. Natural colors, photograph, no text.'
+    if token_count is None or token_count(prompt) <= max_tokens:return prompt
     raise ValueError('music_prompt_encoder_budget')

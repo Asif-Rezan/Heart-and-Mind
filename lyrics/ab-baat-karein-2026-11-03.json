@@ -1,0 +1,40 @@
+{
+  "automatic_recovery": true,
+  "song": {
+    "title": "अब बात करें | Ab Baat Karein | Hindi Romantic Song 2026",
+    "lyrics": "[Verse 1]\nखाली पड़ी है बगल की जगह आज भी\nतुम बिन अधूरी रही ये मुलाकात आज भी\nकागज का टिकट हथेली में मुड़ता रहा\nकहना था कितना मगर मैं चुप रहा\n\n[Pre-Chorus]\nगाड़ी चली तो तुम्हारी कमी रह गई\nभीगी हुई रात आँखों में थम गई\n\n[Chorus]\nअब बात करें तो दूरी पिघल जाए\nरूठी हुई शाम फिर से सँवर जाए\nतुम कह दो मन में छुपी हर बात\nमैं साथ बैठूँ सुनूँ सारी रात\n\n[Verse 2]\nआखिरी गाड़ी रुकी तुम नज़र आ गईं\nरूठी हुई शाम में रौनकें छा गईं\nइस बार अपनी सफाई न देता रहा\nमैं चुप तुम्हारी शिकायत को सुनता रहा\n\n[Chorus]\nअब बात करें तो दूरी पिघल जाए\nरूठी हुई शाम फिर से सँवर जाए\nतुम कह दो मन में छुपी हर बात\nमैं साथ बैठूँ सुनूँ सारी रात\n\n[Bridge]\nतुम्हें बदलने का वादा न माँगूँगा मैं\nबदलूँगा खुद को तुम्हें रोज सुनूँगा मैं\n\n[Final Chorus]\nअब बात करें तो दूरी पिघल जाए\nरूठी हुई शाम फिर से सँवर जाए\nतुम कह दो मन में छुपी हर बात\nमैं साथ बैठूँ सुनूँ सारी रात\n\n[Outro]\nअगली सुबह जब नया दिन उतरने लगे\nहम साथ चल दें जहाँ मन ठहरने लगे",
+    "duration": 195,
+    "vocal_gender": "male",
+    "song_date": "2026-11-03",
+    "visual_mood": "romance",
+    "prompt": "Solo male lead vocal; no female singer or duet. Hindi romantic acoustic pop, piano, acoustic guitar, soft dholak and warm bass; 86 BPM, 4/4. Natural Hindi diction, breathable two-bar phrases, clear pauses and legato melody. Intimate verses, lifted repeated chorus, sparse bridge, resolved ending. Vocal entry within 8 seconds, chorus by 40 seconds. Vocal-forward balanced mix, no speech or long solos.",
+    "description": "एक खाली जगह, मुड़ा हुआ टिकट और देर से लौटी एक मुस्कान—अब बात करें एक मौलिक हिंदी प्रेमगीत है। इस बार अपनी सफाई देने के बजाय वह सुनना चाहता है। Ab Baat Karein is an original Hindi romantic song about meeting again at a railway platform and choosing to listen, with gentle piano, acoustic guitar and dholak. #HindiMusic #RomanticSong",
+    "tags": [
+      "Ab Baat Karein",
+      "अब बात करें",
+      "Hindi romantic song",
+      "Hindi love song",
+      "original Hindi music",
+      "Hindi acoustic pop",
+      "romantic reunion song",
+      "Heart and Mind"
+    ],
+    "thumbnail_text": "AB BAAT KAREIN",
+    "background_prompt": "An adult Indian couple sit side by side on a railway platform bench after rain, smiling gently, both faces visible in neutral daylight.",
+    "thumbnail_prompt": "An adult Indian woman and man stand shoulder to shoulder beside a railway bench, exchanging hopeful smiles, both faces visible in natural daylight.",
+    "visual_scenes": [
+      "An adult Indian couple sit on a railway bench, a folded ticket between them, both faces visible.",
+      "The adult couple stand beside a stopped train after rain, exchanging a quiet smile.",
+      "The woman speaks while her partner listens on the platform bench, both faces visible.",
+      "The couple look toward each other beside a folded ticket, their hands resting close together.",
+      "The couple stand shoulder to shoulder under the station shelter, sharing a hopeful smile.",
+      "The couple walk side by side away from the railway bench in clear morning light."
+    ]
+  },
+  "editorial_review": {
+    "status": "reviewed",
+    "reviewer": "Codex authored editorial pass",
+    "notes": "Original replacement for the repeatedly rejected platform reunion draft. Reviewed idiomatic Hindi, consistent male narrator addressing tum, clear reunion and decision to listen, natural paired rhyme and canonical repeated chorus. Written structure and vowel heuristics pass. This is an authored editorial assessment, not a human or audio approval.",
+    "song_sha256": "26b7cad4b2051d750148ed2694597c5d08d788e82477e599c58eac90be6876cc"
+  }
+}
