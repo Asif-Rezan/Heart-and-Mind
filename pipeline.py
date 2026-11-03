@@ -300,6 +300,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
         temporary = draft_path.with_suffix('.tmp')
         temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
         temporary.replace(draft_path)
+    from story_visual_contract import ENGLISH_PATTERN
     packaging_schema = {'type': 'object', 'additionalProperties': False,
         'required': ['description', 'tags', 'thumbnail_text', 'background_prompt', 'thumbnail_prompt'],
         'properties': {
@@ -307,10 +308,11 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
             'tags': {'type': 'array', 'minItems': 8, 'maxItems': 12,
                      'items': {'type': 'string', 'minLength': 1, 'maxLength': 40}},
             'thumbnail_text': {'type': 'string', 'minLength': 3, 'maxLength': 26, 'pattern': '^[A-Za-z0-9 !?]+$'},
-            'background_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380},
-            'thumbnail_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380}}}
+            'background_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380, 'pattern':ENGLISH_PATTERN},
+            'thumbnail_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380, 'pattern':ENGLISH_PATTERN},
+            'visual_scenes': {'type':'array','minItems':4,'maxItems':8,'items':{'type':'string','minLength':40,'maxLength':160,'pattern':ENGLISH_PATTERN}}}}
     packaging_prompt = f'''Package the supplied original Hindi song. Do not rewrite the song.
-    Genre: {genre}. Visual mood: {mood}. Return only these five JSON fields.
+    Genre: {genre}. Visual mood: {mood}. Return the listed JSON fields.
     description: 60-100 words, readable Hindi and English. The first 150 characters must
       naturally include this song's name and "{search_term}". The first two lines should explain
       its specific emotion/story and include "{hindi_term}". Then give one natural listening
@@ -346,10 +348,15 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
       faces clearly separated, sharp eyes, soft natural skin light and a softly blurred lyric-specific setting.
       One clear emotional moment that reads at phone size; no unrelated older man, collage or busy props.
       Use the full frame for the scene; no blank typography panel, no red paint strokes.
-      This is a TEXT-FREE photograph: no Hindi, Romanized Hindi or English lettering, song title, hook,
+      This is a TEXT-FREE cinematic scene: no Hindi, Romanized Hindi or English lettering, song title, hook,
       year, badge, logo, watermark or signature. Do not ask the image model to draw writing.
-      The thumbnail_text field is retained only as metadata and for the existing video overlay;
+      The thumbnail_text field is retained only as metadata;
       it is never rendered on the thumbnail or sent to the image model.
+    visual_scenes: 4-8 concise English scenes (40-160 characters each) following THIS song's
+      actual verse/chorus/bridge emotional progression. Use the same fully clothed adult
+      couple (healing: adult woman), the lyric-specific setting and meaningful objects.
+      Describe visible actions, not camera/typography. No unrelated drama or wealth.
+      They will be illustrated in realistic cinematic 3D storybook style.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
     The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
     Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.
@@ -403,6 +410,9 @@ def validate_duration(seconds):
 def render(root):
     from artwork import create_artwork
     song = json.loads((root/'song.json').read_text())
+    if song.get('video_format')=='hindi-music-storybook-5s-v1':
+        from music_video import render as render_motion
+        return render_motion(root,song)
     create_artwork(root, song)
     subprocess.run(['ffmpeg', '-y', '-loop', '1', '-i', str(root/'cover.png'), '-i', str(root/'song.wav'),
         '-filter_complex', '[1:a]asplit=2[a][v];[v]showwaves=s=1600x90:mode=line:colors=0xf9b4cc:rate=25,format=rgba[w];[0:v][w]overlay=160:980:shortest=1,format=yuv420p[out]',
@@ -471,7 +481,7 @@ def publish(client, root, song, state, save):
     raise TimeoutError('HD processing pending; rerun same run ID')
 
 
-def run(run_id, defer_drive_cleanup=False):
+def run(run_id, defer_drive_cleanup=False, require_prepared=False):
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', run_id):
         raise ValueError('Invalid run ID')
     root = Path('output')/run_id
@@ -496,12 +506,24 @@ def run(run_id, defer_drive_cleanup=False):
         day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
         song = (validate_song(json.loads((root/'song.json').read_text()))
                 if (root/'song.json').exists() else make_song(day, history, root/'song-draft.json', generation_id=run_id))
+        if not (root/'song.json').exists():song['video_format']='hindi-music-storybook-5s-v1'
         digest = hashlib.sha256(song['lyrics'].encode()).hexdigest()
         if song_duplicate_reason(song, history, run_id):
             raise DuplicateSongError()
         state.update(song=song, hash=digest)
         save()
+    if require_prepared and (root/'song.json').is_file():
+        prepared=validate_song(json.loads((root/'song.json').read_text()))
+        if normalize_lyrics(prepared['lyrics'])!=normalize_lyrics(state['song']['lyrics']):
+            raise RuntimeError('Prepared song differs from the reserved music')
+        if song_duplicate_reason(prepared,history,run_id):raise DuplicateSongError()
+        state['song']=prepared
+        state['hash']=hashlib.sha256(prepared['lyrics'].encode()).hexdigest()
+        save()
     song = validate_song(state['song'])
+    if require_prepared:
+        missing=[name for name in ('song.wav','video.mp4','thumbnail.jpg') if not (root/name).is_file()]
+        if missing:raise RuntimeError('Prepared music publication assets missing')
     (root/'song.json').write_text(json.dumps(song, ensure_ascii=False, indent=2))
     if not (root/'song.wav').exists():
         fid = store.find(f'runs/{run_id}/song.wav')
@@ -514,11 +536,18 @@ def run(run_id, defer_drive_cleanup=False):
     if not state.get('video_id'):
         store.upload(root/'song.wav', f'runs/{run_id}/song.wav')
         if not (root/'video.mp4').exists():
-            from song_images import generate_song_images
-            generate_song_images(root, song)
+            if song.get('video_format')=='hindi-music-storybook-5s-v1':
+                from music_video import prepare_timeline,generate_images
+                prepare_timeline(root,song);generate_images(root,song)
+            else:
+                from song_images import generate_song_images
+                generate_song_images(root, song)
             render(root)
         validate_duration(duration(root/'video.mp4'))
-        for name in ('song.json', 'video.mp4', 'thumbnail.jpg', 'background-source.png', 'thumbnail-source.png', 'image-manifest.json'):
+        if song.get('video_format')=='hindi-music-storybook-5s-v1':
+            from music_video import validate_rendered
+            validate_rendered(root,song)
+        for name in ('song.json', 'video.mp4', 'thumbnail.jpg', 'background-source.png', 'thumbnail-source.png', 'image-manifest.json','music-video-timing.json','music-render-state.json'):
             if (root/name).exists():
                 store.upload(root/name, f'runs/{run_id}/{name}')
     elif not (root/'thumbnail.jpg').exists():
@@ -536,11 +565,12 @@ def run(run_id, defer_drive_cleanup=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id', required=True)
+    parser.add_argument('--require-prepared',action='store_true',help='Publish only completed local media; never synthesize in the publish job')
     parser.add_argument('--defer-drive-cleanup', action='store_true',
                         help='Leave verified media cleanup to the separate workflow job')
     args = parser.parse_args()
     try:
-        run(args.run_id, defer_drive_cleanup=args.defer_drive_cleanup)
+        run(args.run_id, defer_drive_cleanup=args.defer_drive_cleanup,require_prepared=args.require_prepared)
     except Exception as error:
         # Avoid leaking OAuth/API credentials through raw exception response bodies.
         print(pipeline_failure_message(error))

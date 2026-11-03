@@ -1,4 +1,4 @@
-name: Demo thumbnail and background preview
+name: Legacy two-image music artwork demo (manual archive)
 on:
   workflow_dispatch:
     inputs:

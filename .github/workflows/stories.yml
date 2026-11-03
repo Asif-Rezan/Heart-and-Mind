@@ -16,8 +16,6 @@ run-name: ${{ inputs.sample_mode && 'One-minute production-pipeline sample' || '
         description: Previous STORY workflow run number to resume (not a kids run)
         required: false
         type: string
-  schedule:
-  - cron: 0 21 * * *
 env:
   STORY_FORMAT: ${{ inputs.sample_mode && 'pipeline-sample-60s-v1' || 'short-story-v2' }}
 permissions:
