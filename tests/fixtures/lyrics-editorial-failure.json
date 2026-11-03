@@ -1,0 +1,156 @@
+{
+  "song": {
+    "title": "बस स्टॉप पर तुम्हारा नाम | Bus Stop Par Tumhari Naam | Heart Touching Hindi Song 2026",
+    "lyrics": "[Verse 1]\nरेल प्लेटफॉर्म पर चुपचुप बैठा हूँ\nतुम्हारी चुप के जैसे हवा में फैल रही है\nअंधेरे में तुम्हारा नाम खास लगता है\nबात करने के लिए इंतज़ार कर रहा हूँ\n\n[Pre-Chorus]\nदूरी अभी भी खिल रही है\nलेकिन तुम्हारे पास जाने के लिए तैयार हूँ\n\n[Chorus]\nतुम्हारी ओर से बात करो, मैं बेचैन हूँ\nबारिश आए तो तुम्हारा नाम लें\nहवा में तुम्हारी आवाज़ बची रहे\nअब मैं तुम्हारे पास बैठने के लिए तैयार हूँ\n\n[Verse 2]\nएक बस ने तुम्हें लेकर लाया\nतुम्हारी आवाज़ में खुशी छा गई\nजैसे कोई बात तुम्हारे लिए हुई\nअब यह दूरी सिर्फ़ अधूरी लगती है\n\n[Chorus]\nतुम्हारी ओर से बात करो, मैं बेचैन हूँ\nबारिश आए तो तुम्हारा नाम लें\nहवा में तुम्हारी आवाज़ बची रहे\nअब मैं तुम्हारे पास बैठने के लिए तैयार हूँ\n\n[Bridge]\nअब मैं चुपचुप करूँगा\nतुम्हारे पास बैठने के लिए तैयार हूँ\n\n[Final Chorus]\nतुम्हारी ओर से बात करो, मैं बेचैन हूँ\nबारिश आए तो तुम्हारा नाम लें\nहवा में तुम्हारी आवाज़ बची रहे\nअब मैं तुम्हारे पास बैठने के लिए तैयार हूँ\n\n[Outro]\nतुम्हारी ओर से बात करो, मैं बेचैन हूँ\nबारिश आए तो तुम्हारा नाम लें",
+    "duration": 195,
+    "prompt": "Solo male lead vocal; no female singer or duet. Hindi uplifting folk pop; grounded hopeful vocal, acoustic guitar, flute, warm percussion; 96 BPM, 4/4. Warm melodic tone, natural Hindi diction, legato phrasing. Two-bar vocal phrases; match melody to Hindi word stress, never rush syllables. Repeat the chorus melody; leave breath gaps between lines. Vocal entry within 8s; catchy chorus by 40s. Intimate verses, lifted chorus, sparse bridge, final chorus, resolved ending. Vocal-forward balanced mix, warm bass, restrained reverb; no speech or long solos.",
+    "vocal_gender": "male",
+    "song_date": "2026-11-03"
+  },
+  "quality": {
+    "version": 4,
+    "lyrics_hash": "ca2b4a915908570adab4cb8b9b919c45f4773caf17f7199d2e6ea190ae5e23fa",
+    "passed": false,
+    "issues": [
+      "Chorus: 'तुम्हारी ओर से बात करो, मैं बेचैन हूँ' has uneven vowel length and forced phrasing that doesn't flow naturally when spoken; the syllable stress is inconsistent and breaks natural breath points.",
+      "Chorus: 'बारिश आए तो तुम्हारा नाम लें' lacks audible end-rhyme and uses a filler-like structure that feels artificial in speech.",
+      "Final Chorus: repeated lines lack progression; the phrasing is mechanically identical without emotional or narrative development, violating natural progression of a romantic relationship.",
+      "Bridge: 'अब मैं चुपचुप करूँगा' introduces abrupt shift in tone and action with no clear emotional context or narrative build-up.",
+      "Pre-Chorus: 'दूरी अभी भी खिल रही है' has an unnatural vowel length mismatch and awkward phrasing that disrupts spoken rhythm."
+    ],
+    "warnings": [
+      "Pre-Chorus: uneven estimated vowel lengths [16, 28]; inspect spoken phrasing",
+      "Chorus: uneven estimated vowel lengths [25, 20, 21, 29]; inspect spoken phrasing",
+      "Chorus: uneven estimated vowel lengths [25, 20, 21, 29]; inspect spoken phrasing",
+      "Bridge: uneven estimated vowel lengths [13, 25]; inspect spoken phrasing",
+      "Final Chorus: uneven estimated vowel lengths [25, 20, 21, 29]; inspect spoken phrasing"
+    ],
+    "word_count": 181,
+    "sections": [
+      {
+        "section": "Verse 1",
+        "words": [
+          6,
+          9,
+          7,
+          8
+        ],
+        "estimated_vowel_units": [
+          20,
+          26,
+          24,
+          24
+        ]
+      },
+      {
+        "section": "Pre-Chorus",
+        "words": [
+          6,
+          8
+        ],
+        "estimated_vowel_units": [
+          16,
+          28
+        ]
+      },
+      {
+        "section": "Chorus",
+        "words": [
+          8,
+          6,
+          6,
+          9
+        ],
+        "estimated_vowel_units": [
+          25,
+          20,
+          21,
+          29
+        ]
+      },
+      {
+        "section": "Verse 2",
+        "words": [
+          6,
+          6,
+          6,
+          7
+        ],
+        "estimated_vowel_units": [
+          18,
+          20,
+          22,
+          21
+        ]
+      },
+      {
+        "section": "Chorus",
+        "words": [
+          8,
+          6,
+          6,
+          9
+        ],
+        "estimated_vowel_units": [
+          25,
+          20,
+          21,
+          29
+        ]
+      },
+      {
+        "section": "Bridge",
+        "words": [
+          4,
+          7
+        ],
+        "estimated_vowel_units": [
+          13,
+          25
+        ]
+      },
+      {
+        "section": "Final Chorus",
+        "words": [
+          8,
+          6,
+          6,
+          9
+        ],
+        "estimated_vowel_units": [
+          25,
+          20,
+          21,
+          29
+        ]
+      },
+      {
+        "section": "Outro",
+        "words": [
+          8,
+          6
+        ],
+        "estimated_vowel_units": [
+          25,
+          20
+        ]
+      }
+    ],
+    "limitation": "Written phrasing heuristic; melody, pronunciation and perceived emotion require listening review.",
+    "semantic_review": {
+      "passed": false,
+      "coherent_relationship": true,
+      "natural_hindi": true,
+      "natural_rhyme": false,
+      "singable_phrasing": false,
+      "issues": [
+        "Chorus: 'तुम्हारी ओर से बात करो, मैं बेचैन हूँ' has uneven vowel length and forced phrasing that doesn't flow naturally when spoken; the syllable stress is inconsistent and breaks natural breath points.",
+        "Chorus: 'बारिश आए तो तुम्हारा नाम लें' lacks audible end-rhyme and uses a filler-like structure that feels artificial in speech.",
+        "Final Chorus: repeated lines lack progression; the phrasing is mechanically identical without emotional or narrative development, violating natural progression of a romantic relationship.",
+        "Bridge: 'अब मैं चुपचुप करूँगा' introduces abrupt shift in tone and action with no clear emotional context or narrative build-up.",
+        "Pre-Chorus: 'दूरी अभी भी खिल रही है' has an unnatural vowel length mismatch and awkward phrasing that disrupts spoken rhythm."
+      ],
+      "reviewer": "same-model-critique-not-human-or-audio-verification"
+    }
+  }
+}

@@ -87,7 +87,7 @@ class LyricQualityTests(unittest.TestCase):
     def test_semantic_failure_cannot_pass_on_balanced_counts_alone(self):
         critique = {'passed':False, 'issues':['Verse 2: imagery has no relationship meaning']}
         with patch('lyric_quality.review', side_effect=[critique, {'passed':True,'issues':[]}]) as reviewer:
-            with patch('lyrics_cpu.request_story', side_effect=[response(CORE),response({'lyrics':GOOD}),response({'lyrics':GOOD}),response(PACKAGE)]) as model:
+            with patch('lyrics_cpu.request_story', side_effect=[response(CORE),response({'lyrics':GOOD}),response({'verse_2':parse_sections(GOOD)['verse_2']}),response(PACKAGE)]) as model:
                 song = make_song('2026-11-03', [])
         self.assertEqual(reviewer.call_count, 2)
         self.assertIn('imagery has no relationship meaning', model.call_args_list[2].args[1]['messages'][-1]['content'])
@@ -103,6 +103,86 @@ class LyricQualityTests(unittest.TestCase):
         self.assertFalse(result['passed'])
         self.assertIn('not-human', result['reviewer'])
         self.assertIn('do not rewrite', request.call_args.args[0])
+        self.assertIn('NEVER reject an unchanged final chorus', request.call_args.args[0])
+
+    def test_production_editorial_failure_targets_only_flagged_stanzas_on_resume(self):
+        from lyric_quality import semantic_repair_schema, recovery_diagnostics
+        fixture=Path(__file__).parent/'tests/fixtures/lyrics-editorial-failure.json'
+        failed=json.loads(fixture.read_text())
+        schema=semantic_repair_schema(failed['song']['lyrics'],failed['quality'])
+        self.assertEqual(set(schema['required']),{'pre_chorus','chorus','bridge'})
+        repaired={key:parse_sections(GOOD)[key] for key in schema['required']}
+        with tempfile.TemporaryDirectory() as directory:
+            draft=Path(directory)/'song-draft.json'
+            draft.write_text(json.dumps(failed['song']))
+            draft.with_name('lyrics-quality.json').write_text(json.dumps(failed['quality']))
+            diagnostic=recovery_diagnostics(draft.parent)
+            self.assertEqual(diagnostic['structural_issues'],[])
+            self.assertEqual(len(diagnostic['semantic_issues']),5)
+            self.assertEqual(set(diagnostic['failed_criteria']),{'natural_rhyme','singable_phrasing'})
+            with patch('lyrics_cpu.request_story',side_effect=[response(repaired),response(PACKAGE)]) as model:
+                song=make_song('2026-11-03',[],draft)
+            self.assertEqual(model.call_count,2)
+            prompt=model.call_args_list[0].args[1]['messages'][-1]['content']
+            self.assertIn(failed['quality']['semantic_review']['issues'][0],prompt)
+            self.assertIn('Preserve all other stanzas',prompt)
+            self.assertEqual(parse_sections(song['lyrics'])['verse_1'],parse_sections(failed['song']['lyrics'])['verse_1'])
+            self.assertTrue(song['lyric_quality']['passed'])
+
+    def test_persistent_editorial_rejection_stays_bounded_and_unapproved(self):
+        from lyric_quality import LyricQualityError
+        critique=dict(passed=False,issues=['Bridge: unresolved grammar'])
+        bridge={'bridge':parse_sections(GOOD)['bridge']}
+        with tempfile.TemporaryDirectory() as directory:
+            draft=Path(directory)/'song-draft.json'
+            with patch('lyric_quality.review',return_value=critique) as reviewer, \
+                    patch('lyrics_cpu.request_story',side_effect=[response(CORE),
+                        response({'lyrics':GOOD}),response(bridge),response(bridge)]) as model:
+                with self.assertRaises(LyricQualityError):make_song('2026-11-03',[],draft)
+            self.assertEqual(reviewer.call_count,3)
+            self.assertEqual(model.call_count,4)
+            report=json.loads(draft.with_name('lyrics-quality.json').read_text())
+            self.assertFalse(report['passed'])
+            self.assertEqual(report['semantic_review']['issues'],critique['issues'])
+
+    def test_transient_reviewer_error_retries_without_rewriting_lyrics(self):
+        from lyrics_cpu import StoryGenerationError
+        with patch('lyric_quality.review',side_effect=[StoryGenerationError('temporary'),dict(passed=True,issues=[])]) as reviewer, \
+                patch('lyrics_cpu.request_story',side_effect=[response(CORE),response({'lyrics':GOOD}),response(PACKAGE)]) as model:
+            song=make_song('2026-11-03',[])
+        self.assertTrue(song['lyric_quality']['passed'])
+        self.assertEqual(reviewer.call_count,2)
+        self.assertEqual(model.call_count,3)
+
+    def test_reviewer_outage_checkpoints_unapproved_edited_lyrics(self):
+        from lyrics_cpu import StoryGenerationError
+        with tempfile.TemporaryDirectory() as directory:
+            draft=Path(directory)/'song-draft.json'
+            with patch('lyric_quality.review',side_effect=StoryGenerationError('private runtime detail')), \
+                    patch('lyrics_cpu.request_story',side_effect=[response(CORE),response({'lyrics':GOOD})]) as model:
+                with self.assertRaisesRegex(ValueError,'reviewer unavailable'):
+                    make_song('2026-11-03',[],draft)
+            report=json.loads(draft.with_name('lyrics-quality.json').read_text())
+            self.assertFalse(report['passed'])
+            self.assertTrue(report['review_pending'])
+            self.assertEqual(report['error_type'],'StoryGenerationError')
+            self.assertNotIn('private runtime detail',json.dumps(report))
+            self.assertEqual(json.loads(draft.read_text())['lyrics'],GOOD)
+            self.assertEqual(model.call_count,2)
+            with patch('lyric_quality.review',return_value=dict(passed=True,issues=[])), \
+                    patch('lyrics_cpu.request_story',return_value=response(PACKAGE)) as resumed:
+                recovered=make_song('2026-11-03',[],draft)
+            self.assertTrue(recovered['lyric_quality']['passed'])
+            self.assertEqual(resumed.call_count,1)
+
+    def test_recovery_ignores_editorial_feedback_for_different_lyrics(self):
+        from lyric_quality import recovery_diagnostics
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/'song-draft.json').write_text(json.dumps(dict(CORE)))
+            (root/'lyrics-quality.json').write_text(json.dumps(dict(lyrics_hash='stale',
+                semantic_review=dict(issues=['stale criticism']))))
+            self.assertEqual(recovery_diagnostics(root)['semantic_issues'],[])
 
     def test_tampered_saved_lyrics_stop_before_audio_inference(self):
         import prepare_music

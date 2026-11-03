@@ -127,20 +127,20 @@ jobs:
         python - <<'PYTHON'
         import json, os
         from pathlib import Path
-        from lyric_quality import assess
+        from lyric_quality import recovery_diagnostics
         root = Path('output') / os.environ['SONG_RUN_ID']
         draft = root / 'song-draft.json'
         if draft.exists():
-            report = assess(json.loads(draft.read_text())['lyrics'])
-            diagnostics = dict(code='lyrics_quality_rejected', word_count=report['word_count'],
-                               structural_issues=report['issues'], music_started=False,
-                               run_id=os.environ['SONG_RUN_ID'], prepared_run=os.environ['GITHUB_RUN_ID'])
+            diagnostics = dict(recovery_diagnostics(root), run_id=os.environ['SONG_RUN_ID'],
+                               prepared_run=os.environ['GITHUB_RUN_ID'])
             (root / 'lyrics-recovery.json').write_text(json.dumps(diagnostics, indent=2))
             print(json.dumps(diagnostics), flush=True)
             with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
-                summary.write('Lyrics require revision; music was not started.\n\n')
-                summary.write(f"Sung words: {report['word_count']}; accepted range: 160–235.\n\n")
-                for issue in report['issues']:
+                summary.write(('Editorial reviewer unavailable; saved lyrics await review. '
+                               if diagnostics['review_pending'] else 'Lyrics require revision. ')
+                              + 'Music was not started.\n\n')
+                summary.write(f"Sung words: {diagnostics['word_count']}; accepted range: 160–235.\n\n")
+                for issue in diagnostics['structural_issues'] + diagnostics['semantic_issues']:
                     summary.write('- ' + issue + '\n')
                 summary.write('\nInspect lyrics-quality.json for editorial checks. '
                               'Resume after fixing the cause with the same run_id and '

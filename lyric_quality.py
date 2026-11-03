@@ -11,7 +11,7 @@ class LyricQualityError(ValueError):
     pass
 
 
-VERSION = 4
+VERSION = 5
 ORDER = ['Verse 1', 'Pre-Chorus', 'Chorus', 'Verse 2', 'Chorus', 'Bridge', 'Final Chorus', 'Outro']
 COUNTS = [4, 2, 4, 4, 4, 2, 4, 2]
 GUIDE = '''Write a romantic/emotional Hindi album song about affection, longing,
@@ -109,6 +109,10 @@ def review(request, lyrics, genre, bpm, voice, attempt=0, phrasing_warnings=()):
                     'issues':dict(type='array',maxItems=6,items=dict(type='string',minLength=1,maxLength=220))})
     prompt = f'''Review these original Hindi lyrics critically; do not rewrite them.
     Genre {genre}; {bpm} BPM, 4/4, solo {voice} narrator.
+    The chorus, repeated chorus and Final Chorus MUST use identical words.
+    This is intentional song form: NEVER reject an unchanged final chorus or require
+    new narrative progression in a repeated chorus. Judge progression in Verse 2
+    and Bridge. Judge singability by spoken Hindi, not rigid written vowel counts.
     Judge each boolean honestly. coherent_relationship: meaningful romantic/emotional
     relationship with a clear situation and progression, no motivational sermon or
     random metaphors. natural_hindi: idiomatic grammar, consistent pronouns/gender.
@@ -182,3 +186,45 @@ def length_repair_schema(lyrics, report):
     return dict(type='object', additionalProperties=False, required=selected,
                 properties={key:dict(type='array',minItems=count,maxItems=count,items=line)
                             for key,count in SECTION_KEYS if key in selected})
+
+
+def semantic_repair_schema(lyrics, report):
+    """Repair named stanzas while preserving the rest and canonical chorus copies."""
+    critique = report.get('semantic_review', {})
+    if critique.get('passed') is not False:
+        return None
+    sections = parse_sections(lyrics)
+    if set(sections) != {key for key, _ in SECTION_KEYS}:
+        return None
+    aliases = {'verse_1': r'\bverse\s*1\b', 'verse_2': r'\bverse\s*2\b',
+               'pre_chorus': r'\bpre[- ]chorus\b', 'chorus': r'(?<!pre-)(?<!pre )\bchorus\b',
+               'bridge': r'\bbridge\b', 'outro': r'\boutro\b'}
+    feedback = ' '.join(critique.get('issues', []))
+    selected = [key for key, _ in SECTION_KEYS if re.search(aliases[key],feedback,re.I)]
+    # A global critique needs a complete editorial rewrite, not a guessed stanza.
+    if not selected:return None
+    schema = section_schema()
+    schema['required'] = selected
+    schema['properties'] = {key:value for key,value in schema['properties'].items() if key in selected}
+    return schema
+
+
+def recovery_diagnostics(root):
+    """Expose saved structural AND editorial reasons without rerunning inference."""
+    import json
+    from pathlib import Path
+    root = Path(root)
+    draft = json.loads((root/'song-draft.json').read_text())
+    structural = assess(draft['lyrics'])
+    saved_path = root/'lyrics-quality.json'
+    saved = json.loads(saved_path.read_text()) if saved_path.exists() else {}
+    current = saved.get('lyrics_hash') == structural['lyrics_hash']
+    semantic = saved.get('semantic_review', {}) if current else {}
+    return dict(code='lyrics_reviewer_unavailable' if current and saved.get('review_pending') else 'lyrics_quality_rejected',
+                review_pending=bool(current and saved.get('review_pending')),
+                error_type=saved.get('error_type') if current else None,
+                word_count=structural['word_count'],
+                structural_issues=structural['issues'], semantic_issues=semantic.get('issues', []),
+                failed_criteria=[key for key in ('coherent_relationship','natural_hindi',
+                    'natural_rhyme','singable_phrasing') if semantic.get(key) is False],
+                music_started=False)

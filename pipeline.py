@@ -254,6 +254,9 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
         edit_schema = {'type': 'object', 'additionalProperties': False, 'required': ['lyrics'],
             'properties': {'lyrics': core_schema['properties']['lyrics']}}
         report = assess(song['lyrics'])
+        if quality.get('lyrics_hash') == report['lyrics_hash'] and quality.get('passed') is False:
+            report['issues'] += quality.get('semantic_review', {}).get('issues', [])
+            if quality.get('semantic_review'):report['semantic_review'] = quality['semantic_review']
         for attempt in range(3):
             # Save a pending report before inference so an interruption cannot silently
             # promote an unreviewed draft to an approved song on resume.
@@ -272,24 +275,56 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
             {json.dumps(report['sections'], ensure_ascii=False)}
             Return only JSON lyrics, never commentary, translations or credits.
             Original lyrics: {song['lyrics']}'''
-            from lyric_quality import length_repair_schema, parse_sections, render_sections
+            from lyric_quality import length_repair_schema, semantic_repair_schema, parse_sections, render_sections
+            semantic_repair = semantic_repair_schema(song['lyrics'], report)
             repair = length_repair_schema(song['lyrics'], report) if attempt else None
-            if repair:
+            resume_review = (attempt == 0 and quality.get('review_pending') and
+                quality.get('lyrics_hash') == assess(song['lyrics'])['lyrics_hash'] and
+                assess(song['lyrics'])['passed'])
+            if resume_review:
+                pass
+            elif repair or semantic_repair:
                 sections = parse_sections(song['lyrics'])
+                selected_schema = repair or semantic_repair
                 repair_prompt = (edit_prompt + '\nRepair ONLY the requested stanza arrays. '
-                    'Every line MUST contain exactly 7 or 8 Hindi words with single spaces. '
-                    'Use no commas or punctuation except an optional final danda. '
-                    'Rewrite naturally; never cut words off the original line. '
-                    'Return only the requested stanza keys: '+', '.join(repair['required']))
-                sections.update(request(repair_prompt, repair, 3500, 150+attempt))
+                    'Preserve all other stanzas. Replace the flagged wording with idiomatic Hindi, '
+                    'natural paired rhyme and a consistent emotional situation. '
+                    'Do not return the rejected lines unchanged. '
+                    + ('Every line MUST contain exactly 7 or 8 Hindi words with single spaces. '
+                       'Use no commas or punctuation except an optional final danda. ' if repair else '')
+                    + 'Rewrite naturally; never cut words off the original line. '
+                    'Return only the requested stanza keys: '+', '.join(selected_schema['required']))
+                sections.update(request(repair_prompt, selected_schema, 3500, 150+attempt))
                 song['lyrics'] = normalize_lyrics(render_sections(sections))
             else:
                 song['lyrics'] = normalize_lyrics(request(edit_prompt, edit_schema, 5000, 100+attempt)['lyrics'])
             report = assess(song['lyrics'])
             structural_issues = list(report['issues'])
             if report['passed']:
-                critique = review(request, song['lyrics'], genre, bpm, editorial_voice, attempt,
-                    phrasing_warnings=report.get('warnings',[]))
+                # Persist the edited candidate before critique; reviewer outages must
+                # not discard successful editing or approve an unchecked draft.
+                if draft_path is not None:
+                    temporary = draft_path.with_suffix('.tmp')
+                    temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
+                    temporary.replace(draft_path)
+                from lyrics_cpu import StoryGenerationError
+                from jsonschema import ValidationError
+                for review_attempt in range(2):
+                    pending = dict(report, passed=False, review_pending=True,
+                                   review_attempts=review_attempt+1)
+                    if quality_path is not None:
+                        quality_path.write_text(json.dumps(pending,ensure_ascii=False,indent=2))
+                    try:
+                        critique = review(request, song['lyrics'], genre, bpm, editorial_voice, attempt,
+                            phrasing_warnings=report.get('warnings',[]))
+                        break
+                    except (StoryGenerationError, OSError, ValidationError) as exc:
+                        pending['error_type'] = type(exc).__name__
+                        if quality_path is not None:
+                            quality_path.write_text(json.dumps(pending,ensure_ascii=False,indent=2))
+                        if review_attempt == 1:
+                            from lyric_quality import LyricQualityError
+                            raise LyricQualityError('Editorial reviewer unavailable; saved lyrics remain unapproved') from None
                 report['semantic_review'] = critique
                 report['passed'] = critique['passed']
                 report['issues'] += critique['issues']
@@ -298,7 +333,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
             print(json.dumps({'phase':'lyric revision checked','attempt':attempt+1,
                 'passed':report['passed'],'word_count':report['word_count'],
                 'issue_count':len(report['issues']), 'structural_issues':structural_issues,
-                'repair_mode':'stanza-length' if repair else 'full-editorial',
+                'repair_mode':'review-resume' if resume_review else 'stanza-length' if repair else 'stanza-editorial' if semantic_repair else 'full-editorial',
                 'semantic_passed':report.get('semantic_review',{}).get('passed'),
                 'checkpoint':'song-draft.json', 'diagnostics':'lyrics-quality.json'}),flush=True)
             if draft_path is not None:
