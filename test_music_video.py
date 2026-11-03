@@ -124,6 +124,29 @@ class MusicVideoTests(unittest.TestCase):
                 self.assertIn(outfits['female_outfit'],contract['people'])
                 self.assertEqual(outfits,mv.scene_contract(SONG,index,12,kind)['music_portrait'])
 
+    def test_review_transient_error_reuses_the_generated_candidate(self):
+        from story_image_review import generate_reviewed
+        def draw(prompt,path,**kwargs):
+            Image.new('RGB',(256,256),'navy').save(path)
+        with tempfile.TemporaryDirectory() as folder, \
+                patch('story_image_cpu.generate',side_effect=draw) as generate, \
+                patch('story_image_review.review_image',side_effect=[OSError('temporary'),dict(passed=True,answers=[])]) as review:
+            path=Path(folder)/'scene.png'
+            report=generate_reviewed('unused',path,1,mv.scene_contract(SONG,0,1))
+            self.assertTrue(path.exists())
+            self.assertEqual(generate.call_count,1)
+            self.assertEqual(review.call_count,2)
+            self.assertEqual(report['review_attempts'],2)
+
+    def test_count_checks_reject_ambiguous_counts_and_accept_pair_synonyms(self):
+        from story_image_review import matches
+        self.assertTrue(matches('two people',['two']))
+        self.assertFalse(matches('two or three',['two']))
+        self.assertFalse(matches('three people',['two']))
+        check=mv.scene_contract(SONG,0,1)['checks'][0]
+        self.assertTrue(matches('man and woman',check['answers']))
+        self.assertFalse(matches('man',check['answers']))
+
     def test_failed_music_review_cannot_publish_best_candidate(self):
         from story_image_review import generate_reviewed
         contract=mv.scene_contract(SONG,0,1)

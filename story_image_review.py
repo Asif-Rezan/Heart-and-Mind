@@ -7,7 +7,7 @@ import re
 
 MODEL = 'Salesforce/blip-vqa-base'
 REVISION = '787b3d35d57e49572baabd22884b3d5a05acf072'
-VERSION = 'open-vqa-v4'
+VERSION = 'open-vqa-v5'
 _processor = _model = None
 
 
@@ -25,6 +25,9 @@ def matches(answer, expected):
     if not answer or re.search(r'\b(no|none|nothing|without|not|unknown|cannot)\b', answer):
         return False
     acceptable = [normalized(item) for item in expected if normalized(item)]
+    if acceptable and all(item.isdigit() for item in acceptable):
+        numbers = re.findall(r'\b\d+\b', answer)
+        return len(numbers) == 1 and numbers[0] in acceptable
     return any(re.search(r'\b'+re.escape(item)+r's?\b', answer) for item in acceptable)
 
 
@@ -87,11 +90,16 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
             if kind == 'thumbnail':
                 checked = candidate.with_suffix('.jpg')
                 export_thumbnail(candidate, checked)
-            try:
-                report = review_image(checked, contract['checks'])
-            except Exception as exc:
-                report = dict(version=VERSION,model=MODEL,revision=REVISION,passed=False,
-                              answers=[],error_type=type(exc).__name__)
+            # A reviewer/download exception should retry the same expensive image.
+            # A completed negative verdict still requires a new candidate.
+            for review_attempt in range(2):
+                try:
+                    report = review_image(checked, contract['checks'])
+                    break
+                except Exception as exc:
+                    report = dict(version=VERSION,model=MODEL,revision=REVISION,passed=False,
+                                  answers=[],error_type=type(exc).__name__)
+            report['review_attempts'] = review_attempt + 1
             report.update(attempt=attempt, prompt=composition, source_sha256=digest(candidate))
         except Exception as exc:
             report = dict(version=VERSION,model=MODEL,revision=REVISION,passed=False,

@@ -285,6 +285,14 @@ jobs:
         path: artifacts/music-images/
         retention-days: 7
         if-no-files-found: warn
+    - name: Preserve image review diagnostics even when generation fails
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: music-image-review-${{ github.run_id }}-${{ matrix.shard }}
+        path: output/*/image-review/
+        retention-days: 7
+        if-no-files-found: ignore
     strategy:
       fail-fast: false
       max-parallel: 14
@@ -348,6 +356,17 @@ jobs:
           output/*/background-source.png
           output/*/music-*.json
         retention-days: 7
+    - name: Preserve render diagnostics
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: music-render-diagnostics-${{ github.run_id }}
+        path: |
+          output/*/song.json
+          output/*/music-*.json
+          output/*/short-edit-plan.json
+        retention-days: 7
+        if-no-files-found: ignore
   publish:
     needs:
     - lyrics

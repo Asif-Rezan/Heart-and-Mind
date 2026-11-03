@@ -493,13 +493,13 @@ def publish(client, root, song, state, save):
         save()
     elif not state.get('thumbnail_uploaded'):
         client.thumbnails().set(videoId=state['video_id'],
-            media_body=MediaFileUpload(str(root/'thumbnail.jpg'))).execute()
+            media_body=MediaFileUpload(str(root/'thumbnail.jpg'))).execute(num_retries=5)
         state['thumbnail_uploaded'] = True
         save()
     deadline = time.monotonic() + 1800
     while time.monotonic() < deadline:
         items = client.videos().list(part='snippet,status,processingDetails,contentDetails',
-                                    id=state['video_id']).execute().get('items', [])
+                                    id=state['video_id']).execute(num_retries=5).get('items', [])
         if not items:
             raise RuntimeError('Uploaded video unavailable')
         video = items[0]

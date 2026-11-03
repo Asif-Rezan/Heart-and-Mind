@@ -96,7 +96,7 @@ def scene_contract(song, index, count, kind='background'):
     if mood!='healing':people+='; man, 30, Indian, '+male_outfit
     lines=[x.strip() for x in song['lyrics'].splitlines() if x.strip() and not x.lstrip().startswith('[')]
     evidence=(lines[min(len(lines)-1,int(index/max(1,count)*len(lines)))] if lines else song['lyrics'])[:300]
-    checks=[dict(question='Who is shown in this scene?',answers=['woman'] if mood=='healing' else ['couple'])]
+    checks=[dict(question='Who is shown in this scene?',answers=['woman'] if mood=='healing' else ['couple','man and woman','woman and man'])]
     if mood!='healing':
         checks.extend([dict(question='How many people are shown?',answers=['two']),
                        dict(question='How many faces are visible?',answers=['two'])])

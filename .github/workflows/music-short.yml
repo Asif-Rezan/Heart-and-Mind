@@ -167,6 +167,7 @@ jobs:
     - name: Generate fresh portrait images on four parallel workers
       run: python -u music_short.py --parent-run "$PARENT_RUN" --stage images
     - name: Package worker-owned portrait assets
+      if: always()
       run: python music_short.py --parent-run "$PARENT_RUN" --stage package
     - uses: actions/upload-artifact@v4
       if: always()
@@ -175,6 +176,14 @@ jobs:
         path: artifacts/music-images/
         retention-days: 7
         if-no-files-found: warn
+    - name: Preserve image review diagnostics even when generation fails
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: short-image-review-${{ github.run_id }}-${{ matrix.shard }}
+        path: output/*/image-review/
+        retention-days: 7
+        if-no-files-found: ignore
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -227,6 +236,17 @@ jobs:
           output/*-short/short-edit-plan.json
         retention-days: 7
         if-no-files-found: warn
+    - name: Preserve render diagnostics
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: short-render-diagnostics-${{ github.run_id }}
+        path: |
+          output/*/song.json
+          output/*/music-*.json
+          output/*/short-edit-plan.json
+        retention-days: 7
+        if-no-files-found: ignore
   publish:
     needs:
     - render
