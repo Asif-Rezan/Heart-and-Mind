@@ -192,3 +192,33 @@ The test suite covers the saved music engine, publication/channel safeguards,
 current image style/recovery, five-second fractional-duration timelines, separate
 full-HD thumbnails, worker-owned artifacts, and actual FFmpeg motion/dissolve/audio
 rendering. Tests do not predict YouTube views, CTR, or audience retention.
+
+
+## Parallel long video and independent Shorts
+
+Every music run now starts the long audio worker and twelve image workers directly
+from the saved lyrics. Image identities use the requested duration; the final edit
+still uses the measured audio and five-second cuts. A fractional audio overrun uses
+the final scene again, without forcing all image workers to wait for synthesis.
+
+The same run calls `music-short.yml` to make one companion Short. Its reviewed
+chorus and bridge receive a **new 45-second ACE-Step synthesis** with a hook-first
+arrangement; no long-song audio is clipped. Three image workers generate fresh
+576×1024 portrait scenes, then the edit exports 1080×1920. Long music, long images,
+Short music and Short images can all run concurrently, subject to GitHub's runner
+quota. The Short uses the same song hook, rather than claiming to be a new song.
+
+The companion has a separate `-short` run identity, artifacts and durable Drive
+publication state. It publishes publicly on the verified Heart and Mind channel,
+with synthetic-media disclosure, `#Shorts`, measured duration/dimension checks and
+the same ambiguous-upload protection as long videos. YouTube selects its thumbnail
+frame; the uploader does not attempt an unsupported Shorts custom-thumbnail change.
+Temporary Drive media is removed only after fresh public HD/metadata verification.
+`PUBLISH_ENABLED=false` disables both uploads. A failed companion does not block
+long-video publication, and its state never overwrites the long-song history.
+
+To attach a companion to a long run already in progress, dispatch **Independent
+portrait music Short** with `source_run` (the numeric GitHub run ID containing
+`music-input-<source_run>`) and `parent_run` (its saved song identity). Use the same
+values to retry; never change the parent source under a published companion ID.
+Long parent IDs receive a stable shortened companion identity.
