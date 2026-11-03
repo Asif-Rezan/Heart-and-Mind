@@ -1,5 +1,7 @@
 name: Romantic couple image test
 on:
+  push:
+    branches: [codex/fix-live-lyric-quality]
   workflow_dispatch:
     inputs:
       authored_song:
@@ -19,7 +21,7 @@ jobs:
         kind: [background, thumbnail, portrait]
     env:
       IMAGE_KIND: ${{ matrix.kind }}
-      AUTHORED_SONG: ${{ inputs.authored_song }}
+      AUTHORED_SONG: ${{ inputs.authored_song || 'ab-baat-karein-2026-11-03' }}
       HF_HUB_DISABLE_XET: '1'
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
       OMP_NUM_THREADS: '4'
