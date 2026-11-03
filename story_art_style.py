@@ -63,18 +63,21 @@ def focused_prompt(record, kind='background', attempt=0, token_count=None, max_t
 
 
 def music_portrait_prompt(record, kind, token_count=None, max_tokens=77):
-    """Keep both romantic leads and face lighting ahead of optional scene detail."""
+    """A single pair and neutral color survive the encoders' limited context."""
+    import re
     couple = record['music_portrait']['couple']
-    subject = ('Romantic Indian couple, one woman in sari, one man in ivory kurta. '
-               if couple else 'Indian woman in teal sari, hopeful smile. ')
-    framing = 'Close chest-up shot. ' if kind == 'thumbnail' else 'Medium waist-up shot. '
-    faces = ('Two separate faces, both facing camera, tender smiles. ' if couple
-             else 'Face facing camera. ')
-    lead = subject + framing + faces + 'Sharp eyes, natural faces, soft frontal light. '
-    # The real dual-tokenizer budget includes the backend safety suffix.
-    for words in (16, 10, 6, 0):
-        scene = ' '.join(record['event'].split()[:words]).rstrip(' ,.;')
-        prompt = lead + (scene + '. ' if scene else '') + 'Cinematic 3D render, no text.'
+    subject = ('Romantic couple, exactly two adults. Man left, navy shirt. Woman right, blue sari. '
+               if couple else 'Indian woman in blue sari, hopeful smile. ')
+    framing = 'Chest-up, faces large. ' if kind == 'thumbnail' else 'Waist-up. '
+    pose = 'Leaning together, tender glance, both faces visible. ' if couple else 'Face visible. '
+    lead = subject + framing + pose + 'Neutral daylight, natural skin, sharp eyes. '
+    # Repeating the event's actors made the small model invent a third person.
+    # Use only environmental anchors after the pair; never copy warm-light cues.
+    anchors = [word for word in ('rain', 'window', 'door', 'courtyard', 'bookshop', 'river', 'platform')
+               if re.search(r'\b'+word+r'\b', record['event'], re.I)]
+    scene = ', '.join(anchors[:2])
+    for detail in (scene, ''):
+        prompt = lead + (detail + '. ' if detail else '') + 'Cool blue background, cinematic photograph, no text.'
         if token_count is None or token_count(prompt) <= max_tokens:
             return prompt
     raise ValueError('music_prompt_encoder_budget')

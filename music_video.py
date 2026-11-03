@@ -24,7 +24,7 @@ from story_writer import save_json
 
 FORMAT = 'hindi-music-storybook-5s-v1'
 VERSION = 'cinematic-music-edit-v1'
-MUSIC_ART_VERSION = 'romantic-couple-faces-v1'
+MUSIC_ART_VERSION = 'romantic-couple-neutral-v2'
 IMAGE_SECONDS = 5
 FPS = 25
 DISSOLVE = .4

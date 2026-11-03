@@ -76,7 +76,7 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
         composition = focused_prompt(contract,kind,attempt)
         try:
             used_prompt=generate(composition, candidate, seed=seed+attempt*7919,
-                     negative_extra=('distant people, back view, hidden face, profile, crowd, overlapping faces'
+                     negative_extra=('third person, extra people, duplicate man, group photo, wedding, gold, amber, yellow tint, orange light, sepia, distant people, hidden face, overlapping faces'
                                      if contract.get('music_portrait') else
                                      'headshot, beauty portrait, fashion editorial, isolated face'),
                      story_contract=contract,kind=kind,composition_attempt=attempt,**kwargs)

@@ -98,9 +98,13 @@ class MusicVideoTests(unittest.TestCase):
             for attempt in (0,1):
                 prompt=focused_prompt(plan['contract'],kind,attempt,
                                       token_count=lambda text:len(text.split())+30)
-                self.assertIn('one woman in sari, one man in ivory kurta',prompt)
-                self.assertIn('Two separate faces',prompt)
-                self.assertIn('soft frontal light',prompt)
+                self.assertIn('exactly two adults',prompt)
+                self.assertIn('Woman right, blue sari',prompt)
+                self.assertNotIn('An adult couple',prompt)
+                self.assertNotIn('warm',prompt)
+                self.assertIn('both faces visible',prompt)
+                self.assertIn('Neutral daylight',prompt)
+                self.assertIn('Cool blue background',prompt)
                 self.assertNotIn('Wide shot',prompt)
             self.assertIn(dict(question='How many faces are visible?',answers=['two']),
                           plan['contract']['checks'])
