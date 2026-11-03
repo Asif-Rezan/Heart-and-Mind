@@ -24,7 +24,7 @@ def focused_prompt(record, kind='background', attempt=0, token_count=None, max_t
     """Put visible story nouns inside the short CLIP context, before cast detail."""
     import re
     if record.get('music_portrait'):
-        return music_portrait_prompt(record,kind,token_count,max_tokens)
+        return music_portrait_prompt(record,kind,token_count,max_tokens,attempt)
     text=record['event']
     nouns=('notebook','letter','toy','book','door','key','box','bag','photograph','phone','drawing','tree','house','school')
     answers=' '.join(a for check in record['checks'] for a in check['answers'])
@@ -62,7 +62,7 @@ def focused_prompt(record, kind='background', attempt=0, token_count=None, max_t
     return prompt
 
 
-def music_portrait_prompt(record, kind, token_count=None, max_tokens=77):
+def music_portrait_prompt(record, kind, token_count=None, max_tokens=77, attempt=0):
     """A single pair and neutral color survive the encoders' limited context."""
     import re
     couple = record['music_portrait']['couple']
@@ -70,6 +70,12 @@ def music_portrait_prompt(record, kind, token_count=None, max_tokens=77):
     female = record['music_portrait'].get('female_outfit','casual top')
     subject = (f'Adult man in a {male} embracing an adult woman in a {female}. '
                if couple else f'Adult woman in a {female}, hopeful smile. ')
+    if couple and attempt:
+        subject = (f'Exactly two adults, woman in a {female} on left, man in a {male} on right. '
+                   'Standing side by side, facing camera. ')
+        if attempt >= 2:
+            subject = ('Two-person portrait: adult woman on left and adult man on right, '
+                       'shoulders touching, looking at camera. ')
     framing = 'Chest-up, faces large. ' if kind == 'thumbnail' else 'Waist-up. '
     pose = 'Both faces visible, gentle smiles. ' if couple else 'Face visible. '
     lead = subject + framing + pose + 'Neutral white balance, natural skin tones, daylight, sharp eyes. '

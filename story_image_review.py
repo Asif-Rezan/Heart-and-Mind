@@ -11,6 +11,11 @@ VERSION = 'open-vqa-v5'
 _processor = _model = None
 
 
+class ImageReviewFailed(RuntimeError):
+    """No candidate passed; other scene checkpoints remain usable."""
+
+
+
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -73,12 +78,25 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
     work = path.parent/'image-review'/path.stem
     work.mkdir(parents=True, exist_ok=True)
     reports = []
-    for attempt in range(2):
-        candidate = work/f'candidate-{attempt}.png'
+    # Replaying the same failed seeds cannot repair a deterministic diffusion result.
+    retry_state = work/'retry-state.json'
+    identity = hashlib.sha256(json.dumps(dict(version=VERSION,seed=seed,contract=contract,
+        kind=kind,options=kwargs),sort_keys=True).encode()).hexdigest()
+    offset = 0
+    if contract.get('music_portrait') and retry_state.exists():
+        try:
+            saved = json.loads(retry_state.read_text())
+            if saved.get('identity') == identity:offset = max(0,int(saved['next_attempt']))
+        except (ValueError,KeyError,TypeError):
+            pass
+    for attempt in range(4 if contract.get('music_portrait') else 2):
+        if contract.get('music_portrait'):
+            save_json(retry_state,dict(identity=identity,next_attempt=offset+attempt+1))
+        candidate = work/f'candidate-{offset+attempt}.png'
         from story_art_style import focused_prompt
         composition = focused_prompt(contract,kind,attempt)
         try:
-            used_prompt=generate(composition, candidate, seed=seed+attempt*7919,
+            used_prompt=generate(composition, candidate, seed=seed+(offset+attempt)*7919,
                      negative_extra=('third person, extra people, duplicate man, group photo, wedding, orange color cast, blue color cast, sepia, oversaturated, distant people, hidden face, overlapping faces'
                                      if contract.get('music_portrait') else
                                      'headshot, beauty portrait, fashion editorial, isolated face'),
@@ -115,7 +133,8 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
             candidate.replace(path)
             return report
     if contract.get('music_portrait'):
-        raise RuntimeError('Music couple/face review failed; inspect image-review candidates before publishing')
+        raise ImageReviewFailed(f'Music couple/face review failed for {path.name} after {len(reports)} candidates; '
+                                f'inspect {work / "reviews.json"}. Retry images to reuse completed scenes.')
     # A failed quality/service check must not discard narration or stop the video.
     available=[r for r in reports if r.get('source_sha256')]
     if available:
