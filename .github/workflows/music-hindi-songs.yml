@@ -196,17 +196,9 @@ jobs:
 
           output/*/music-video-timing.json
         retention-days: 7
-    - uses: actions/upload-artifact@v4
-      with:
-        name: music-visual-input-${{ github.run_id }}
-        path: |-
-          output/*/song.json
-          output/*/music-video-timing.json
-        retention-days: 7
   images:
     needs:
     - lyrics
-    - music
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -219,7 +211,7 @@ jobs:
       CPU_IMAGE_HEIGHT: '576'
       CPU_IMAGE_STEPS: '20'
       IMAGE_SHARD: ${{ matrix.shard }}
-      IMAGE_SHARDS: '12'
+      IMAGE_SHARDS: '14'
     steps:
     - uses: actions/checkout@v4
       with:
@@ -241,7 +233,7 @@ jobs:
         pip install --no-cache-dir -r requirements.txt -r requirements-images-cpu.txt
     - uses: actions/download-artifact@v4
       with:
-        name: music-visual-input-${{ github.run_id }}
+        name: music-input-${{ github.run_id }}
         path: output/
     - name: Restore previous song artwork when available
       if: inputs.prepared_run != '' && needs.lyrics.outputs.has_motion_images == 'true'
@@ -252,8 +244,8 @@ jobs:
         path: output/
         pattern: generated-artwork-${{ inputs.prepared_run }}-*
         merge-multiple: true
-    - name: Generate current 3D scenes for measured five-second intervals
-      run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage images --motion-video
+    - name: Generate independent 3D scenes while music synthesizes
+      run: python -u music_video.py --root "output/$SONG_RUN_ID" --stage images
     - name: Package only this worker’s images and manifests
       if: always()
       run: if [ -f "output/$SONG_RUN_ID/song.json" ]; then python music_video.py --root "output/$SONG_RUN_ID" --stage
@@ -267,7 +259,7 @@ jobs:
         if-no-files-found: warn
     strategy:
       fail-fast: false
-      max-parallel: 12
+      max-parallel: 14
       matrix:
         shard:
         - 0
@@ -282,6 +274,8 @@ jobs:
         - 9
         - 10
         - 11
+        - 12
+        - 13
   render:
     needs:
     - lyrics
@@ -387,3 +381,11 @@ jobs:
     - run: pip install -r requirements.txt
     - name: Verify public HD video and clean its temporary media
       run: python -u cleanup_drive.py --run-id "$SONG_RUN_ID"
+  shorts:
+    needs:
+    - lyrics
+    uses: ./.github/workflows/music-short.yml
+    with:
+      source_run: ${{ github.run_id }}
+      parent_run: ${{ needs.lyrics.outputs.run_id }}
+    secrets: inherit

@@ -123,9 +123,10 @@ For an immediate new song, run the music workflow on `main` with:
 - `prepared_run`: leave empty for a new song. To resume an unfinished song, provide
   its previous numeric music workflow run and reuse the **same** run ID/voice.
 
-Generation order: lyrics/history/channel checks → ACE-Step full song → measured
-visual timeline → **12 image workers** → Python/FFmpeg cinematic edit → checksum-
-verified upload on Heart and Mind → fresh public-HD verification and Drive cleanup.
+Generation order: lyrics/history/channel checks → parallel ACE-Step full song and
+**14 image workers**, plus independent Shorts music and **4 portrait workers** →
+measured edits → checksum-verified uploads on Heart and Mind → fresh public-HD
+verification and Drive cleanup.
 Publishing requires completed local assets and cannot silently start another music
 synthesis job. A rerun never reuploads an already confirmed published identity.
 
@@ -192,3 +193,40 @@ The test suite covers the saved music engine, publication/channel safeguards,
 current image style/recovery, five-second fractional-duration timelines, separate
 full-HD thumbnails, worker-owned artifacts, and actual FFmpeg motion/dissolve/audio
 rendering. Tests do not predict YouTube views, CTR, or audience retention.
+
+
+## Parallel long video and independent Shorts
+
+Every music run now starts the long audio worker and fourteen image workers directly
+from the saved lyrics. Image identities use the requested duration; the final edit
+still uses the measured audio and five-second cuts. A fractional audio overrun uses
+the final scene again, without forcing all image workers to wait for synthesis.
+
+The same run calls `music-short.yml` to make one companion Short. Its reviewed
+chorus and bridge receive a **new 45-second ACE-Step synthesis** with a hook-first
+arrangement; no long-song audio is clipped. Four image workers generate fresh
+576×1024 portrait scenes, then the edit exports 1080×1920. Shorts use a dedicated
+edit: an immediate hook card, audio-energy cuts
+near the tempo grid, alternating two/four-beat shots, punch-in/pull-out/panning,
+restrained accent flashes and large readable lyric cards inside the portrait safe
+area. These cards are editorial excerpts, not forced-aligned karaoke timestamps.
+
+Long music, long images, Short music and Short images can all run concurrently, subject to GitHub's runner
+quota. The generation fan-out is 14 long-image workers + 4 portrait workers +
+2 separate music workers = 20 jobs. The Short uses the same song hook, rather than
+claiming to be a new song.
+
+The companion has a separate `-short` run identity, artifacts and durable Drive
+publication state. It publishes publicly on the verified Heart and Mind channel,
+with synthetic-media disclosure, `#Shorts`, measured duration/dimension checks and
+the same ambiguous-upload protection as long videos. YouTube selects its thumbnail
+frame; the uploader does not attempt an unsupported Shorts custom-thumbnail change.
+Temporary Drive media is removed only after fresh public HD/metadata verification.
+`PUBLISH_ENABLED=false` disables both uploads. A failed companion does not block
+long-video publication, and its state never overwrites the long-song history.
+
+To attach a companion to a long run already in progress, dispatch **Independent
+portrait music Short** with `source_run` (the numeric GitHub run ID containing
+`music-input-<source_run>`) and `parent_run` (its saved song identity). Use the same
+values to retry; never change the parent source under a published companion ID.
+Long parent IDs receive a stable shortened companion identity.

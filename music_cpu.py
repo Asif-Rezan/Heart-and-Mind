@@ -87,9 +87,18 @@ def runtime(source):
     return torch, CpuHandler, GenerationParams, GenerationConfig, generate_music
 
 
+def validate_audio_duration(song, seconds):
+    from pipeline import validate_duration
+    if song.get('media_kind')=='shorts':
+        if not 30 <= seconds <= 59:
+            raise ValueError('Measured Shorts audio must be 30-59 seconds')
+    else:
+        validate_duration(seconds)
+
+
 def synthesize(song, target, source, model_root):
-    from pipeline import validate_song, validate_duration, duration
-    validate_song(song)
+    from pipeline import validate_song, duration
+    validate_song(song, allow_short=True)
     checkpoints(model_root)
     os.environ['ACESTEP_CHECKPOINTS_DIR'] = str(model_root.resolve())
     os.environ['ACESTEP_INIT_LLM'] = 'false'
@@ -118,7 +127,7 @@ def synthesize(song, target, source, model_root):
     if not result.success or not result.audios:
         raise RuntimeError('ACE-Step CPU music synthesis failed')
     audio = Path(result.audios[0]['path'])
-    validate_duration(duration(audio))
+    validate_audio_duration(song, duration(audio))
     temporary = target.with_suffix('.part.wav')
     shutil.copyfile(audio, temporary)
     temporary.replace(target)
@@ -128,9 +137,9 @@ def synthesize(song, target, source, model_root):
 def generate(song, target, state, save):
     # Local CPU generation has no remote task to duplicate. A failed or killed
     # runner can regenerate the same saved lyrics without resubmitting to a service.
-    from pipeline import validate_duration, duration
+    from pipeline import duration
     if target.exists():
-        validate_duration(duration(target))
+        validate_audio_duration(song, duration(target))
         return
     source = Path(os.environ.get('ACESTEP_SOURCE_DIR', '.vendor/ace-step')).resolve()
     model_root = Path(os.environ.get('ACESTEP_CHECKPOINTS_DIR', '.models/acestep')).resolve()
@@ -146,7 +155,7 @@ def generate(song, target, state, save):
         state.update(generation_started=False, generation_failed='Local CPU worker failed; saved lyrics retained')
         save()
         raise RuntimeError('Local ACE-Step CPU worker failed; resume the saved run') from None
-    validate_duration(duration(target))
+    validate_audio_duration(song, duration(target))
     state.pop('generation_failed', None)
     state.update(audio_ready=True, generation_started=False)
     save()

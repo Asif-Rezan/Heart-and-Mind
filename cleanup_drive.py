@@ -12,8 +12,11 @@ MEDIA = ('song.wav', 'video.mp4', 'thumbnail.jpg', 'background-source.png',
 
 def verify_public(client, state):
     from pipeline import metadata_tags, upload_description
-    if state.get('phase') != 'published' or not state.get('video_id') or state.get('thumbnail_uploaded') is not True:
-        raise RuntimeError('Published video and uploaded thumbnail required before cleanup')
+    thumbnail_ready = state.get('thumbnail_uploaded') is True or (
+        state.get('song',{}).get('media_kind')=='shorts' and
+        state.get('thumbnail_mode')=='youtube-selected-frame')
+    if state.get('phase') != 'published' or not state.get('video_id') or not thumbnail_ready:
+        raise RuntimeError('Published video and confirmed thumbnail mode required before cleanup')
     items = client.videos().list(part='snippet,status,processingDetails,contentDetails',
                                 id=state['video_id']).execute().get('items', [])
     if len(items) != 1:
