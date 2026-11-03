@@ -15,6 +15,10 @@ name: Hindi album music generation and public publishing
         - auto
         - male
         - female
+      authored_song:
+        description: Optional reviewed song identity from lyrics/ (new run ID only)
+        required: false
+        type: string
       prepared_run:
         description: Optional previous GitHub run ID containing saved lyrics or music
         required: false
@@ -43,6 +47,7 @@ jobs:
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
       REQUESTED_RUN_ID: ${{ inputs.run_id }}
       REQUESTED_VOCAL_GENDER: ${{ inputs.vocal_gender || 'auto' }}
+      REQUESTED_AUTHORED_SONG: ${{ inputs.authored_song }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -113,7 +118,7 @@ jobs:
         DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
       run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage lyrics --check-history --vocal-gender "$REQUESTED_VOCAL_GENDER"
-        --motion-video
+        --motion-video --authored-song "$REQUESTED_AUTHORED_SONG"
     - uses: actions/upload-artifact@v4
       if: always()
       with:

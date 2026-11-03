@@ -11,7 +11,7 @@ class LyricQualityError(ValueError):
     pass
 
 
-VERSION = 3
+VERSION = 4
 ORDER = ['Verse 1', 'Pre-Chorus', 'Chorus', 'Verse 2', 'Chorus', 'Bridge', 'Final Chorus', 'Outro']
 COUNTS = [4, 2, 4, 4, 4, 2, 4, 2]
 GUIDE = '''Write a romantic/emotional Hindi album song about affection, longing,
@@ -59,6 +59,7 @@ def assess(text):
     text_layout = re.sub(r'(?m)^[ \t]*(\[[^\]\n]+\])[ \t]+([^\n]+)$', r'\1\n\2', text)
     sections = []
     issues = []
+    warnings = []
     for raw in text_layout.splitlines():
         line = raw.strip()
         if not line: continue
@@ -82,13 +83,13 @@ def assess(text):
         if any(n < 4 or n > 10 for n in words):
             issues.append(f'{name}: phrase too short or overloaded; aim 6-9 words')
         if any(n < 8 or n > 36 for n in weights) or (weights and max(weights)-min(weights) > 7):
-            issues.append(f'{name}: uneven estimated vowel lengths {weights}; revise for balanced phrases')
+            warnings.append(f'{name}: uneven estimated vowel lengths {weights}; inspect spoken phrasing')
     if [s[0] for s in sections] == ORDER:
         if sections[2][1] != sections[4][1] or sections[2][1] != sections[6][1]:
             issues.append('All three chorus performances must use identical words')
         if len(sections[0][1]) == len(sections[3][1]) == 4:
             if any(abs(vowel_weight(a)-vowel_weight(b)) > 6 for a,b in zip(sections[0][1],sections[3][1])):
-                issues.append('Corresponding verse lines need compatible phrase lengths for the same melody')
+                warnings.append('Corresponding verse lines may need compatible phrasing for the same melody')
         verse_lines = sections[0][1]+sections[3][1]
         if len(set(verse_lines)) < 6:
             issues.append('Verses repeat filler instead of developing the relationship')
@@ -96,11 +97,11 @@ def assess(text):
     if not 160 <= word_count <= 235:
         issues.append(f'Total sung words {word_count}; target 180-220')
     return dict(version=VERSION, lyrics_hash=fingerprint(text), passed=not issues,
-                issues=issues, word_count=word_count, sections=metrics,
+                issues=issues, warnings=warnings, word_count=word_count, sections=metrics,
                 limitation='Written phrasing heuristic; melody, pronunciation and perceived emotion require listening review.')
 
 
-def review(request, lyrics, genre, bpm, voice, attempt=0):
+def review(request, lyrics, genre, bpm, voice, attempt=0, phrasing_warnings=()):
     """Separate model critique of meaning/rhyme; fallible, not human approval."""
     criteria = ['coherent_relationship', 'natural_hindi', 'natural_rhyme', 'singable_phrasing']
     schema = dict(type='object', additionalProperties=False, required=criteria+['issues'],
@@ -116,6 +117,8 @@ def review(request, lyrics, genre, bpm, voice, attempt=0):
     points for two-bar phrases; no crammed prose. Written counts alone cannot prove this.
     For every false criterion give a specific section/line and concrete revision reason
     in issues. Do not approve merely because the JSON/structure is correct.
+    Heuristic phrasing warnings (check pronunciation, not a rigid numeric meter):
+    {phrasing_warnings}
     Lyrics:\n{lyrics}'''
     result = request(prompt, schema, 1600, 200+attempt)
     return dict(passed=all(result[key] for key in criteria) and not result['issues'],

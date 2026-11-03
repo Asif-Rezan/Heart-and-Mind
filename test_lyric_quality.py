@@ -38,7 +38,7 @@ class LyricQualityTests(unittest.TestCase):
         self.assertEqual(len(short.split()), len(long.split()))
         self.assertGreater(vowel_weight(long)-vowel_weight(short), 20)
         altered = GOOD.replace(GOOD.splitlines()[1], long)
-        self.assertTrue(any('vowel lengths' in issue for issue in assess(altered)['issues']))
+        self.assertTrue(any('vowel lengths' in issue for issue in assess(altered)['warnings']))
 
     def test_bounded_revision_stops_before_packaging_or_synthesis(self):
         with tempfile.TemporaryDirectory() as directory:

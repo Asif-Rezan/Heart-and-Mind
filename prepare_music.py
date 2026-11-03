@@ -11,7 +11,7 @@ from music_cpu import generate
 import os
 
 
-def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motion_video=False):
+def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motion_video=False, authored_song=None):
     if vocal_gender not in ('auto', 'male', 'female'):
         raise ValueError('Vocal choice must be auto, male or female')
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', run_id):
@@ -31,6 +31,19 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
         history = Store().load('history.json', [])
         # A rerun of an already published identity must resume, not regenerate it.
         history = [entry for entry in history if entry.get('run') != run_id]
+    selected = None
+    if authored_song:
+        from authored_song import load_authored_song
+        selected = load_authored_song(authored_song)
+        if song_duplicate_reason(selected, history):
+            from pipeline import DuplicateSongError
+            raise DuplicateSongError()
+        if (root/'song.json').exists():
+            saved = json.loads((root/'song.json').read_text())
+            if any(saved.get(key) != selected.get(key) for key in ('lyrics','prompt','vocal_gender')):
+                raise ValueError('Authored song differs from saved media; use a fresh run ID')
+        elif (root/'song.wav').exists() or (root/'song-draft.json').exists():
+            raise ValueError('Authored song needs a fresh run ID, not a different saved draft')
     if check_history and (root/'song.json').exists():
         existing = validate_song(json.loads((root/'song.json').read_text()))
         if song_duplicate_reason(existing, history):
@@ -41,8 +54,10 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
     if (root/'song.json').exists():
         song = validate_song(json.loads((root/'song.json').read_text()))
     else:
-        song = make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
+        song = selected or make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
         (root/'song.json').write_text(json.dumps(song, ensure_ascii=False, indent=2))
+        if selected:
+            (root/'lyrics-quality.json').write_text(json.dumps(song['lyric_quality'],ensure_ascii=False,indent=2))
     if song.get('lyric_quality_version'):
         from lyric_quality import assess
         report = assess(song['lyrics'])
@@ -101,11 +116,12 @@ if __name__ == '__main__':
     parser.add_argument('--stage', choices=['all', 'lyrics', 'music', 'images', 'render'], default='all')
     parser.add_argument('--check-history', action='store_true',
                         help='Verify title and lyrics against Drive publication history before costly stages')
+    parser.add_argument('--authored-song', help='Reviewed song identity from the repository lyrics/ directory')
     parser.add_argument('--motion-video',action='store_true',help='Use current 3D visuals, five-second changes and cinematic editing')
     parser.add_argument('--vocal-gender', choices=['auto', 'male', 'female'], default='auto')
     args = parser.parse_args()
     try:
-        prepare(args.run_id, args.stage, check_history=args.check_history, vocal_gender=args.vocal_gender,motion_video=args.motion_video)
+        prepare(args.run_id, args.stage, check_history=args.check_history, vocal_gender=args.vocal_gender,motion_video=args.motion_video,authored_song=args.authored_song)
     except Exception as error:
         print(pipeline_failure_message(error), flush=True)
         raise SystemExit(1)

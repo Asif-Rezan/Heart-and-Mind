@@ -266,7 +266,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
             {GUIDE}
             Read/sing each phrase aloud privately. Check idiomatic meaning, grammar,
             natural end-rhyme, emotional sincerity and breath points, not just word count.
-            Fix these written-phrasing problems: {json.dumps(report['issues'], ensure_ascii=False)}
+            Fix these written-phrasing problems: {json.dumps(report['issues']+report.get('warnings',[]), ensure_ascii=False)}
             Estimated vowel lengths (heuristic, not exact sung matra):
             {json.dumps(report['sections'], ensure_ascii=False)}
             Return only JSON lyrics, never commentary, translations or credits.
@@ -274,7 +274,8 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
             song['lyrics'] = normalize_lyrics(request(edit_prompt, edit_schema, 5000, 100+attempt)['lyrics'])
             report = assess(song['lyrics'])
             if report['passed']:
-                critique = review(request, song['lyrics'], genre, bpm, editorial_voice, attempt)
+                critique = review(request, song['lyrics'], genre, bpm, editorial_voice, attempt,
+                    phrasing_warnings=report.get('warnings',[]))
                 report['semantic_review'] = critique
                 report['passed'] = critique['passed']
                 report['issues'] += critique['issues']

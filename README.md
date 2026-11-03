@@ -1,6 +1,7 @@
 # Heart and Mind — Hindi music videos
 
-The active pipeline creates original Hindi songs again: Qwen writes the lyrics,
+The active pipeline creates original Hindi songs again: Qwen drafts lyrics or an
+explicitly selected, repository-reviewed original song supplies them,
 ACE-Step 1.5 sings the full song, and the current realistic cinematic **3D storybook**
 image system supplies the video scenes and thumbnail. New music videos change their
 background image **every five seconds**, measured against the generated audio.
@@ -77,6 +78,31 @@ than being told to preserve a defective hook. Review reports use version 3 and
 emit static, useful failure diagnostics without dumping the song into job logs.
 Existing failed draft artifacts can be supplied as `prepared_run` for recovery.
 
+### Reviewed production song after the second lyric rejection — 2026-11-03
+
+Run `41594691413` had correct section layout but weak, nonsensical Hindi. It stopped
+before music after the written-vowel heuristic found a bridge difference of 8 units
+(14 vs 22). Such estimates cannot prove acoustic rhythm: they are now warnings
+passed to editorial critique, rather than a rigid meter veto. Structural errors,
+word overload, inconsistent choruses and failed meaning/rhyme critique still block
+an automatically drafted song. The 4B model's poetry remains fallible; these changes
+are not proof that future automatic lyrics will be good.
+
+For the next video, `lyrics/tum-laut-aao-2026-11-03.json` contains a newly authored,
+Codex-edited 199-word original romantic song with natural Hindi, male narrator,
+consistent तुम address, exact chorus repeats, 86 BPM directions and lyric-specific
+3D scene/thumbnail prompts. Its editorial provenance is explicitly recorded as an
+authored review, **not a model approval or a human listening review**. It passes the
+structural and written-phrasing checks without warnings. Synthesized audio has not
+yet been auditioned.
+
+Set workflow input `authored_song=tum-laut-aao-2026-11-03` with a **fresh** run ID.
+The lyrics stage loads this exact reviewed file, rechecks publication history and
+phrasing, records its SHA-256, and never asks the text model to rewrite it. All audio,
+images, five-second video editing and publication guards use the normal pipeline.
+Leave `prepared_run` empty. Omit `authored_song` for the automatic drafting path.
+An authored source cannot replace different saved lyrics/audio under an existing ID.
+
 ## Daily automation and manual runs
 
 Active workflow: [`.github/workflows/music-hindi-songs.yml`](.github/workflows/music-hindi-songs.yml),
@@ -93,6 +119,7 @@ For an immediate new song, run the music workflow on `main` with:
 
 - `run_id`: a fresh identity such as `music-2026-11-03-return-01`. Empty uses the Dhaka date.
 - `vocal_gender`: `auto`, `male`, or `female`.
+- `authored_song`: optional reviewed song identity from `lyrics/`; empty uses model drafting.
 - `prepared_run`: leave empty for a new song. To resume an unfinished song, provide
   its previous numeric music workflow run and reuse the **same** run ID/voice.
 
