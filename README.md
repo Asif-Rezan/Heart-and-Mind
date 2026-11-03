@@ -32,6 +32,35 @@ Implementation checkpoint: [`checkpoint/music-return-3d-5s-2026-11-03`](https://
 - Scene progression is editorial pacing through the song, **not word-level lyric
   transcription or lip synchronization**. Existing singing/lyrics are preserved.
 
+## Lyrics and phrasing revision — 2026-11-03
+
+Music automation is **manually disabled in GitHub Actions** at the user’s request.
+Do not enable it or start a song until the lyrics changes have been reviewed. The
+first return run failed before songwriting: regression tests needed `ffprobe`.
+The lyrics job now installs FFmpeg before tests; no song was generated or published.
+
+New lyrics focus on romance, longing, separation, reunion, tenderness and healing
+after lost love, rather than motivational advice. The songwriter and revision pass
+receive the same tempo, 4/4 meter and breathable two-bar phrasing brief. Verse lines
+should share a melodic shape, with natural near-rhyme and an exact repeated chorus.
+
+`lyric_quality.py` checks section/line counts, chorus identity, repeated verse filler,
+word load and approximate written vowel lengths. A separate model critique also
+checks relationship meaning, idiomatic Hindi, natural rhyme and singable phrasing.
+It sends specific failures back for at most three revisions, saves
+`lyrics-quality.json`, and blocks music creation
+if these checks still fail. New song metadata carries the checked lyric hash and
+report; resumed preparation rechecks the text. Historical unversioned songs are
+not silently rewritten beneath existing audio.
+
+This is a **written-phrasing heuristic**, not exact Hindi scansion, an acoustic beat
+score or proof of good poetry. Schwa deletion, held notes, melody and emotional
+delivery still need listening review. No new full song has been auditioned for this
+revision. The previous music-return implementation remains saved at commit
+[`77c2f23`](https://github.com/Asif-Rezan/Heart-and-Mind/commit/77c2f236157ccca2efcd50cc7d0a9ad0ef292e89)
+and its existing checkpoint tag. The test lyric in `tests/fixtures/romantic_lyrics.txt` exercises the checks;
+it is not hardcoded as the generator’s song.
+
 ## Daily automation and manual runs
 
 Active workflow: [`.github/workflows/music-hindi-songs.yml`](.github/workflows/music-hindi-songs.yml),

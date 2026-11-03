@@ -43,6 +43,11 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
     else:
         song = make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
         (root/'song.json').write_text(json.dumps(song, ensure_ascii=False, indent=2))
+    if song.get('lyric_quality_version'):
+        from lyric_quality import assess
+        report = assess(song['lyrics'])
+        if not report['passed']:
+            raise ValueError('Saved lyrics failed phrasing checks; revise before generating music')
     if motion_video:
         from music_video import FORMAT
         song['video_format']=FORMAT

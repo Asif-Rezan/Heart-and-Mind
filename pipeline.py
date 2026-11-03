@@ -108,10 +108,10 @@ SONG_PROFILES = (
     ('romance', 'Hindi romantic acoustic pop', 'new love; an ordinary shared moment becomes unforgettable', 'warm intimate solo vocal, acoustic guitar, piano, gentle live drums', 'TERE SAATH'),
     ('heartbreak', 'Hindi sad piano ballad', 'a quiet goodbye; acceptance rather than blame', 'restrained vulnerable solo vocal, felt piano, cello, spacious drums', 'ADHURI BAATEIN'),
     ('romance', 'Hindi indie dream pop', 'long-distance love; two lives connected by a small daily ritual', 'airy expressive vocal, clean electric guitar, atmospheric synths, soft groove', 'DOOR HOKE BHI'),
-    ('healing', 'Hindi uplifting folk pop', 'starting again after loss; rediscovering self-worth', 'grounded hopeful vocal, acoustic guitar, flute, warm percussion', 'PHIR SE JEE LE'),
+    ('healing', 'Hindi uplifting folk pop', 'learning to trust love again after a painful separation', 'grounded hopeful vocal, acoustic guitar, flute, warm percussion', 'PHIR SE JEE LE'),
     ('romance', 'Hindi celebratory dance pop', 'joyful reunion; choosing each other again', 'playful energetic vocal, dholak, bass, bright synths, danceable rhythm', 'DIL KA JASHN'),
     ('heartbreak', 'Hindi ghazal-inspired contemporary ballad', 'unspoken affection; a letter that never reaches its reader', 'measured expressive vocal, harmonium, tabla, sarangi, subtle piano', 'ANKAHI MOHABBAT'),
-    ('healing', 'Hindi soulful cinematic pop', 'finding hope in solitude; courage for a new morning', 'soulful solo vocal, piano, strings, gradual percussion build', 'NAYI SUBAH'),
+    ('healing', 'Hindi soulful cinematic pop', 'missing a loved one in solitude; a tender promise to meet again', 'soulful solo vocal, piano, strings, gradual percussion build', 'NAYI SUBAH'),
     ('romance', 'Hindi monsoon lo-fi pop', 'remembering a first meeting in the rain', 'soft intimate vocal, mellow keys, muted guitar, relaxed lo-fi beat', 'BAARISH AUR TUM'),
 )
 
@@ -146,6 +146,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     objects = ('a folded letter', 'a shared umbrella', 'an old photograph', 'a cup of tea',
                'a handwritten note', 'a train ticket', 'a pressed flower', 'a familiar scarf')
     scene = f'{places[seed % len(places)]}, with {objects[(seed // len(places)) % len(objects)]}'
+    from lyric_quality import GUIDE, VERSION as LYRIC_VERSION, assess, review
     prompt = f'''Write an ORIGINAL Hindi song for Heart and Mind on {day}.
     Today's direction: {genre}. Emotional story: {story}.
     Musical arrangement: {arrangement}. Visual mood: {mood}.
@@ -160,9 +161,9 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     Write a memorable 2-4 line chorus with one distinctive central phrase; repeat that chorus
     consistently. Verses should advance the story, not paraphrase the chorus. Keep a singable
     syllable pattern within each section; avoid forced rhyme, filler and unrelated imagery.
-    Structure: [Intro] (instrumental, no sung directions), [Verse 1] (4 lines),
+    Structure: [Verse 1] (4 lines),
     [Pre-Chorus] (2), [Chorus] (4), [Verse 2] (4), [Chorus] (same 4),
-    [Bridge] (2-4), [Final Chorus] (same 4), [Outro] (2).
+    [Bridge] (2), [Final Chorus] (same 4), [Outro] (2).
     Target 180-220 sung words for a focused 3 to 3.5 minute album song.
     Keep most lines 5-8 words, with balanced lengths that fit one melodic phrase.
     The chorus must say something specific and emotionally meaningful, not repeat only
@@ -187,7 +188,9 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     duration: integer seconds 180-210, aim 195.
     No spoken CTA. Keep the song focused: 180-220 sung words, including repeated choruses.
     Do not add metadata, descriptions, tags or image prompts to this response.
-    Privately revise for originality, story, meter and singability before returning.'''
+    Mandatory songwriting brief (takes priority over general suggestions): {GUIDE}
+    Privately speak/sing every line at the supplied tempo and revise before returning.'''
+    prompt += f"\nMusical meter: {genre}, steady 4/4; use two-bar phrases."
     from lyrics_cpu import MODEL_ID, request_story
     core_schema = {'type': 'object', 'additionalProperties': False,
         'required': ['title', 'lyrics', 'prompt', 'duration'],
@@ -202,9 +205,12 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     # outside the completion prevents maxLength retries from discarding good lyrics.
     tempos = (86, 72, 92, 96, 112, 76, 82, 80)
     bpm = tempos[SONG_PROFILES.index(song_profile(day))]
+    prompt += f'\nWrite for {bpm} BPM in 4/4 with two-bar vocal phrases.'
     production_prompt = (f'Solo {vocal_gender} lead vocal; no {opposite_gender} singer or duet. '
         f'{genre}; {arrangement}; {bpm} BPM, 4/4. '
         'Warm melodic tone, natural Hindi diction, legato phrasing. '
+        'Two-bar vocal phrases; match melody to Hindi word stress, never rush syllables. '
+        'Repeat the chorus melody; leave breath gaps between lines. '
         'Vocal entry within 8s; catchy chorus by 40s. Intimate verses, lifted chorus, '
         'sparse bridge, final chorus, resolved ending. Vocal-forward balanced mix, '
         'warm bass, restrained reverb; no speech or long solos.')
@@ -247,42 +253,54 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     editorial_voice = song.get('vocal_gender')
     narrator_instruction = (f'Keep the first-person narrator consistent with a solo {editorial_voice} singer.'
                             if editorial_voice else 'Preserve the original narrator and grammatical gender.')
-    # A separate editorial pass catches grammatical Hindi that can satisfy JSON
-    # validation while remaining awkward to sing. Checkpoint it across metadata retries.
+    # Revision checkpoints apply to new/versioned drafts only. Never rewrite historical
+    # unversioned cores that may already have matching generated audio.
     quality_path = draft_path.with_name('lyrics-quality.json') if draft_path is not None else None
-    lyric_hash = hashlib.sha256(song['lyrics'].encode()).hexdigest()
     quality = json.loads(quality_path.read_text()) if quality_path is not None and quality_path.exists() else {}
-    if (fresh_core or quality.get('version') == 1) and quality.get('lyrics_hash') != lyric_hash:
-        if quality_path is not None:
-            quality_path.write_text(json.dumps({'version': 1, 'lyrics_hash': None}))
+    needs_review = fresh_core or bool(quality.get('version'))
+    if needs_review and not (quality.get('version') == LYRIC_VERSION and
+            quality.get('passed') and quality.get('semantic_review', {}).get('passed') and quality.get('lyrics_hash') == assess(song['lyrics'])['lyrics_hash']):
         edit_schema = {'type': 'object', 'additionalProperties': False, 'required': ['lyrics'],
             'properties': {'lyrics': core_schema['properties']['lyrics']}}
-        edit_prompt = f'''Act as a meticulous native Hindi lyric editor, then a vocal arranger.
-        Polish this original song for {genre}. Preserve its story, viewpoint, emotional turn
-        and distinctive hook. Return only lyrics, never commentary, credits or translations.
-        Fix unnatural Hindi, literal English translations, tense, gender and verb agreement.
-        {narrator_instruction}
-        Maintain one form of address (तू or तुम), and a consistent narrator throughout.
-        Use everyday idiomatic Hindi, concrete images and clear emotional meaning.
-        Remove nonsensical metaphors, filler and unnatural loanwords. Do not merely swap synonyms.
-        Each line must make sense when spoken aloud and be comfortable to sing in one breath.
-        Aim 5-8 words per line with comparable lengths within each section, without forced rhyme.
-        Keep a distinctive four-line chorus, repeated exactly, that expresses the central feeling.
-        Verse 2 must advance the story; the short bridge changes perspective or makes a decision.
-        Use [Verse 1], [Pre-Chorus], [Chorus], [Verse 2], [Chorus], [Bridge],
-        [Final Chorus], [Outro]. All sung words in Devanagari. No directions outside brackets.
-        Aim 180-220 sung words including repetitions. Do not expand into a long poem.
-        Privately check grammar, meaning, repetition and singability before returning.
-        Original lyrics: {song['lyrics']}'''
-        song['lyrics'] = normalize_lyrics(request(edit_prompt, edit_schema, 5000, 100)['lyrics'])
-        if draft_path is not None:
-            temporary = draft_path.with_suffix('.tmp')
-            temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
-            temporary.replace(draft_path)
-            quality = {'version': 1, 'lyrics_hash': hashlib.sha256(song['lyrics'].encode()).hexdigest()}
-            temporary = quality_path.with_suffix('.tmp')
-            temporary.write_text(json.dumps(quality))
-            temporary.replace(quality_path)
+        report = assess(song['lyrics'])
+        for attempt in range(3):
+            # Save a pending report before inference so an interruption cannot silently
+            # promote an unreviewed draft to an approved song on resume.
+            if quality_path is not None:
+                quality_path.write_text(json.dumps(dict(report, passed=False), ensure_ascii=False, indent=2))
+            edit_prompt = f'''Act as a native Hindi romantic lyricist and vocal arranger.
+            Polish this song for {genre}, {bpm} BPM in 4/4. Preserve its specific
+            relationship, viewpoint, emotional turn and memorable central hook.
+            {narrator_instruction}
+            {GUIDE}
+            Read/sing each phrase aloud privately. Check idiomatic meaning, grammar,
+            natural end-rhyme, emotional sincerity and breath points, not just word count.
+            Fix these written-phrasing problems: {json.dumps(report['issues'], ensure_ascii=False)}
+            Estimated vowel lengths (heuristic, not exact sung matra):
+            {json.dumps(report['sections'], ensure_ascii=False)}
+            Return only JSON lyrics, never commentary, translations or credits.
+            Original lyrics: {song['lyrics']}'''
+            song['lyrics'] = normalize_lyrics(request(edit_prompt, edit_schema, 5000, 100+attempt)['lyrics'])
+            report = assess(song['lyrics'])
+            if report['passed']:
+                critique = review(request, song['lyrics'], genre, bpm, editorial_voice, attempt)
+                report['semantic_review'] = critique
+                report['passed'] = critique['passed']
+                report['issues'] += critique['issues']
+                if not critique['passed'] and not report['issues']:
+                    report['issues'].append('Editorial critique failed; revise meaning, Hindi, rhyme and phrasing')
+            if draft_path is not None:
+                temporary = draft_path.with_suffix('.tmp')
+                temporary.write_text(json.dumps(song, ensure_ascii=False, indent=2))
+                temporary.replace(draft_path)
+                temporary = quality_path.with_suffix('.tmp')
+                temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2))
+                temporary.replace(quality_path)
+            if report['passed']:
+                quality = report
+                break
+        else:
+            raise ValueError('Lyrics need revision before music generation: ' + '; '.join(report['issues']))
     # Check saved cores too: resumed artifacts may predate the current history.
     # A title-only correction keeps good lyrics instead of regenerating the music.
     if song_duplicate_reason(song, history) == 'lyrics':
@@ -364,6 +382,9 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     song['lyrics'] = normalize_lyrics(song['lyrics'])
     song.update(request(packaging_prompt, packaging_schema, 3000))
     song['visual_mood'] = mood  # Chosen locally, never ask the model to reproduce a fixed enum.
+    if needs_review:
+        song['lyric_quality_version'] = LYRIC_VERSION
+        song['lyric_quality'] = quality
     return validate_song(song)
 
 

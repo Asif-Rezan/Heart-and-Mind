@@ -7,7 +7,7 @@ from jsonschema import Draft202012Validator
 
 from pipeline import make_song
 
-CORE = {'title': 'नई सुबह | Nayi Subah | Hindi Soulful Song', 'lyrics': '[Verse 1]\n' + 'नई सुबह में फिर से जीना है\n'*30,
+CORE = {'title': 'नई सुबह | Nayi Subah | Hindi Soulful Song', 'lyrics': (Path(__file__).parent/'tests/fixtures/romantic_lyrics.txt').read_text().strip(),
         'prompt': 'Hindi cinematic soulful pop with piano and warm expressive vocals', 'duration': 240}
 PACKAGE = {'description': 'A hopeful original Hindi song about starting again. #HindiMusic',
            'tags': ['Nayi Subah', 'नई सुबह', 'Hindi song', 'Hindi soul', 'hopeful song', 'Hindi pop', 'original music', 'Heart and Mind'],
@@ -21,6 +21,11 @@ def response(value):
 
 
 class SongGenerationTests(unittest.TestCase):
+    def setUp(self):
+        reviewer = patch('lyric_quality.review', return_value={'passed':True, 'issues':[]})
+        reviewer.start()
+        self.addCleanup(reviewer.stop)
+
     def test_song_and_packaging_are_separate_validated_requests(self):
         requests = []
         def request(endpoint, payload):
@@ -150,7 +155,7 @@ class SongGenerationTests(unittest.TestCase):
             request.assert_not_called()
 
     def test_editor_output_drives_metadata_and_is_checkpointed_once(self):
-        polished = '[Verse 1]\n' + 'तेरी हँसी से रोशन मेरी शाम हुई\n' * 24
+        polished = CORE['lyrics'].replace('तेरी हँसी से मेरी शाम सँवर गई', 'तेरी हँसी से रोशन मेरी शाम हुई')
         with tempfile.TemporaryDirectory() as temp:
             draft = Path(temp)/'song-draft.json'
             with patch('lyrics_cpu.request_story', side_effect=[response(CORE),

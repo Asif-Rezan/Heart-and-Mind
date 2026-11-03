@@ -58,6 +58,8 @@ jobs:
         [[ "$RUN_ID" =~ ^[a-zA-Z0-9_-]{1,80}$ ]] || exit 1
         echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
     - run: pip install -r requirements.txt -r requirements-lyrics.txt
+    - name: Install FFmpeg for audio/video regression checks
+      run: sudo apt-get update && sudo apt-get install -y ffmpeg
     - run: |-
         pip install -r requirements-test.txt
         python -m unittest -q
