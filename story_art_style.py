@@ -66,10 +66,10 @@ def music_portrait_prompt(record, kind, token_count=None, max_tokens=77):
     """A single pair and neutral color survive the encoders' limited context."""
     import re
     couple = record['music_portrait']['couple']
-    subject = ('Romantic couple, exactly two adults. Man left, navy shirt. Woman right, blue sari. '
+    subject = ('A man and a woman embracing, romantic portrait. '
                if couple else 'Indian woman in blue sari, hopeful smile. ')
     framing = 'Chest-up, faces large. ' if kind == 'thumbnail' else 'Waist-up. '
-    pose = 'Leaning together, tender glance, both faces visible. ' if couple else 'Face visible. '
+    pose = 'Both faces visible, gentle smiles. ' if couple else 'Face visible. '
     lead = subject + framing + pose + 'Neutral daylight, natural skin, sharp eyes. '
     # Repeating the event's actors made the small model invent a third person.
     # Use only environmental anchors after the pair; never copy warm-light cues.
@@ -77,7 +77,7 @@ def music_portrait_prompt(record, kind, token_count=None, max_tokens=77):
                if re.search(r'\b'+word+r'\b', record['event'], re.I)]
     scene = ', '.join(anchors[:2])
     for detail in (scene, ''):
-        prompt = lead + (detail + '. ' if detail else '') + 'Cool blue background, cinematic photograph, no text.'
+        prompt = lead + (detail + '. ' if detail else '') + 'Soft grey background, cinematic photograph, no text.'
         if token_count is None or token_count(prompt) <= max_tokens:
             return prompt
     raise ValueError('music_prompt_encoder_budget')
