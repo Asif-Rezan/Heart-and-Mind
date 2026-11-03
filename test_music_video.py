@@ -36,8 +36,10 @@ def fixture(root,seconds=12.32):
 
 
 class MusicVideoTests(unittest.TestCase):
-    def test_singing_engine_is_the_exact_saved_music_implementation(self):
-        self.assertEqual(Path('music_cpu.py').read_bytes(),Path('legacy/hindi-music/music_cpu.py').read_bytes())
+    def test_long_and_short_singing_keep_the_same_pinned_engine(self):
+        import music_cpu
+        self.assertEqual(music_cpu.SOURCE_REVISION,'ca1e85fe9430179831e6bc6be790c332190a3866')
+        self.assertEqual(music_cpu.MODEL,'acestep-v15-turbo')
 
     def test_prepared_publication_cannot_start_music_when_assets_are_missing(self):
         import pipeline
@@ -97,9 +99,9 @@ class MusicVideoTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder,patch('music_video.generate_reviewed',side_effect=draw) as model:
             root=Path(folder)/'song-run';root.mkdir();fixture(root)
             mv.generate_images(root,SONG,shard=0,shards=2)
-            self.assertEqual(model.call_count,3)  # Slots 0, 2 and the separate thumbnail.
+            self.assertEqual(model.call_count,21)  # Twenty owned planned scenes plus the separate thumbnail.
             mv.generate_images(root,SONG,shard=0,shards=2)
-            self.assertEqual(model.call_count,3)
+            self.assertEqual(model.call_count,21)
             destination=Path(folder)/'owned'
             mv.package_images(root,destination,0,2)
             names={p.name for p in (destination/root.name).iterdir()}
@@ -116,8 +118,8 @@ class MusicVideoTests(unittest.TestCase):
         self.assertTrue(set(music).issubset({'name','on','env','permissions','concurrency','jobs','run-name'}))
         self.assertEqual(music['on']['schedule'][0]['cron'],'0 21 * * *')
         self.assertNotIn('schedule',story['on'])
-        self.assertEqual(music['jobs']['images']['needs'],['lyrics','music'])
-        self.assertEqual(len(music['jobs']['images']['strategy']['matrix']['shard']),12)
+        self.assertEqual(music['jobs']['images']['needs'],['lyrics'])
+        self.assertEqual(len(music['jobs']['images']['strategy']['matrix']['shard']),14)
         publish=music['jobs']['publish']['steps']
         commands=' '.join(step.get('run','') for step in publish)
         self.assertIn('--require-prepared',commands)

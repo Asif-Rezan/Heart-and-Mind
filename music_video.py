@@ -23,11 +23,11 @@ from story_visual_contract import compile_contract, REVIEW_VERSION as PLAN_REVIE
 from story_writer import save_json
 
 FORMAT = 'hindi-music-storybook-5s-v1'
-VERSION = 'cinematic-music-edit-v1'
+VERSION = 'cinematic-music-edit-v2'
 IMAGE_SECONDS = 5
 FPS = 25
 DISSOLVE = .4
-SHARDS = 12
+SHARDS = 14
 
 
 def song_identity(song):
@@ -39,6 +39,15 @@ def visual_timeline(seconds):
     if not math.isfinite(seconds) or not 0 < seconds <= 360:raise ValueError('Invalid music duration')
     return [dict(index=i,start=i*IMAGE_SECONDS,end=min((i+1)*IMAGE_SECONDS,seconds))
             for i in range(math.ceil(seconds/IMAGE_SECONDS))]
+
+
+def planned_timeline(song):
+    """Image identities use requested duration so synthesis never blocks image workers."""
+    return dict(slots=visual_timeline(song['duration']))
+
+
+def source_index(song, index):
+    return min(index, len(planned_timeline(song)['slots'])-1)
 
 
 def prepare_timeline(root, song, allow_short=False):
@@ -92,9 +101,9 @@ def scene_contract(song, index, count, kind='background'):
 
 
 def image_plan(song, timing, index, kind='background'):
-    count=len(timing['slots']);contract=scene_contract(song,index,count,kind)
-    width,height=SOURCE_SIZE if kind=='thumbnail' else (1024,576)
-    plan=dict(kind=kind,contract=contract,prompt=art_prompt(contract['prompt'],kind),
+    timing=planned_timeline(song);count=len(timing['slots']);contract=scene_contract(song,index,count,kind)
+    width,height=SOURCE_SIZE if kind=='thumbnail' else ((576,1024) if song.get('media_kind')=='shorts' else (1024,576))
+    plan=dict(kind=kind,contract=contract,prompt=art_prompt(contract['prompt'] + ('; vertical portrait composition, subjects centred, generous headroom' if song.get('media_kind')=='shorts' else ''),kind),
               model=MODEL,revision=REVISION,art_version=ART_VERSION,review_version=REVIEW_VERSION,
               music_format=FORMAT,song_identity=song_identity(song),width=width,height=height,steps=20,
               seed=int(hashlib.sha256((song_identity(song)+':'+kind+':'+str(index)).encode()).hexdigest()[:8],16))
@@ -103,7 +112,7 @@ def image_plan(song, timing, index, kind='background'):
 
 
 def generate_images(root, song, shard=None, shards=None):
-    root=Path(root);timing=load_timeline(root,song)
+    root=Path(root);timing=planned_timeline(song)
     shard=int(os.getenv('IMAGE_SHARD','0')) if shard is None else shard
     shards=int(os.getenv('IMAGE_SHARDS','1')) if shards is None else shards
     if not 0<=shard<shards:raise ValueError('Invalid music image shard')
@@ -122,6 +131,8 @@ def generate_images(root, song, shard=None, shards=None):
         completed[str(i)]=dict(plan,review=report);save_json(path,completed)
     if shard==0:
         shutil.copyfile(root/'music-scene-000-source.png',root/'background-source.png')
+        if song.get('media_kind')=='shorts':
+            return completed
         plan=image_plan(song,timing,0,'thumbnail');target=root/'thumbnail-source.png';state=root/'music-thumbnail-manifest.json'
         old=json.loads(state.read_text()) if state.exists() else {}
         if not cache_current(old,plan,target):
@@ -149,11 +160,11 @@ def render(root, song, width=1920, height=1080, allow_short=False):
     root=Path(root);timing=load_timeline(root,song);seconds=timing['duration'];slots=timing['slots']
     if not allow_short:validate_duration(seconds)
     if digest(root/'song.wav')!=timing['audio_sha256']:raise ValueError('Music audio changed; rebuild its visual timeline')
-    sources=[root/f"music-scene-{s['index']:03d}-source.png" for s in slots]
-    if not allow_short:
+    sources=[root/f"music-scene-{source_index(song,s['index']):03d}-source.png" for s in slots]
+    if not allow_short or song.get('media_kind')=='shorts':
         records={}
         for file in root.glob('music-image-manifest-*.json'):records.update(json.loads(file.read_text()))
-        if any(not cache_current(records.get(str(s['index'])),image_plan(song,timing,s['index']),p) for s,p in zip(slots,sources)):
+        if any(not cache_current(records.get(str(source_index(song,s['index']))),image_plan(song,timing,source_index(song,s['index'])),p) for s,p in zip(slots,sources)):
             raise ValueError('Music scene assets are missing or stale')
         thumb=json.loads((root/'music-thumbnail-manifest.json').read_text())
         if not cache_current(thumb,image_plan(song,timing,0,'thumbnail'),root/'thumbnail-source.png'):
@@ -192,7 +203,7 @@ def render(root, song, width=1920, height=1080, allow_short=False):
         out=f'blend{i}';filters.append(f'[{tail}][v{i}]xfade=transition=fade:duration={overlaps[i-1]}:offset={slots[i]["start"]}[{out}]');tail=out
     audio_index=len(clips)
     filters += [f'[{audio_index}:a]asplit=2[audio][meter]',
-        '[meter]showwaves=s=1600x64:mode=line:colors=0xffdbaf:rate=25,format=rgba,colorkey=black:0.05:0.1,colorchannelmixer=aa=0.55[wave]',
+        f'[meter]showwaves=s={min(1600,width-80)}x64:mode=line:colors=0xffdbaf:rate=25,format=rgba,colorkey=black:0.05:0.1,colorchannelmixer=aa=0.55[wave]',
         f'[{tail}][wave]overlay=(W-w)/2:H-100:eof_action=repeat:shortest=0,fade=t=in:d=0.3,fade=t=out:st={max(0,seconds-.6)}:d=0.6,format=yuv420p[out]']
     script=work/'edit.ffscript';script.write_text(';\n'.join(filters))
     args=['-filter_complex_threads','1']

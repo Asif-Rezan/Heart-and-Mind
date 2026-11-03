@@ -84,7 +84,7 @@ def normalize_lyrics(text):
     return re.sub(r'\\+t', ' ', text)
 
 
-def validate_song(song):
+def validate_song(song, *, allow_short=False):
     for field in ('title', 'lyrics', 'prompt', 'description'):
         if not isinstance(song.get(field), str) or not song[field].strip():
             raise ValueError('Missing song ' + field)
@@ -93,8 +93,9 @@ def validate_song(song):
     song['lyrics'] = normalize_lyrics(song['lyrics'])
     if not re.search(r'[\u0900-\u097f]', song['lyrics']):
         raise ValueError('Hindi Devanagari lyrics required')
-    if not 180 <= song.get('duration', 0) <= 360:
-        raise ValueError('Song must be 180-360 seconds')
+    minimum, maximum = (30, 59) if allow_short and song.get('media_kind')=='shorts' else (180, 360)
+    if not minimum <= song.get('duration', 0) <= maximum:
+        raise ValueError(f'Song must be {minimum}-{maximum} seconds')
     if 'tags' in song and (not isinstance(song['tags'], list) or
             not all(isinstance(tag, str) and 0 < len(tag.strip()) <= 40 for tag in song['tags'])):
         raise ValueError('Invalid song tags')
@@ -398,7 +399,7 @@ def upload_description(song):
     hashtag = {'romance': '#HindiRomanticSong', 'heartbreak': '#HindiSadSong',
                'healing': '#HeartTouchingSong'}.get(mood, '#HindiMusic')
     return ('\n'.join(sentences) + '\n\nOriginal Hindi music by Heart and Mind.\n\n'
-            '#HindiSong #HindiMusic ' + hashtag)
+            '#HindiSong #HindiMusic ' + hashtag + (' #Shorts' if song.get('media_kind')=='shorts' else ''))
 
 
 def metadata_tags(song):
@@ -471,7 +472,10 @@ def publish(client, root, song, state, save):
             _, result = request.next_chunk(num_retries=5)
         state['video_id'] = result['id']
         save()
-    if not state.get('thumbnail_uploaded'):
+    if song.get('media_kind')=='shorts':
+        state['thumbnail_mode']='youtube-selected-frame'
+        save()
+    elif not state.get('thumbnail_uploaded'):
         client.thumbnails().set(videoId=state['video_id'],
             media_body=MediaFileUpload(str(root/'thumbnail.jpg'))).execute()
         state['thumbnail_uploaded'] = True
