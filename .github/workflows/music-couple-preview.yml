@@ -38,7 +38,7 @@ jobs:
           sudo swapon /swapfile-images
       - run: |
           pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install --no-cache-dir -r requirements-images-cpu.txt pillow
+          pip install --no-cache-dir -r requirements.txt -r requirements-images-cpu.txt
       - name: Verify every production prompt with the real pinned tokenizers
         run: python -u verify_music_prompt_budget.py
       - name: Generate with production model and corrected couple prompt
