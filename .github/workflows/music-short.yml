@@ -139,7 +139,7 @@ jobs:
       CPU_IMAGE_HEIGHT: '1024'
       CPU_IMAGE_STEPS: '20'
       IMAGE_SHARD: ${{ matrix.shard }}
-      IMAGE_SHARDS: '3'
+      IMAGE_SHARDS: '4'
       PARENT_RUN: ${{ inputs.parent_run }}
     steps:
     - uses: actions/checkout@v4
@@ -164,7 +164,7 @@ jobs:
       with:
         name: short-input-${{ github.run_id }}
         path: output/
-    - name: Generate fresh portrait images on three parallel workers
+    - name: Generate fresh portrait images on four parallel workers
       run: python -u music_short.py --parent-run "$PARENT_RUN" --stage images
     - name: Package worker-owned portrait assets
       run: python music_short.py --parent-run "$PARENT_RUN" --stage package
@@ -177,12 +177,13 @@ jobs:
         if-no-files-found: warn
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 4
       matrix:
         shard:
         - 0
         - 1
         - 2
+        - 3
   render:
     needs:
     - music
@@ -223,6 +224,7 @@ jobs:
           output/*-short/video.mp4
           output/*-short/thumbnail.jpg
           output/*-short/music-render-state.json
+          output/*-short/short-edit-plan.json
         retention-days: 7
         if-no-files-found: warn
   publish:

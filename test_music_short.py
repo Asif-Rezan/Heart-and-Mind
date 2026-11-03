@@ -57,7 +57,7 @@ class CompanionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder,patch('music_video.generate_reviewed',side_effect=reviewed_image) as model:
             root=Path(folder)
             for shard in range(3):mv.generate_images(root,self.song,shard=shard,shards=3)
-            self.assertEqual(model.call_count,10)
+            self.assertEqual(model.call_count,9)
             self.assertFalse((root/'song.wav').exists())
             with Image.open(root/'music-scene-008-source.png') as image:self.assertEqual(image.size,(576,1024))
             with patch('pipeline.duration',return_value=45.2):
@@ -115,15 +115,41 @@ class CompanionTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'missing prepared media'):short.publish_short('parent')
             synth.assert_not_called();store.assert_not_called()
 
+    def test_short_cli_calls_the_dedicated_editor(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'output/parent-short';root.mkdir(parents=True)
+            (root/'song.json').write_text(json.dumps(self.song))
+            with patch('music_short.Path',side_effect=lambda x:Path(folder)/x),patch('sys.argv',['music_short.py','--parent-run','parent','--stage','render']),patch('music_short.render',autospec=True) as editor,patch('music_short.validate_media'):
+                short.main()
+            editor.assert_called_once_with(root,self.song,width=1080,height=1920)
+
+    def test_short_cuts_follow_audio_energy_and_captions_have_honest_alignment(self):
+        from short_edit import edit_plan
+        samples=np.zeros(45*8000,dtype=np.float32)
+        samples[11360:11520]=.8
+        plan=edit_plan(self.song,45,samples)
+        self.assertGreater(len(plan['slots']),9)
+        self.assertAlmostEqual(plan['slots'][1]['start'],1.42,delta=.025)
+        self.assertLessEqual(plan['slots'][0]['end'],1.5)
+        self.assertEqual(plan['slots'][0]['start'],0)
+        self.assertEqual(plan['slots'][-1]['end'],45)
+        self.assertEqual(len({s['move'] for s in plan['slots']}),4)
+        self.assertTrue(all(.8<=s['end']-s['start']<=3.2 for s in plan['slots']))
+        self.assertEqual(plan['cards'][0]['start'],0)
+        self.assertEqual(plan['alignment'],'editorial-lyric-cards-not-word-timestamps')
+        self.assertTrue(all(a['end']==b['start'] for a,b in zip(plan['slots'],plan['slots'][1:])))
+
     def test_workflow_runs_both_music_engines_and_both_image_groups_independently(self):
         jobs=yaml.safe_load(Path('.github/workflows/music-hindi-songs.yml').read_text())['jobs']
         self.assertEqual(jobs['images']['needs'],['lyrics'])
         self.assertEqual(jobs['music']['needs'],'lyrics')
         self.assertEqual(jobs['shorts']['needs'],['lyrics'])
+        self.assertEqual(len(jobs['images']['strategy']['matrix']['shard'])+4+2,20)
         self.assertNotIn('music-visual-input',str(jobs['images']))
         shortjobs=yaml.safe_load(Path('.github/workflows/music-short.yml').read_text())['jobs']
         self.assertEqual(shortjobs['music']['needs'],['plan'])
         self.assertEqual(shortjobs['images']['needs'],['plan'])
+        self.assertEqual(len(shortjobs['images']['strategy']['matrix']['shard']),4)
         self.assertEqual(shortjobs['render']['needs'],['music','images'])
         installs=[x for x in shortjobs['images']['steps'] if 'pip install --no-cache-dir torch' in x.get('run','')]
         self.assertEqual(len(installs),1)
@@ -139,7 +165,8 @@ class CompanionTests(unittest.TestCase):
             song=dict(self.song,duration=5)
             sf.write(root/'song.wav',.08*np.sin(2*np.pi*330*np.arange(sr*5)/sr),sr)
             mv.prepare_timeline(root,song,allow_short=True);mv.generate_images(root,song)
-            mv.render(root,song,width=1080,height=1920,allow_short=True)
+            from short_edit import render
+            render(root,song,width=1080,height=1920,allow_test=True)
             info=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=width,height','-select_streams','v:0','-of','json',str(root/'video.mp4')],text=True))
             self.assertEqual(info['streams'][0],dict(width=1080,height=1920))
             self.assertAlmostEqual(pipeline.duration(root/'video.mp4'),5,delta=.1)

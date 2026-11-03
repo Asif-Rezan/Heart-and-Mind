@@ -27,7 +27,7 @@ VERSION = 'cinematic-music-edit-v2'
 IMAGE_SECONDS = 5
 FPS = 25
 DISSOLVE = .4
-SHARDS = 12
+SHARDS = 14
 
 
 def song_identity(song):
@@ -131,6 +131,8 @@ def generate_images(root, song, shard=None, shards=None):
         completed[str(i)]=dict(plan,review=report);save_json(path,completed)
     if shard==0:
         shutil.copyfile(root/'music-scene-000-source.png',root/'background-source.png')
+        if song.get('media_kind')=='shorts':
+            return completed
         plan=image_plan(song,timing,0,'thumbnail');target=root/'thumbnail-source.png';state=root/'music-thumbnail-manifest.json'
         old=json.loads(state.read_text()) if state.exists() else {}
         if not cache_current(old,plan,target):

@@ -211,7 +211,7 @@ jobs:
       CPU_IMAGE_HEIGHT: '576'
       CPU_IMAGE_STEPS: '20'
       IMAGE_SHARD: ${{ matrix.shard }}
-      IMAGE_SHARDS: '12'
+      IMAGE_SHARDS: '14'
     steps:
     - uses: actions/checkout@v4
       with:
@@ -259,7 +259,7 @@ jobs:
         if-no-files-found: warn
     strategy:
       fail-fast: false
-      max-parallel: 12
+      max-parallel: 14
       matrix:
         shard:
         - 0
@@ -274,6 +274,8 @@ jobs:
         - 9
         - 10
         - 11
+        - 12
+        - 13
   render:
     needs:
     - lyrics

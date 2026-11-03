@@ -9,7 +9,8 @@ import subprocess
 
 from music_cpu import generate, validate_audio_duration
 from pipeline import validate_song, duration, publish, youtube_client
-from music_video import generate_images, prepare_timeline, render, song_identity
+from music_video import generate_images, prepare_timeline, song_identity
+from short_edit import render
 from story_media import digest
 from story_writer import save_json
 from storage import Store
@@ -61,6 +62,9 @@ def validate_media(root,song):
     validate_audio_duration(song,duration(root/'video.mp4'))
     state=json.loads((root/'music-render-state.json').read_text())
     identity=state['identity']
+    from short_edit import VERSION as EDIT_VERSION
+    if identity.get('version')!=EDIT_VERSION:
+        raise ValueError('Companion needs the dedicated Shorts edit')
     if (identity['width'],identity['height'])!=(1080,1920):
         raise ValueError('Shorts render must be 1080x1920')
     if (identity['timing']['song_identity']!=song_identity(song) or
@@ -117,7 +121,7 @@ def main():
         from music_video import package_images
         package_images(root,Path('artifacts/music-images'),int(os.getenv('IMAGE_SHARD','0')),int(os.getenv('IMAGE_SHARDS','1')))
     elif args.stage=='render':
-        render(root,song,width=1080,height=1920,allow_short=True);validate_media(root,song)
+        render(root,song,width=1080,height=1920);validate_media(root,song)
     else:publish_short(args.parent_run)
 
 

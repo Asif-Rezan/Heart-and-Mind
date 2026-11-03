@@ -119,7 +119,7 @@ class MusicVideoTests(unittest.TestCase):
         self.assertEqual(music['on']['schedule'][0]['cron'],'0 21 * * *')
         self.assertNotIn('schedule',story['on'])
         self.assertEqual(music['jobs']['images']['needs'],['lyrics'])
-        self.assertEqual(len(music['jobs']['images']['strategy']['matrix']['shard']),12)
+        self.assertEqual(len(music['jobs']['images']['strategy']['matrix']['shard']),14)
         publish=music['jobs']['publish']['steps']
         commands=' '.join(step.get('run','') for step in publish)
         self.assertIn('--require-prepared',commands)
