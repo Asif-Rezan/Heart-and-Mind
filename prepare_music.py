@@ -51,12 +51,27 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
                     if key in existing}
             (root/'song-draft.json').write_text(json.dumps(core, ensure_ascii=False))
             (root/'song.json').unlink()
-    from lyric_quality import LyricQualityError
+    from lyric_quality import LyricQualityError, assess
+    recovered = None
+    # A restored, definitively rejected draft already has a negative editorial
+    # verdict. Do not spend another twenty minutes replaying the same repair loop.
+    quality_path = root/'lyrics-quality.json'
+    draft_path = root/'song-draft.json'
+    if check_history and selected is None and not (root/'song.json').exists() and quality_path.exists() and draft_path.exists():
+        quality = json.loads(quality_path.read_text())
+        draft = json.loads(draft_path.read_text())
+        voice = draft.get('vocal_gender')
+        if (quality.get('passed') is False and
+                quality.get('semantic_review', {}).get('passed') is False and
+                quality.get('lyrics_hash') == assess(draft['lyrics'])['lyrics_hash'] and
+                voice in ('male','female') and vocal_gender in ('auto',voice)):
+            from lyric_recovery import recover_reviewed_song
+            recovered = recover_reviewed_song(root,history,voice)
     if (root/'song.json').exists():
         song = validate_song(json.loads((root/'song.json').read_text()))
     else:
         try:
-            song = selected or make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
+            song = selected or recovered or make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
         except LyricQualityError:
             if not check_history:raise
             # Quality rejection is recoverable content failure, not permission to

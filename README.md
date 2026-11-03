@@ -262,7 +262,9 @@ an unpublished, voice-matched original explicitly opted into automatic recovery
 in `lyrics/`. The reviewed source must include a matching `song_sha256`; edits
 invalidate its review. Historical explicitly selected authored songs are not part
 of this pool unless opted in. Title and lyric hashes are checked against the
-loaded publication history, and replacement is forbidden if saved audio/video
+loaded publication history. Restoring a hash-matched, already rejected editorial
+checkpoint selects recovery directly instead of replaying another long model repair
+loop. Replacement is forbidden if saved audio/video
 already exists. A successful replacement saves `lyrics-recovery.json` with source
 identity and digest while preserving `song-draft.json` and `lyrics-quality.json`
 as the rejected model checkpoint. It does not regenerate packaging with the model.
@@ -272,3 +274,12 @@ The reviewed catalog is finite: once no unpublished voice-matched song remains,
 preparation stops with `reviewed_song_unavailable` and requests a new reviewed
 original. It never relabels or republishes an old song. Temporary model/runtime
 errors outside lyric quality rejection are not silently converted to new content.
+
+
+Artwork readiness now checks landscape, thumbnail and independent portrait plans
+with the exact production song identities, seeds, dimensions and model revisions.
+`verify_music_prompt_budget.py` measures every planned retry with both real CLIP
+tokenizers, including the safety rewrite suffix; this caught an overflowing
+thumbnail retry that word-count approximations missed. Run the manual Romantic
+couple image test on the release branch before treating new art direction as
+validated. It generates test artifacts only and does not publish a video.

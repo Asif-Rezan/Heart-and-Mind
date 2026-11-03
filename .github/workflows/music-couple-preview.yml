@@ -1,7 +1,5 @@
 name: Romantic couple image test
 on:
-  push:
-    branches: [codex/fix-live-lyric-quality]
   workflow_dispatch:
     inputs:
       authored_song:

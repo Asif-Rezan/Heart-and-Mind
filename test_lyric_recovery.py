@@ -60,6 +60,7 @@ class ReviewedRecoveryTests(unittest.TestCase):
     def test_complete_preparation_recovers_after_quality_failure_and_resumes(self):
         with tempfile.TemporaryDirectory() as folder:
             root=self.root(folder)
+            (root/'lyrics-quality.json').unlink()
             store=Mock();store.load.return_value=[]
             with patch('prepare_music.Path',side_effect=lambda x:Path(folder)/x), \
                     patch('storage.Store',return_value=store), \
@@ -73,6 +74,19 @@ class ReviewedRecoveryTests(unittest.TestCase):
             self.assertEqual(saved['lyrics'],self.song['lyrics'])
             self.assertEqual(saved['generation_recovery']['mode'],'reviewed-original')
             store.load.assert_called_with('history.json',[])
+
+    def test_restored_run10_rejection_does_not_replay_expensive_model_repairs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=self.root(folder)
+            original=(root/'lyrics-quality.json').read_bytes()
+            store=Mock();store.load.return_value=[]
+            with patch('prepare_music.Path',side_effect=lambda x:Path(folder)/x), \
+                    patch('storage.Store',return_value=store), \
+                    patch('prepare_music.make_song') as model:
+                prepare_music.prepare('saved','lyrics',check_history=True)
+            model.assert_not_called()
+            self.assertEqual((root/'lyrics-quality.json').read_bytes(),original)
+            self.assertEqual(json.loads((root/'song.json').read_text())['authored_source']['identity'],IDENTITY)
 
     def test_unverified_history_and_unrelated_errors_cannot_trigger_replacement(self):
         with tempfile.TemporaryDirectory() as folder:
