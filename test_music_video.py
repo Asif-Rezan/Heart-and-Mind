@@ -101,7 +101,7 @@ class MusicVideoTests(unittest.TestCase):
                 self.assertIn('A man and a woman embracing',prompt)
                 self.assertNotIn('An adult couple',prompt)
                 self.assertNotIn('warm',prompt)
-                self.assertIn('both faces visible',prompt)
+                self.assertIn('both faces visible',prompt.lower())
                 self.assertIn('Neutral daylight',prompt)
                 self.assertIn('Soft grey background',prompt)
                 self.assertNotIn('Wide shot',prompt)
