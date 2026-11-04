@@ -14,7 +14,7 @@ def background_plan(song, base):
     style = song.get('visual_style', 'illustration')
     if style not in ('photo', 'illustration'):
         raise ValueError('Unsupported background visual_style')
-    look = ('Hand-painted gouache illustration, textured paper, rich teal and coral.'
+    look = ('Gouache illustration, textured paper, teal and coral.'
             if style == 'illustration' else 'Colorful editorial photograph, natural skin.')
     lighting = 'Warm frontal light, soft shadows, eye-level view.'
     # New songs can provide a people-free setting. Strip casting from legacy scenes.
@@ -25,15 +25,15 @@ def background_plan(song, base):
                    '', scene, flags=re.I)
     scene = ' '.join(scene.split()[:24]).strip(' ,.;')
     subjects = {
-        'scenery': ('Empty unoccupied setting: ' + scene + '. ' + look + ' ' + lighting,
+        'scenery': (look + ' Empty unoccupied setting: ' + scene + '. ' + lighting,
                     1024, 576, 'people, person, faces, man, woman, couple, human figures, portraits'),
-        'man': ('One adult South Asian man alone, short black hair, masculine square jaw, '
-                'clean-shaven, plain blue kurta. Centered chest-up portrait, entire head and shoulders visible, '
-                'gentle smile, hands below frame, plain ivory background. ' + look + ' ' + lighting,
+        'man': (look + ' One adult South Asian man alone, short black hair, square jaw, '
+                'clean-shaven, plain blue kurta. Chest-up, entire head and shoulders visible, '
+                'gentle smile, hands below frame, ivory background. ' + lighting,
                 512, 768, 'woman, sari, earrings, necklace, forehead jewelry, second person, hands, fingers'),
-        'woman': ('One adult South Asian woman alone, long black hair, red sari, small gold earrings. '
-                  'Centered chest-up portrait, entire head and shoulders visible, gentle smile, '
-                  'hands below frame, plain ivory background. ' + look + ' ' + lighting,
+        'woman': (look + ' One adult South Asian woman alone, long black hair, red sari, small gold earrings. '
+                  'Chest-up, entire head and shoulders visible, gentle smile, '
+                  'hands below frame, ivory background. ' + lighting,
                   512, 768, 'man, beard, mustache, second person, hands, fingers'),
     }
     parts = []
