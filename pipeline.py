@@ -311,8 +311,8 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     background_prompt: 20-25 English words describing ONE beautiful music-video frame.
       Start with the people and their emotional action, then the lyric-specific setting,
       weather and lighting. Keep the romance or emotional story visible; avoid empty generic scenery.
-      For love/reunion: a fully clothed adult South Asian couple sharing a natural affectionate
-      moment. For separation: an adult with a meaningful keepsake or a couple visibly apart.
+      For love/reunion: one fully clothed adult South Asian man and one adult South Asian woman standing
+      side by side with separate bodies and a visible gap; both clean-shaven. No hugging or kissing. For separation: an adult with a meaningful keepsake or a couple visibly apart.
       For healing: an adult moving toward warm light with a hopeful expression.
       Medium-wide framing: people large enough to recognize, on the right, with room on the left
       and lower edge for the existing song overlay. One setting, natural anatomy, realistic skin,
@@ -321,8 +321,8 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     thumbnail_prompt: a DIFFERENT 20-25 word English scene that sells THIS song's feeling.
       Start with the adult South Asian subject and ONE clear emotion: tender reunion,
       quiet longing, painful separation or hopeful relief, as supported by the lyrics.
-      Show a chest-up portrait or close couple, faces large and sharp with readable eyes.
-      For a couple, use one lead face and one supporting face, natural eye contact or distance
+      Show a chest-up portrait or two clearly separated people, faces large and sharp with readable eyes.
+      For a couple, use one man and one woman, both clean-shaven, separate torsos and a visible gap
       that communicates the relationship. No exaggerated crying or unrelated shock expressions.
       For romance show exactly ONE adult couple, only TWO people; for healing or solo heartbreak
       use ONE adult lead, with no extras. Close chest-up poster portraits, the faces

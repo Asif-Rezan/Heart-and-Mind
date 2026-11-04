@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from PIL import Image
 from image_cpu import MODEL, REVISION
@@ -12,24 +13,32 @@ def image_plan(song):
     identity = hashlib.sha256((song['title'] + '\n' + song['lyrics']).encode()).hexdigest()
     mood = visual_mood(song)
     defaults = {
-        'romance': 'Adult South Asian couple walking together, warm smiles, sunset park, golden light',
+        'romance': 'Sunset park, flowering trees, golden light, warm smiles',
         'heartbreak': 'Adult South Asian woman waiting at rainy train station, wistful face, blue twilight',
         'healing': 'Adult South Asian woman looking toward sunrise in a meadow, hopeful face, warm light',
     }
     plans = []
     for kind, field in (('background', 'background_prompt'), ('thumbnail', 'thumbnail_prompt')):
         scene = song.get(field) or defaults[mood]
-        # Keep exact lettering and layout ahead of scenic detail in the encoder.
-        scene = ' '.join(scene.split()[:18 if kind == 'thumbnail' else 26]).rstrip(',.;')
-        if kind == 'thumbnail':
-            portrait = ('exactly one adult couple, two large well-lit faces on left' if mood == 'romance'
-                        else 'one adult lead, large well-lit face on left')
-            prompt = ('Vibrant colorful romantic album poster. Title "' + hook_text(song, mood) +
-                '", bold yellow-white lettering on red brush, right side, clear of faces. ' +
-                portrait + '. ' + scene + '. Golden light, fully clothed adults, full-frame scenery.')
+        # Put casting/anatomy first: SSD-1B's CLIP encoders truncate long prompts.
+        # Avoid contact poses even when an older song.json requests one.
+        scene = re.sub(r'\b(?:hugging|embracing|cuddling|kissing|holding hands|close couple)\b',
+                       'standing apart', scene, flags=re.I)
+        scene = ' '.join(scene.split()[:18]).rstrip(',.;')
+        side = 'left' if kind == 'thumbnail' else 'right'
+        if mood == 'romance':
+            portrait = ('One adult South Asian man and one adult South Asian woman, '
+                        'both clean-shaven, separate bodies, visible gap, standing side by side. '
+                        f'Two well-lit faces on {side}. ')
         else:
-            prompt = ('Bright colorful romantic music still, medium portrait on right, clearly lit faces. ' +
-                scene + '. Golden face light, vivid blue backdrop, rich colors, fully clothed adults, no lettering.')
+            portrait = f'One adult South Asian woman, clean-shaven face, well-lit portrait on {side}. '
+        if kind == 'thumbnail':
+            prompt = (portrait + 'Colorful album poster. Title "' + hook_text(song, mood) +
+                      '", yellow-white lettering on red brush, right side, clear of faces. ' +
+                      scene + '. Fully clothed adults.')
+        else:
+            prompt = (portrait + 'Colorful music still. ' + scene +
+                      '. Fully clothed adults, no lettering.')
         # Seed depends on the song and purpose; never the same fixed seed for every upload.
         seed = int(hashlib.sha256((identity + kind).encode()).hexdigest()[:8], 16)
         plans.append(dict(kind=kind, prompt=prompt,

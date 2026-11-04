@@ -28,15 +28,28 @@ class SongImageTests(unittest.TestCase):
     def test_framing_survives_long_scene_prompts_and_purposes_stay_distinct(self):
         long_scene = 'Adult South Asian couple sharing a quiet reunion under a courtyard lamp ' + 'long scenery description ' * 60
         plans = image_plan(dict(SONG, visual_mood='romance', background_prompt=long_scene, thumbnail_prompt=long_scene))
-        self.assertTrue(plans[0]['prompt'].startswith('Bright colorful romantic music still'))
-        self.assertTrue(plans[1]['prompt'].startswith('Vibrant colorful romantic album poster'))
-        self.assertIn('exactly one adult couple', plans[1]['prompt'])
-        self.assertIn('two large well-lit faces on left', plans[1]['prompt'])
+        self.assertTrue(plans[0]['prompt'].startswith('One adult South Asian man and one adult South Asian woman'))
+        self.assertTrue(plans[1]['prompt'].startswith('One adult South Asian man and one adult South Asian woman'))
+        self.assertIn('separate bodies, visible gap', plans[1]['prompt'])
+        self.assertIn('Two well-lit faces on left', plans[1]['prompt'])
         for plan in plans:
             self.assertLessEqual(len(plan['prompt'].split()), 82)
             self.assertIn('courtyard lamp', plan['prompt'])
-            self.assertIn('fully clothed adults', plan['prompt'])
+            self.assertIn('Fully clothed adults', plan['prompt'])
             self.assertNotIn('Hopeful Hindi folk pop', plan['prompt'])
+
+    def test_romantic_contact_poses_are_replaced_in_both_images(self):
+        song = dict(SONG, visual_mood='romance',
+                    background_prompt='Couple hugging in a sunset park',
+                    thumbnail_prompt='Couple holding hands and embracing beside a river')
+        for plan in image_plan(song):
+            prompt = plan['prompt']
+            self.assertIn('both clean-shaven', prompt)
+            self.assertIn('separate bodies, visible gap', prompt)
+            self.assertIn('standing apart', prompt)
+            self.assertNotIn('hugging', prompt)
+            self.assertNotIn('embracing', prompt)
+            self.assertNotIn('holding hands', prompt)
 
     def test_only_thumbnail_requests_integrated_model_lettering(self):
         background, thumbnail = image_plan(dict(SONG, thumbnail_text='NAI SUBAH'))
@@ -94,6 +107,8 @@ class SongImageTests(unittest.TestCase):
                 negative = worker.call_args.kwargs['negative_prompt']
                 self.assertEqual('text, letters,' in negative, not allow)
                 self.assertIn('watermark', negative)
+                self.assertIn('fused bodies', negative)
+                self.assertIn('beard, mustache', negative)
 
     def test_hook_year_is_not_passed_to_thumbnail_model(self):
         plan = image_plan(dict(SONG, thumbnail_text='TERE SAATH 2026'))[1]
