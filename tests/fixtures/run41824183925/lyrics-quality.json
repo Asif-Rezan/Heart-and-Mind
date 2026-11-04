@@ -1,0 +1,122 @@
+{
+  "version": 5,
+  "lyrics_hash": "b43d7d375d97ad32b4127cfcd6eca5f0869039854d52f530baacb9c0b5f9fb72",
+  "passed": false,
+  "issues": [
+    "Total sung words 153; target 180-220"
+  ],
+  "warnings": [],
+  "word_count": 153,
+  "sections": [
+    {
+      "section": "Verse 1",
+      "words": [
+        7,
+        5,
+        6,
+        7
+      ],
+      "estimated_vowel_units": [
+        19,
+        17,
+        19,
+        17
+      ]
+    },
+    {
+      "section": "Pre-Chorus",
+      "words": [
+        6,
+        6
+      ],
+      "estimated_vowel_units": [
+        18,
+        15
+      ]
+    },
+    {
+      "section": "Chorus",
+      "words": [
+        6,
+        6,
+        5,
+        6
+      ],
+      "estimated_vowel_units": [
+        18,
+        17,
+        17,
+        16
+      ]
+    },
+    {
+      "section": "Verse 2",
+      "words": [
+        6,
+        5,
+        6,
+        6
+      ],
+      "estimated_vowel_units": [
+        17,
+        18,
+        17,
+        18
+      ]
+    },
+    {
+      "section": "Chorus",
+      "words": [
+        6,
+        6,
+        5,
+        6
+      ],
+      "estimated_vowel_units": [
+        18,
+        17,
+        17,
+        16
+      ]
+    },
+    {
+      "section": "Bridge",
+      "words": [
+        6,
+        6
+      ],
+      "estimated_vowel_units": [
+        18,
+        16
+      ]
+    },
+    {
+      "section": "Final Chorus",
+      "words": [
+        6,
+        6,
+        5,
+        6
+      ],
+      "estimated_vowel_units": [
+        18,
+        17,
+        17,
+        16
+      ]
+    },
+    {
+      "section": "Outro",
+      "words": [
+        6,
+        6
+      ],
+      "estimated_vowel_units": [
+        18,
+        17
+      ]
+    }
+  ],
+  "limitation": "Written phrasing heuristic; melody, pronunciation and perceived emotion require listening review.",
+  "attempts_exhausted": true
+}

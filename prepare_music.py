@@ -58,20 +58,29 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
         if selected:
             song = selected
         else:
-            from lyric_quality import LyricQualityError
+            from lyric_quality import LyricQualityError, LyricRecoveryUnavailable
+            from lyrics_cpu import StoryGenerationError
             from lyric_recovery import recover_reviewed_song, rejected_checkpoint
             from pipeline import vocal_gender_for_day
             voice = vocal_gender_for_day(day) if vocal_gender == 'auto' else vocal_gender
             draft = root/'song-draft.json'
             if draft.exists():
                 voice = json.loads(draft.read_text()).get('vocal_gender', voice)
+            song = None
             if check_history and rejected_checkpoint(root):
-                song = recover_reviewed_song(root, history, voice)
-            else:
+                try:
+                    song = recover_reviewed_song(root, history, voice)
+                except LyricRecoveryUnavailable:
+                    # A finite catalogue is not the only recovery path. Repair the
+                    # saved draft with the bounded decoder instead of stopping here.
+                    print(json.dumps({'phase':'lyrics recovery','strategy':'bounded-draft-repair',
+                                      'reason':'reviewed-catalogue-exhausted'}),flush=True)
+            if song is None:
                 try:
                     song = make_song(day, history, draft, generation_id=run_id, vocal_gender_override=vocal_gender)
-                except LyricQualityError:
-                    if not check_history:
+                except (LyricQualityError, StoryGenerationError) as error:
+                    recoverable = isinstance(error,LyricQualityError) or error.code == 'story_model_response_invalid'
+                    if not check_history or not recoverable:
                         raise
                     song = recover_reviewed_song(root, history, voice)
             if song.get('authored_source'):
@@ -144,5 +153,10 @@ if __name__ == '__main__':
     try:
         prepare(args.run_id, args.stage, check_history=args.check_history, vocal_gender=args.vocal_gender,motion_video=args.motion_video,authored_song=args.authored_song)
     except Exception as error:
+        from music_failure import save_failure
+        try:
+            save_failure(args.run_id,args.stage,error)
+        except OSError:
+            print('Generation diagnostics could not be saved; inspect the failed runner.',flush=True)
         print(pipeline_failure_message(error), flush=True)
         raise SystemExit(1)

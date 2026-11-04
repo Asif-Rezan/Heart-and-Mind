@@ -119,6 +119,9 @@ jobs:
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
       run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage lyrics --check-history --vocal-gender "$REQUESTED_VOCAL_GENDER"
         --motion-video --authored-song "$REQUESTED_AUTHORED_SONG"
+    - name: Explain failed generation and checkpoint recovery
+      if: failure()
+      run: python music_failure.py
     - uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -209,7 +212,7 @@ jobs:
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
       CPU_IMAGE_WIDTH: '1024'
       CPU_IMAGE_HEIGHT: '576'
-      CPU_IMAGE_STEPS: '20'
+      CPU_IMAGE_STEPS: '24'
       IMAGE_SHARD: ${{ matrix.shard }}
       IMAGE_SHARDS: '14'
     steps:

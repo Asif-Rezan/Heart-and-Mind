@@ -115,7 +115,7 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
             print('Safety rejection; retrying a restrained story scene.', flush=True)
         reference_args=dict(image=reference,strength=.80) if reference is not None else {}
         result = pipeline(**reference_args, prompt=candidate, negative_prompt=negative_extra+", "+negative_prompt(), width=width, height=height,
-            num_inference_steps=steps, guidance_scale=GUIDANCE_SCALE,
+            num_inference_steps=steps, guidance_scale=(story_contract.get('guidance_scale',GUIDANCE_SCALE) if story_contract else GUIDANCE_SCALE),
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):
             print(f'Image safety check rejected attempt {attempt+1}/2.', flush=True)

@@ -80,7 +80,7 @@ class MusicVideoTests(unittest.TestCase):
         timing=dict(slots=mv.visual_timeline(195))
         plans=[mv.image_plan(SONG,timing,i) for i in range(39)]
         self.assertEqual(len({p['seed'] for p in plans}),39)
-        self.assertTrue(all(p['art_version']==mv.ART_VERSION and p['steps']==20 for p in plans))
+        self.assertTrue(all(p['art_version']==mv.ART_VERSION and p['steps']==24 for p in plans))
         self.assertTrue(all(p['model']==mv.MODEL and p['revision']==mv.REVISION for p in plans))
         self.assertTrue(all('woman, 28' in p['contract']['people'] and 'man, 30' in p['contract']['people'] for p in plans))
         thumb=mv.image_plan(SONG,timing,0,'thumbnail')
@@ -91,6 +91,19 @@ class MusicVideoTests(unittest.TestCase):
         healing=mv.image_plan(dict(SONG,visual_mood='healing'),timing,0)
         self.assertNotIn('; man',healing['contract']['people'])
         self.assertNotIn('man',healing['contract']['checks'][0]['answers'])
+
+    def test_approved_natural_style_survives_actual_focused_prompt(self):
+        from story_art_style import focused_prompt, RENDER_STYLE
+        contract=mv.scene_contract(SONG,0,39)
+        prompt=focused_prompt(contract)
+        self.assertTrue(prompt.startswith(mv.MUSIC_RENDER_STYLE))
+        self.assertIn('sage sari',contract['people'])
+        self.assertIn('oatmeal kurta',contract['people'])
+        self.assertIn('red color cast',contract['negative_extra'])
+        self.assertEqual(contract['guidance_scale'],6.0)
+        legacy=dict(contract)
+        legacy.pop('render_style')
+        self.assertIn(RENDER_STYLE,focused_prompt(legacy))
 
     def test_image_resume_and_packaging_keep_only_the_owner_files(self):
         def draw(prompt,path,seed,contract,**kwargs):

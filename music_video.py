@@ -14,13 +14,20 @@ import shutil
 
 from PIL import Image
 from artwork import visual_mood
-from story_art_style import VERSION as ART_VERSION, art_prompt
 from story_image_review import VERSION as REVIEW_VERSION, cache_current, generate_reviewed
 from story_image_cpu import MODEL, REVISION
 from story_media import digest, run_ffmpeg
 from story_thumbnail import SOURCE_SIZE, export_thumbnail
 from story_visual_contract import compile_contract, REVIEW_VERSION as PLAN_REVIEW_VERSION
 from story_writer import save_json
+
+ART_VERSION = 'music-natural-storybook-3d-v1'
+MUSIC_RENDER_STYLE = 'Natural 3D storybook illustration, rounded forms, soft daylight, natural skin, cream, sage, wood. '
+MUSIC_NEGATIVE = 'red color cast, orange color cast, oversaturated red, neon colors, gouache, watercolor, cutout edges'
+
+def art_prompt(scene, kind='background'):
+    return MUSIC_RENDER_STYLE + scene + ' No lettering.'
+
 
 FORMAT = 'hindi-music-storybook-5s-v1'
 VERSION = 'cinematic-music-edit-v2'
@@ -87,13 +94,16 @@ def scene_contract(song, index, count, kind='background'):
     event='; '.join(clauses) or defaults[mood]
     if len(event)>160:event=event[:161].rsplit(' ',1)[0]
     if len(event)<15:event=defaults[mood]
-    people='woman, 28, Indian, teal sari gold border'
-    if mood!='healing':people+='; man, 30, Indian, ivory kurta dark jacket'
+    people='woman, 28, South Asian, sage sari cream border'
+    if mood!='healing':people+='; man, 30, South Asian, oatmeal kurta'
     lines=[x.strip() for x in song['lyrics'].splitlines() if x.strip() and not x.lstrip().startswith('[')]
     evidence=(lines[min(len(lines)-1,int(index/max(1,count)*len(lines)))] if lines else song['lyrics'])[:300]
     checks=[dict(question='Who is shown in this scene?',answers=['woman','girl'] if mood=='healing' else ['woman','man','couple','people'])]
     if kind=='thumbnail' and mood!='healing':checks.append(dict(question='How many people are shown?',answers=['two']))
     record=compile_contract(dict(event=event,people=people,setting='The lyric-specific music video setting',evidence=evidence,checks=checks))
+    record['render_style']=MUSIC_RENDER_STYLE
+    record['negative_extra']=MUSIC_NEGATIVE
+    record['guidance_scale']=6.0
     record['fallback']=dict(mode='authored-scene',literal_event=event,reason='songwriter-visual-direction')
     record['planning_review']=dict(version=PLAN_REVIEW_VERSION,passed=False,
         issues=['Creative interpretation of the song; not independently verified lyric alignment.'])
@@ -105,7 +115,7 @@ def image_plan(song, timing, index, kind='background'):
     width,height=SOURCE_SIZE if kind=='thumbnail' else ((576,1024) if song.get('media_kind')=='shorts' else (1024,576))
     plan=dict(kind=kind,contract=contract,prompt=art_prompt(contract['prompt'] + ('; vertical portrait composition, subjects centred, generous headroom' if song.get('media_kind')=='shorts' else ''),kind),
               model=MODEL,revision=REVISION,art_version=ART_VERSION,review_version=REVIEW_VERSION,
-              music_format=FORMAT,song_identity=song_identity(song),width=width,height=height,steps=20,
+              music_format=FORMAT,song_identity=song_identity(song),width=width,height=height,steps=24,
               seed=int(hashlib.sha256((song_identity(song)+':'+kind+':'+str(index)).encode()).hexdigest()[:8],16))
     if kind=='background':plan.update(timing['slots'][index])
     return plan

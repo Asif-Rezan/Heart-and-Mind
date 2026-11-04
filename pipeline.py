@@ -196,15 +196,17 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                     if key in ('title', 'lyrics', 'duration')})
     def request(instructions, schema, tokens, seed_offset=0):
         from copy import deepcopy
-        from lyric_quality import section_schema, render_sections
+        from lyric_quality import generation_section_schema, render_sections
         from jsonschema import Draft202012Validator
         wire_schema = deepcopy(schema)
         structured_lyrics = 'lyrics' in wire_schema.get('properties', {})
         if structured_lyrics:
-            wire_schema['properties']['lyrics'] = section_schema()
+            wire_schema['properties']['lyrics'] = generation_section_schema()
             instructions += ('\nReturn lyrics as an object of six line arrays: verse_1 (4), '
                 'pre_chorus (2), chorus (4), verse_2 (4), bridge (2), outro (2). '
                 'Each item is one sung Devanagari line without headings or newlines. '
+                'Use 7-8 Hindi words in every non-chorus line, 7-9 in every chorus line. '
+                'This makes 182-220 sung words after repeats. Do not pad with empty filler. '
                 'Write chorus once; repeated choruses are inserted locally.')
         result = request_story('chat/completions', {'model': MODEL_ID,
             'messages': [{'role': 'system', 'content': 'तुम मौलिक हिंदी प्रेमगीत लिखने वाले गीतकार और सख़्त संपादक हो। स्वाभाविक, अर्थपूर्ण और गाने योग्य हिंदी लिखो।'},

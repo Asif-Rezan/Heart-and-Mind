@@ -246,3 +246,16 @@ subsequent stages. Existing WAV/MP4 media is never relabelled. History/network
 failures are not treated as lyric rejection. If no eligible unused song remains,
 `lyrics_recovery_unavailable` stops generation with instructions to replenish the
 reviewed reserve or repair the draft. Recovery does not reuse a published song.
+
+
+Lyric generation now constrains non-chorus lines to 7–8 Hindi words and chorus
+lines to 7–9 words during native decoding. With locally repeated choruses this
+bounds the complete song at 182–220 sung words; meaning/rhyme critique and the
+existing final validation still apply. Historical song validation remains wider.
+Rejected drafts first try an unused reviewed song of the saved narrator's voice.
+If that finite catalogue is exhausted, preparation attempts bounded repair of the
+saved draft instead of failing before repair. Existing audio/video cannot be
+silently assigned different lyrics, and publication-history checks still reject
+reused songs. `generation-failure.json` and the Actions job summary show the failed
+stage, word count and recovery inputs without logging generated prose or secrets.
+Resume by supplying the same `run_id` and the failed run as `prepared_run`.

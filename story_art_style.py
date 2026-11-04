@@ -23,6 +23,7 @@ def art_prompt(scene, kind='background'):
 def focused_prompt(record, kind='background', attempt=0, token_count=None, max_tokens=77):
     """Put visible story nouns inside the short CLIP context, before cast detail."""
     import re
+    render_style=record.get('render_style', RENDER_STYLE)
     text=record['event']
     nouns=('notebook','letter','toy','book','door','key','box','bag','photograph','phone','drawing','tree','house','school')
     answers=' '.join(a for check in record['checks'] for a in check['answers'])
@@ -47,7 +48,7 @@ def focused_prompt(record, kind='background', attempt=0, token_count=None, max_t
         action=' '.join(event.split()[:event_words]).rstrip(' ,.;')
         people='; '.join(' '.join(p.split()[:max(2,people_words//len(cleaned))]) for p in cleaned)
         setting=' '.join(record['setting'].split()[:setting_words]).rstrip(' ,.;')
-        prompt=foreground+RENDER_STYLE+framing+action+'. '+people+'.'+(' '+setting+'.' if setting else '')
+        prompt=foreground+render_style+framing+action+'. '+people+'.'+(' '+setting+'.' if setting else '')
         if token_count is None or token_count(prompt)<=max_tokens:return prompt
     # Very long fictional names are identity metadata, not useful CLIP vocabulary.
     people=[]
@@ -55,6 +56,6 @@ def focused_prompt(record, kind='background', attempt=0, token_count=None, max_t
         age=re.search(r'\b(\d{1,3})\b',part)
         role=next((r for r in ('woman','girl','boy','man','child') if re.search(r'\b'+r+r'\b',part,re.I)),'person')
         people.append(role+(' '+age[1] if age else ''))
-    prompt=foreground+RENDER_STYLE+' '.join(event.split()[:4])+'. '+'; '.join(people)+'.'
+    prompt=foreground+render_style+' '.join(event.split()[:4])+'. '+'; '.join(people)+'.'
     if token_count(prompt)>max_tokens:raise ValueError('story_prompt_encoder_budget')
     return prompt

@@ -1,0 +1,39 @@
+{
+  "recovery_eligible": true,
+  "song": {
+    "title": "किताबों के बीच | Kitabon Ke Beech | Hindi Romantic Song 2026",
+    "lyrics": "[Verse 1]\nपुरानी किताबों में तुम्हारा पहला ख़त मिला\nसूने से दिल में कोई फूल खिला\nखिड़की से आती धूप में बैठी रही\nतुम्हारे लिखे हर लफ़्ज़ को पढ़ती रही\n\n[Pre-Chorus]\nदरवाज़े की आहट पर मैं मुड़ गई\nतुम्हें देखते ही जैसे साँसें थम सी गईं\n\n[Chorus]\nकिताबों के बीच फिर तुम मिल गए\nअधूरे से पन्नों पर रंग खिल गए\nइस बार मेरी बात भी सुनना ज़रा\nफिर प्यार से मेरा नाम कहना ज़रा\n\n[Verse 2]\nमैंने कहा वो शाम अभी याद है\nतुमने कहा दिल में वही फ़रियाद है\nशिकवे सुनाए तो तुम चुपचाप सुनते रहे\nहम धीरे धीरे फिर से पास आते रहे\n\n[Chorus]\nकिताबों के बीच फिर तुम मिल गए\nअधूरे से पन्नों पर रंग खिल गए\nइस बार मेरी बात भी सुनना ज़रा\nफिर प्यार से मेरा नाम कहना ज़रा\n\n[Bridge]\nगुज़रे हुए कल को वहीं छोड़ आएँ\nइस खुली खिड़की से नई धूप बुलाएँ\n\n[Final Chorus]\nकिताबों के बीच फिर तुम मिल गए\nअधूरे से पन्नों पर रंग खिल गए\nइस बार मेरी बात भी सुनना ज़रा\nफिर प्यार से मेरा नाम कहना ज़रा\n\n[Outro]\nखुली किताब वहीं मेज़ पर रखी रही\nमैं हाथ थामकर बस तुम्हारे संग चली",
+    "duration": 195,
+    "vocal_gender": "female",
+    "song_date": "2026-11-04",
+    "visual_mood": "romance",
+    "prompt": "Solo female lead vocal; no male singer or duet. Hindi romantic acoustic pop, warm piano, acoustic guitar, soft bass and restrained dholak; 88 BPM, 4/4. Natural Hindi diction, expressive legato melody, breathable two-bar lines. A bookshop reunion moves from remembered hurt to listening and reconciliation. Vocal entry within 8s, chorus by 40s. Repeat the chorus melody, leave breath gaps, gentle resolved ending, vocal-forward balanced mix, no speech or long solos.",
+    "description": "किताबों के बीच — एक पुराने ख़त से शुरू होकर दो दिलों की नई मुलाक़ात तक पहुँचता मौलिक हिंदी प्रेमगीत। इस बार साथ लौटने से पहले दोनों एक दूसरे की बात सुनते हैं। An original Hindi romantic song about finding an old letter, meeting again and choosing to listen. #HindiMusic #HindiRomanticSong #HeartAndMind",
+    "tags": [
+      "Kitabon Ke Beech",
+      "किताबों के बीच",
+      "Hindi romantic song",
+      "original Hindi music",
+      "Hindi acoustic pop",
+      "Hindi love song",
+      "female vocal Hindi",
+      "Heart and Mind"
+    ],
+    "thumbnail_text": "KITABON KE BEECH",
+    "background_prompt": "An adult South Asian woman discovers an old handwritten letter inside a book beside a sunlit bookshop window, sage sari, natural daylight.",
+    "thumbnail_prompt": "An adult South Asian man in an oatmeal kurta meets a woman in a sage sari beside a sunlit bookshop window, both faces visible, gentle smiles.",
+    "visual_scenes": [
+      "An adult South Asian woman in a sage sari finds a folded handwritten letter inside an old book beside a sunlit bookshop window.",
+      "The woman sits beside the window reading the letter, wooden shelves and green houseplants around her.",
+      "A man in an oatmeal kurta arrives at the bookshop doorway; the woman turns toward him in surprise.",
+      "The adult couple smile gently at each other beside the open book, standing apart in soft neutral daylight.",
+      "The woman talks about an old disagreement while the man listens quietly across a small wooden table.",
+      "The couple leave the open book on the table and walk toward the bookshop door together, hopeful and reconciled."
+    ]
+  },
+  "editorial_review": {
+    "status": "reviewed",
+    "reviewer": "Codex authored editorial pass",
+    "notes": "New original recovery lyrics written and edited for failed run 41824183925. Female narrator is maintained in baithi, padhti and chali; tum address remains consistent. An old letter in a bookshop leads to reunion, acknowledgement of hurt, listening and reconciliation. Verse near-rhymes mila/khila and rahi/rahi, chorus mil/khil and sunna/kehna carry the hook; the repeated zara is a natural request rather than a claim of strict meter. Structure and total sung words are checked separately. This is an agent editorial review, not a human review, model approval, or generated-audio listening review."
+  }
+}
