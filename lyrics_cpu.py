@@ -133,7 +133,7 @@ def request_story(endpoint, payload):
             failed_pattern = error.schema.get('pattern')
             path = list(error.absolute_path)
             if path and path[0] in schema.get('properties', {}):
-                field = path[0]
+                field = '.'.join(str(part) for part in path)
             if isinstance(error.validator_value, int):
                 bound = error.validator_value
         except (ValueError, TypeError, KeyError, IndexError):
@@ -154,7 +154,7 @@ def request_story(endpoint, payload):
                     'Write summary, characters, world and every chapters entry in English. '
                     'Only title, description and spoken text use Hindi. Keep the English planning concise.')
             if issue == 'pattern' and is_hindi_word_pattern(failed_pattern):
-                correction += ' Spoken Hindi must follow the exact word range in its schema: single spaces, Devanagari words, no quotations or ASCII numbers. Do not append exposition.'
+                correction += ' Spoken Hindi must follow the exact word range in its schema: single spaces, Devanagari words, no quotations or ASCII numbers. Shorten overloaded lines or expand short lines; do not repeat the rejected wording. Do not append exposition.'
             if issue == 'pattern' and is_hindi_cta_pattern(failed_pattern):
                 correction += ' The closing line must start with आप, ask a story-specific Hindi question, and end exactly with ? टिप्पणी में बताइए। within the word limit.'
             if issue == 'incomplete_output':

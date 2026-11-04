@@ -1,0 +1,121 @@
+{
+  "version": 4,
+  "lyrics_hash": "670fdd172cec1cb65545b3b78508bef7724bb93407a5e28676a1469dd7a7a57c",
+  "passed": false,
+  "issues": [
+    "Verse 2: phrase too short or overloaded; aim 6-9 words"
+  ],
+  "warnings": [],
+  "word_count": 200,
+  "sections": [
+    {
+      "section": "Verse 1",
+      "words": [
+        9,
+        10,
+        8,
+        10
+      ],
+      "estimated_vowel_units": [
+        27,
+        29,
+        26,
+        32
+      ]
+    },
+    {
+      "section": "Pre-Chorus",
+      "words": [
+        7,
+        8
+      ],
+      "estimated_vowel_units": [
+        17,
+        23
+      ]
+    },
+    {
+      "section": "Chorus",
+      "words": [
+        7,
+        7,
+        6,
+        9
+      ],
+      "estimated_vowel_units": [
+        24,
+        19,
+        19,
+        26
+      ]
+    },
+    {
+      "section": "Verse 2",
+      "words": [
+        8,
+        11,
+        10,
+        8
+      ],
+      "estimated_vowel_units": [
+        25,
+        32,
+        27,
+        27
+      ]
+    },
+    {
+      "section": "Chorus",
+      "words": [
+        7,
+        7,
+        6,
+        9
+      ],
+      "estimated_vowel_units": [
+        24,
+        19,
+        19,
+        26
+      ]
+    },
+    {
+      "section": "Bridge",
+      "words": [
+        7,
+        8
+      ],
+      "estimated_vowel_units": [
+        25,
+        24
+      ]
+    },
+    {
+      "section": "Final Chorus",
+      "words": [
+        7,
+        7,
+        6,
+        9
+      ],
+      "estimated_vowel_units": [
+        24,
+        19,
+        19,
+        26
+      ]
+    },
+    {
+      "section": "Outro",
+      "words": [
+        4,
+        5
+      ],
+      "estimated_vowel_units": [
+        13,
+        16
+      ]
+    }
+  ],
+  "limitation": "Written phrasing heuristic; melody, pronunciation and perceived emotion require listening review."
+}

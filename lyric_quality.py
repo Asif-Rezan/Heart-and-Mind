@@ -11,7 +11,7 @@ class LyricQualityError(ValueError):
     pass
 
 
-VERSION = 4
+VERSION = 5
 ORDER = ['Verse 1', 'Pre-Chorus', 'Chorus', 'Verse 2', 'Chorus', 'Bridge', 'Final Chorus', 'Outro']
 COUNTS = [4, 2, 4, 4, 4, 2, 4, 2]
 GUIDE = '''Write a romantic/emotional Hindi album song about affection, longing,
@@ -80,8 +80,9 @@ def assess(text):
             issues.append(f'{name}: expected {COUNTS[index]} sung lines')
         if any(re.search(r'[A-Za-z]', line) for line in lines):
             issues.append(f'{name}: use Devanagari sung words only')
-        if any(n < 4 or n > 10 for n in words):
-            issues.append(f'{name}: phrase too short or overloaded; aim 6-9 words')
+        for line_number, n in enumerate(words, 1):
+            if n < 4 or n > 10:
+                issues.append(f'{name} line {line_number}: {n} words; use 4-10 words, aim 6-9')
         if any(n < 8 or n > 36 for n in weights) or (weights and max(weights)-min(weights) > 7):
             warnings.append(f'{name}: uneven estimated vowel lengths {weights}; inspect spoken phrasing')
     if [s[0] for s in sections] == ORDER:
@@ -130,11 +131,12 @@ SECTION_KEYS = [('verse_1',4), ('pre_chorus',2), ('chorus',4), ('verse_2',4), ('
 
 def section_schema():
     """Constrain unique stanzas during decoding; chorus copies are rendered locally."""
+    from story_constraints import hindi_word_pattern
     return dict(type='object', additionalProperties=False,
         required=[key for key,_ in SECTION_KEYS],
         properties={key:dict(type='array',minItems=count,maxItems=count,
             items=dict(type='string',minLength=12,maxLength=110,
-                       pattern=r'^[^\r\n\[\]]*[\u0900-\u097f][^\r\n\[\]]*$'))
+                       pattern=hindi_word_pattern(4, 10)))
                     for key,count in SECTION_KEYS})
 
 

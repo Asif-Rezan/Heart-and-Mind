@@ -260,6 +260,8 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
             if quality_path is not None:
                 quality_path.write_text(json.dumps(dict(report, passed=False), ensure_ascii=False, indent=2))
             edit_prompt = f'''Act as a native Hindi romantic lyricist and vocal arranger.
+            Revision attempt {attempt+1} of 3. Do not repeat rejected lines unchanged.
+            Fix the specific section and line in each issue before returning the complete song.
             Polish this song for {genre}, {bpm} BPM in 4/4. Keep usable romantic ideas and the narrator.
             Replace nonsensical imagery or broken Hindi entirely; do not preserve a bad hook.
             Relationship direction: {story}. Setting inspiration: {scene}.
