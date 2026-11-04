@@ -17,7 +17,10 @@ class DuplicateSongError(RuntimeError):
 
 
 def pipeline_failure_message(error):
-    from lyric_quality import LyricQualityError
+    from lyric_quality import LyricQualityError, LyricRecoveryUnavailable
+    if isinstance(error, LyricRecoveryUnavailable):
+        return ('Pipeline failed [lyrics_recovery_unavailable]: no unused reviewed song for this voice. '
+                'Add a reviewed original recovery song or repair the saved draft; music was not started.')
     if isinstance(error, LyricQualityError):
         return ('Pipeline failed [lyrics_quality_rejected]: bounded lyric revisions did not pass. '
                 'Saved draft and lyrics-quality.json contain recovery diagnostics; music was not started.')
@@ -298,6 +301,11 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                 quality = report
                 break
         else:
+            if quality_path is not None:
+                report['attempts_exhausted'] = True
+                temporary = quality_path.with_suffix('.tmp')
+                temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2))
+                temporary.replace(quality_path)
             from lyric_quality import LyricQualityError
             raise LyricQualityError('Lyrics need revision before music generation: ' + '; '.join(report['issues']))
     # Check saved cores too: resumed artifacts may predate the current history.

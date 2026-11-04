@@ -230,3 +230,19 @@ portrait music Short** with `source_run` (the numeric GitHub run ID containing
 `music-input-<source_run>`) and `parent_run` (its saved song identity). Use the same
 values to retry; never change the parent source under a published companion ID.
 Long parent IDs receive a stable shortened companion identity.
+
+### Recovery after rejected generated lyrics
+
+With `--check-history`, a saved failed semantic review or exhausted lyric revisions
+can select an unused repository song marked `recovery_eligible: true`. Candidates
+must pass `load_authored_song` editorial/structure checks, match the saved narrator
+voice, and have neither a title nor lyric hash in publication history. The current
+reserve includes the original female-narrated song `ek-chhatri-mein-2026-11-04`.
+This is an agent-authored editorial review, not a human or audio listening approval.
+
+Recovery preserves the rejected draft and report under `rejected-lyrics/`, records
+its selected source in `lyrics-recovery.json`, and checkpoints accepted lyrics for
+subsequent stages. Existing WAV/MP4 media is never relabelled. History/network
+failures are not treated as lyric rejection. If no eligible unused song remains,
+`lyrics_recovery_unavailable` stops generation with instructions to replenish the
+reviewed reserve or repair the draft. Recovery does not reuse a published song.

@@ -1,0 +1,146 @@
+{
+  "version": 5,
+  "lyrics_hash": "5c9195e0dd4ac23e853ffc37979b2d0614991adda477b6ab05f8d815c89650cb",
+  "passed": false,
+  "issues": [
+    "Chorus line 'तुम्हारा ट्रेन आ गया, जैसे बारिश लगी' has uneven vowel lengths and inconsistent stress pattern when spoken; not naturally phrased for dance pop rhythm",
+    "Verse 1 line 'दूरी के बाद आया, तुम्हारा नाम गिर गया' lacks natural rhyme and has forced metaphor without emotional progression",
+    "Pre-Chorus line 'क्या थी वो दूरी, जब तुम गायब थे' creates abrupt emotional shift with no clear narrative flow",
+    "Bridge line 'दोबारा चले गए हम, तुम्हारे साथ खुले' has mismatched phrasing with earlier verses; lacks consistent breath points and stress",
+    "Outro line 'तुम्हारा ट्रेन आ गया' is phonetically short and abrupt, disrupting the expected crescendo in a celebratory dance pop context",
+    "Final Chorus repetition fails to offer fresh phrasing or emotional progression despite structural symmetry"
+  ],
+  "warnings": [
+    "Verse 1: uneven estimated vowel lengths [30, 23, 26, 31]; inspect spoken phrasing",
+    "Outro: uneven estimated vowel lengths [13, 22]; inspect spoken phrasing",
+    "Corresponding verse lines may need compatible phrasing for the same melody"
+  ],
+  "word_count": 200,
+  "sections": [
+    {
+      "section": "Verse 1",
+      "words": [
+        10,
+        7,
+        8,
+        10
+      ],
+      "estimated_vowel_units": [
+        30,
+        23,
+        26,
+        31
+      ]
+    },
+    {
+      "section": "Pre-Chorus",
+      "words": [
+        8,
+        8
+      ],
+      "estimated_vowel_units": [
+        20,
+        23
+      ]
+    },
+    {
+      "section": "Chorus",
+      "words": [
+        7,
+        7,
+        6,
+        9
+      ],
+      "estimated_vowel_units": [
+        24,
+        19,
+        19,
+        26
+      ]
+    },
+    {
+      "section": "Verse 2",
+      "words": [
+        8,
+        10,
+        10,
+        8
+      ],
+      "estimated_vowel_units": [
+        25,
+        30,
+        27,
+        27
+      ]
+    },
+    {
+      "section": "Chorus",
+      "words": [
+        7,
+        7,
+        6,
+        9
+      ],
+      "estimated_vowel_units": [
+        24,
+        19,
+        19,
+        26
+      ]
+    },
+    {
+      "section": "Bridge",
+      "words": [
+        7,
+        8
+      ],
+      "estimated_vowel_units": [
+        25,
+        24
+      ]
+    },
+    {
+      "section": "Final Chorus",
+      "words": [
+        7,
+        7,
+        6,
+        9
+      ],
+      "estimated_vowel_units": [
+        24,
+        19,
+        19,
+        26
+      ]
+    },
+    {
+      "section": "Outro",
+      "words": [
+        4,
+        7
+      ],
+      "estimated_vowel_units": [
+        13,
+        22
+      ]
+    }
+  ],
+  "limitation": "Written phrasing heuristic; melody, pronunciation and perceived emotion require listening review.",
+  "semantic_review": {
+    "passed": false,
+    "coherent_relationship": true,
+    "natural_hindi": true,
+    "natural_rhyme": false,
+    "singable_phrasing": false,
+    "issues": [
+      "Chorus line 'तुम्हारा ट्रेन आ गया, जैसे बारिश लगी' has uneven vowel lengths and inconsistent stress pattern when spoken; not naturally phrased for dance pop rhythm",
+      "Verse 1 line 'दूरी के बाद आया, तुम्हारा नाम गिर गया' lacks natural rhyme and has forced metaphor without emotional progression",
+      "Pre-Chorus line 'क्या थी वो दूरी, जब तुम गायब थे' creates abrupt emotional shift with no clear narrative flow",
+      "Bridge line 'दोबारा चले गए हम, तुम्हारे साथ खुले' has mismatched phrasing with earlier verses; lacks consistent breath points and stress",
+      "Outro line 'तुम्हारा ट्रेन आ गया' is phonetically short and abrupt, disrupting the expected crescendo in a celebratory dance pop context",
+      "Final Chorus repetition fails to offer fresh phrasing or emotional progression despite structural symmetry"
+    ],
+    "reviewer": "same-model-critique-not-human-or-audio-verification"
+  }
+}

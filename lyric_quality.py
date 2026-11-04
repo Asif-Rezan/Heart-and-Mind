@@ -11,6 +11,10 @@ class LyricQualityError(ValueError):
     pass
 
 
+class LyricRecoveryUnavailable(LyricQualityError):
+    pass
+
+
 VERSION = 5
 ORDER = ['Verse 1', 'Pre-Chorus', 'Chorus', 'Verse 2', 'Chorus', 'Bridge', 'Final Chorus', 'Outro']
 COUNTS = [4, 2, 4, 4, 4, 2, 4, 2]
@@ -116,6 +120,10 @@ def review(request, lyrics, genre, bpm, voice, attempt=0, phrasing_warnings=()):
     natural_rhyme: audible natural end-rhyme/near-rhyme, not identical word filler.
     singable_phrasing: comparable spoken syllable lengths, natural stresses and breath
     points for two-bar phrases; no crammed prose. Written counts alone cannot prove this.
+    The chorus, second chorus and final chorus MUST repeat identical words by design.
+    Never reject repetition or demand fresh final-chorus lyrics. A short resolving
+    outro is allowed. Do not infer an audible performance or demand a crescendo
+    from text alone; judge phrasing conservatively, since melody is not available.
     For every false criterion give a specific section/line and concrete revision reason
     in issues. Do not approve merely because the JSON/structure is correct.
     Heuristic phrasing warnings (check pronunciation, not a rigid numeric meter):

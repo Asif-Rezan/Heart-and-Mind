@@ -54,7 +54,28 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
     if (root/'song.json').exists():
         song = validate_song(json.loads((root/'song.json').read_text()))
     else:
-        song = selected or make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
+        day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
+        if selected:
+            song = selected
+        else:
+            from lyric_quality import LyricQualityError
+            from lyric_recovery import recover_reviewed_song, rejected_checkpoint
+            from pipeline import vocal_gender_for_day
+            voice = vocal_gender_for_day(day) if vocal_gender == 'auto' else vocal_gender
+            draft = root/'song-draft.json'
+            if draft.exists():
+                voice = json.loads(draft.read_text()).get('vocal_gender', voice)
+            if check_history and rejected_checkpoint(root):
+                song = recover_reviewed_song(root, history, voice)
+            else:
+                try:
+                    song = make_song(day, history, draft, generation_id=run_id, vocal_gender_override=vocal_gender)
+                except LyricQualityError:
+                    if not check_history:
+                        raise
+                    song = recover_reviewed_song(root, history, voice)
+            if song.get('authored_source'):
+                selected = song
         (root/'song.json').write_text(json.dumps(song, ensure_ascii=False, indent=2))
         if selected:
             (root/'lyrics-quality.json').write_text(json.dumps(song['lyric_quality'],ensure_ascii=False,indent=2))
