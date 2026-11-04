@@ -209,7 +209,7 @@ jobs:
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
       CPU_IMAGE_WIDTH: '1024'
       CPU_IMAGE_HEIGHT: '576'
-      CPU_IMAGE_STEPS: '20'
+      CPU_IMAGE_STEPS: '24'
       IMAGE_SHARD: ${{ matrix.shard }}
       IMAGE_SHARDS: '14'
     steps:

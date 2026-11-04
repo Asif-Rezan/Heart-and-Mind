@@ -76,7 +76,7 @@ def generate_reviewed(prompt, path, seed, contract, kind='background', **kwargs)
         composition = focused_prompt(contract,kind,attempt)
         try:
             used_prompt=generate(composition, candidate, seed=seed+attempt*7919,
-                     negative_extra='headshot, beauty portrait, fashion editorial, isolated face',
+                     negative_extra='headshot, beauty portrait, fashion editorial, isolated face, '+contract.get('negative_extra',''),
                      story_contract=contract,kind=kind,composition_attempt=attempt,**kwargs)
             if isinstance(used_prompt,str):composition=used_prompt
             from PIL import Image
