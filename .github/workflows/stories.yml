@@ -427,7 +427,7 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-        cache: pip
+        # Installs below disable pip caching; no cache directory is guaranteed.
     - name: Prepare CPU runner memory and audio tools
       run: 'sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
 
@@ -540,7 +540,7 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-        cache: pip
+        # Installs below disable pip caching; no cache directory is guaranteed.
     - name: Prepare CPU image memory and local rendering tools
       run: "if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then\n  sudo timeout 180 apt-get\
         \ -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update\n  sudo timeout\
