@@ -46,14 +46,45 @@ def image_plan(song):
                           width=int(os.getenv('CPU_IMAGE_WIDTH', '1024')),
                           height=int(os.getenv('CPU_IMAGE_HEIGHT', '576')),
                           steps=int(os.getenv('CPU_IMAGE_STEPS', '16')), allow_text=(kind == 'thumbnail')))
+    if song.get('visual_style', 'storybook3d') == 'storybook3d':
+        return [storybook_plan(song, mood, plan) for plan in plans]
     if mood == 'romance':
         from couple_background import background_plan
         plans[0] = background_plan(song, plans[0])
     return plans
 
 
-def generate_song_images(root, song):
+def storybook_plan(song, mood, base):
+    """Generate one coherent scene: no cutouts, painted red palette or model lettering."""
+    kind = base['kind']
+    subject = ('One adult South Asian man in an oatmeal kurta beside one adult South Asian woman in a sage sari. '
+               if mood == 'romance' else 'One adult South Asian woman in a sage outfit. ')
+    setting = song.get(kind + '_setting') or song.get('background_setting') or song.get('background_prompt') or {
+        'romance': 'cozy bookshop window, wooden shelves, green houseplant',
+        'heartbreak': 'quiet railway window, soft rainy daylight',
+        'healing': 'meadow, green foliage, clear morning sky',
+    }[mood]
+    setting = re.sub(r'\b(?:red|ruby|coral|scarlet|cobalt|emerald|golden|cinematic|photography)\b', '', setting, flags=re.I)
+    setting = ' '.join(setting.split()[:12]).rstrip(',.;')
+    framing = 'Faces toward right, open shelves on left' if kind == 'background' else 'Closer faces, softly focused garden'
+    prompt = ('Natural 3D storybook illustration, rounded forms. ' + subject +
+              'Chest-up, separate shoulders, gentle expressions. ' + setting + '. ' + framing +
+              '. Soft daylight, natural skin, cream, green, wood, muted blue, no lettering.')
+    return dict(base, prompt=prompt, style='storybook3d', composition='single-scene',
+                style_version=1, allow_text=False,
+                extra_negative='red color cast, orange color cast, oversaturated red, neon colors, collage, cutout edges, hands')
+
+
+def generate_scene(plan, target):
     from image_cpu import generate
+    kwargs = dict(seed=plan['seed'], allow_text=plan['allow_text'])
+    if 'style' in plan:
+        kwargs.update(style=plan['style'], width=plan['width'], height=plan['height'],
+                      steps=plan['steps'], extra_negative=plan.get('extra_negative', ''))
+    generate(plan['prompt'], target, **kwargs)
+
+
+def generate_song_images(root, song):
     root = Path(root)
     manifest_path = root/'image-manifest.json'
     previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
@@ -75,7 +106,7 @@ def generate_song_images(root, song):
                 from couple_background import generate_background
                 generate_background(root, plan, temporary)
             else:
-                generate(plan['prompt'], temporary, seed=plan['seed'], allow_text=plan['allow_text'])
+                generate_scene(plan, temporary)
             with Image.open(temporary) as image:
                 image.verify()
             temporary.replace(target)

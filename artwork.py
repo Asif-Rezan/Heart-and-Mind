@@ -95,7 +95,8 @@ def create_artwork(root, song):
     draw.text((92, 86), 'HEART & MIND', font=font(28), fill='#f0e9e2')
     draw.text((92, 825), hook_text(song, mood), font=font(64), fill=accent)
     draw.text((96, 918), label, font=font(24), fill='#ffffff')
-    cover = poster_finish(cover)
+    if song.get('visual_style', 'storybook3d') != 'storybook3d':
+        cover = poster_finish(cover)
     cover.save(root/'cover.png')
     with Image.open(root/'thumbnail-source.png') as source:
         thumb = poster_thumbnail(source, song, mood)

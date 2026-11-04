@@ -44,7 +44,7 @@ REVISION = '60987f37e94cd59c36b1cba832b9f97b57395a10'
 _pipeline = None
 def generate(prompt, path, seed, allow_text=False, style="photo", width=None, height=None, extra_negative="", people=True, steps=None):
     global _pipeline
-    if style not in ("photo", "illustration"):
+    if style not in ("photo", "illustration", "storybook3d"):
         raise ValueError("Unsupported image style")
     import torch
     from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
@@ -78,10 +78,14 @@ def generate(prompt, path, seed, allow_text=False, style="photo", width=None, he
         if attempt == 5:
             print('Five safety rejections; retrying a restrained music portrait.', flush=True)
         lettering = 'misspelled title, gibberish, random extra words, ' if allow_text else 'text, letters, '
-        style_negative = ('photograph, photorealistic, camera, realistic skin pores, hands, fingers, full body, exaggerated nose, distorted jaw, asymmetrical eyes, ' if style == 'illustration'
-                          else 'anime, cartoon, watercolor, flat colors, line art, cel shading, ')
-        result = pipeline(prompt=candidate, negative_prompt=lettering + (extra_negative + ', ' if extra_negative else '') + style_negative + 'monochrome, grayscale, sepia, faded colors, underexposed, dark faces, silhouette, backlit face, group, crowd, third person, duplicate faces, blurry, low detail, poor quality, 3D render, CGI, fused bodies, merged torsos, conjoined people, overlapping faces, fused faces, beard, mustache, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, letterbox bars, inset picture, solid black panel, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
-            num_inference_steps=steps, guidance_scale=7.0,
+        if style == 'storybook3d':
+            style_negative = 'flat 2D, gouache, watercolor, brush strokes, cel shading, photograph, exaggerated nose, distorted jaw, asymmetrical eyes, '
+        elif style == 'illustration':
+            style_negative = 'photograph, photorealistic, camera, realistic skin pores, hands, fingers, full body, exaggerated nose, distorted jaw, asymmetrical eyes, 3D render, CGI, '
+        else:
+            style_negative = 'anime, cartoon, watercolor, flat colors, line art, cel shading, 3D render, CGI, '
+        result = pipeline(prompt=candidate, negative_prompt=lettering + (extra_negative + ', ' if extra_negative else '') + style_negative + 'monochrome, grayscale, sepia, faded colors, underexposed, dark faces, silhouette, backlit face, group, crowd, third person, duplicate faces, blurry, low detail, poor quality, fused bodies, merged torsos, conjoined people, overlapping faces, fused faces, beard, mustache, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, letterbox bars, inset picture, solid black panel, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
+            num_inference_steps=steps, guidance_scale=(6.0 if style == 'storybook3d' else 7.0),
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):
             print(f'Image safety check rejected attempt {attempt+1}/10.', flush=True)

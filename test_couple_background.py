@@ -11,7 +11,7 @@ from couple_background import (background_plan, checked_cutout, compose_backgrou
                                generate_background, generate_background_part)
 from song_images import image_plan, generate_song_images
 
-SONG = dict(title='तेरे साथ', lyrics='तेरे साथ चाँदनी', visual_mood='romance',
+SONG = dict(title='तेरे साथ', lyrics='तेरे साथ चाँदनी', visual_mood='romance', visual_style='illustration',
             background_setting='moonlit bookshop, amber lantern')
 
 

@@ -12,7 +12,7 @@ from song_images import image_plan, generate_song_images
 from pipeline import metadata_tags, song_profile, SONG_PROFILES
 
 SONG = dict(title='नई सुबह', lyrics='नई सुबह में फिर से जीना है', prompt='Hopeful Hindi folk pop',
-            visual_mood='healing', tags=['Hindi Folk Song', 'hindi folk song', 'नई सुबह'])
+            visual_mood='healing', visual_style='photo', tags=['Hindi Folk Song', 'hindi folk song', 'नई सुबह'])
 
 
 class SongImageTests(unittest.TestCase):

@@ -86,14 +86,13 @@ New songs alternate solo male/female vocal directions by Asia/Dhaka calendar dat
 
 Manual workflow dispatch can select `vocal_gender=male` or `female` for a new song; `auto` remains the default for scheduled runs. This one-off choice does not shift the daily calendar rotation. Use a new run ID when choosing a different voice; saved songs cannot be relabeled.
 
-Romantic video backgrounds now generate three independent layers: unoccupied scenery,
-one adult man in a blue kurta, and one adult woman in a red sari. CPU U2Net segmentation
-removes each portrait background before placing the two cutouts in separate boxes on the
-right, leaving the left free for video overlays. The shared style and frontal lighting
-reduce visual differences; facial quality and segmentation edges still need visual review.
-Individual PNG/JSON checkpoints allow interrupted generation to resume. Thumbnail inference
-is unchanged. The artwork demo generates the three layers in parallel and, by default,
-reuses the approved thumbnail from run `41812491890`; supply `thumbnail_run` with another
-unexpired approved demo run or leave it blank to generate a new thumbnail. `source_run`
-can recompose a completed layered demo. This downloads a CPU U2Net model on first use;
-there is no paid inference call.
+Default artwork now uses `storybook3d`: a single coherent 3D storybook scene with soft
+daylight, natural skin and a restrained cream, sage, wood and muted-blue palette. Both
+background and thumbnail are freshly generated without lettering. Style-specific negative
+prompts permit 3D rendering and suppress gouache, cutout edges and red/orange casts.
+The demo generates both images independently; `thumbnail_run` is optional and defaults
+to blank so it does not restore an older style. `source_run` only re-exports existing
+sources. Explicit `photo` / `illustration` modes retain the older pipeline for compatibility;
+the layered background experiment is not used by the default style. SSD-1B still needs
+visual review: prompt instructions cannot guarantee correct people or match another
+image generator's rendering quality.
