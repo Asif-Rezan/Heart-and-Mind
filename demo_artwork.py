@@ -13,6 +13,7 @@ SONG = {
     'description': 'An original Hindi romantic song about reuniting in a moonlit old bookshop.',
     'duration': 195,
     'visual_mood': 'romance',
+    'visual_style': 'illustration',
     'thumbnail_text': 'TERE SAATH',
     'background_prompt': 'Moonlit old bookshop, tender smiles beside wooden shelves, golden lantern light, cobalt moonlit window, ruby and emerald clothing.',
     'thumbnail_prompt': 'Colorful old bookshop, tender smiles, wooden shelves, cobalt moonlight through window, warm lantern glow, ruby and emerald clothing.',
@@ -31,7 +32,18 @@ def main():
     else:
         from image_cpu import generate
         plan = next(plan for plan in image_plan(SONG) if plan['kind'] == args.kind)
-        generate(plan['prompt'], args.output/f'{args.kind}-source.png', seed=plan['seed'], allow_text=plan['allow_text'])
+        # Review an illustration experiment without changing production's photo default.
+        scene = ('moonlit bookshop window, amber lantern, teal and coral palette' if args.kind == 'background'
+                 else 'flowering garden, pink blossoms, warm sunset, teal and coral palette')
+        plan['prompt'] = (
+            'Hand-painted gouache storybook illustration, textured paper. '
+            'Exactly two adults: one clean-shaven South Asian man in a blue kurta on the left; '
+            'one South Asian woman in a red sari on the right. '
+            'Separate seated waist-up portraits, visible space between shoulders, hands out of frame. '
+            'Gentle smiles, ' + scene + '. Simple painted faces, fully clothed, no lettering.')
+        plan['style'] = 'illustration'
+        plan['allow_text'] = False
+        generate(plan['prompt'], args.output/f'{args.kind}-source.png', seed=plan['seed'], allow_text=plan['allow_text'], style=plan['style'])
         (args.output/f'{args.kind}-plan.json').write_text(json.dumps(plan, indent=2))
 
 

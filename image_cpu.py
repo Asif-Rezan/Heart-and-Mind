@@ -39,8 +39,10 @@ def recovery_prompt(prompt):
 MODEL = 'segmind/SSD-1B'
 REVISION = '60987f37e94cd59c36b1cba832b9f97b57395a10'
 _pipeline = None
-def generate(prompt, path, seed, allow_text=False):
+def generate(prompt, path, seed, allow_text=False, style="photo"):
     global _pipeline
+    if style not in ("photo", "illustration"):
+        raise ValueError("Unsupported image style")
     import torch
     from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
     torch.set_num_threads(min(os.cpu_count() or 2, 4))
@@ -73,7 +75,9 @@ def generate(prompt, path, seed, allow_text=False):
         if attempt == 5:
             print('Five safety rejections; retrying a restrained music portrait.', flush=True)
         lettering = 'misspelled title, gibberish, random extra words, ' if allow_text else 'text, letters, '
-        result = pipeline(prompt=candidate, negative_prompt=lettering + 'monochrome, grayscale, sepia, faded colors, underexposed, dark faces, silhouette, backlit face, group, crowd, third person, duplicate faces, anime, cartoon, watercolor, flat colors, line art, cel shading, blurry, low detail, poor quality, 3D render, CGI, fused bodies, merged torsos, conjoined people, overlapping faces, fused faces, beard, mustache, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, letterbox bars, inset picture, solid black panel, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
+        style_negative = ('photograph, photorealistic, camera, realistic skin pores, ' if style == 'illustration'
+                          else 'anime, cartoon, watercolor, flat colors, line art, cel shading, ')
+        result = pipeline(prompt=candidate, negative_prompt=lettering + style_negative + 'monochrome, grayscale, sepia, faded colors, underexposed, dark faces, silhouette, backlit face, group, crowd, third person, duplicate faces, blurry, low detail, poor quality, 3D render, CGI, fused bodies, merged torsos, conjoined people, overlapping faces, fused faces, beard, mustache, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, letterbox bars, inset picture, solid black panel, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
             num_inference_steps=steps, guidance_scale=7.0,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):

@@ -110,6 +110,19 @@ class SongImageTests(unittest.TestCase):
                 self.assertIn('fused bodies', negative)
                 self.assertIn('beard, mustache', negative)
 
+    def test_illustration_does_not_suppress_its_own_style(self):
+        worker = Mock(return_value=types.SimpleNamespace(
+            nsfw_content_detected=[False], images=[Image.new('RGB', (256, 256))]))
+        torch = types.SimpleNamespace(set_num_threads=Mock(), Generator=Mock())
+        diffusers = types.SimpleNamespace(DiffusionPipeline=Mock(), DPMSolverMultistepScheduler=Mock())
+        with tempfile.TemporaryDirectory() as temp, patch.object(image_cpu, '_pipeline', worker), patch.dict('sys.modules', {'torch': torch, 'diffusers': diffusers}):
+            image_cpu.generate('Gouache couple illustration', Path(temp)/'art.png', seed=3, style='illustration')
+            negative = worker.call_args.kwargs['negative_prompt']
+            self.assertIn('photograph', negative)
+            self.assertNotIn('watercolor', negative)
+            self.assertNotIn('flat colors', negative)
+            self.assertIn('fused bodies', negative)
+
     def test_hook_year_is_not_passed_to_thumbnail_model(self):
         plan = image_plan(dict(SONG, thumbnail_text='TERE SAATH 2026'))[1]
         self.assertIn('Title "TERE SAATH"', plan['prompt'])
