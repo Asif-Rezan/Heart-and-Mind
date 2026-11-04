@@ -46,6 +46,9 @@ def image_plan(song):
                           width=int(os.getenv('CPU_IMAGE_WIDTH', '1024')),
                           height=int(os.getenv('CPU_IMAGE_HEIGHT', '576')),
                           steps=int(os.getenv('CPU_IMAGE_STEPS', '16')), allow_text=(kind == 'thumbnail')))
+    if mood == 'romance':
+        from couple_background import background_plan
+        plans[0] = background_plan(song, plans[0])
     return plans
 
 
@@ -68,7 +71,11 @@ def generate_song_images(root, song):
                 pass
         if not valid:
             temporary = target.with_suffix('.tmp.png')
-            generate(plan['prompt'], temporary, seed=plan['seed'], allow_text=plan['allow_text'])
+            if plan.get('composition') == 'separate-portraits':
+                from couple_background import generate_background
+                generate_background(root, plan, temporary)
+            else:
+                generate(plan['prompt'], temporary, seed=plan['seed'], allow_text=plan['allow_text'])
             with Image.open(temporary) as image:
                 image.verify()
             temporary.replace(target)

@@ -14,6 +14,7 @@ SONG = {
     'duration': 195,
     'visual_mood': 'romance',
     'visual_style': 'illustration',
+    'background_setting': 'old bookshop, wooden shelves, amber lantern beside a blue moonlit window',
     'thumbnail_text': 'TERE SAATH',
     'background_prompt': 'Moonlit old bookshop, tender smiles beside wooden shelves, golden lantern light, cobalt moonlit window, ruby and emerald clothing.',
     'thumbnail_prompt': 'Colorful old bookshop, tender smiles, wooden shelves, cobalt moonlight through window, warm lantern glow, ruby and emerald clothing.',
@@ -22,19 +23,32 @@ SONG = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--kind', choices=['background', 'thumbnail', 'compose'], required=True)
+    parser.add_argument('--kind', choices=['background', 'background-man', 'background-woman', 'background-scenery', 'thumbnail', 'compose'], required=True)
     parser.add_argument('--output', type=Path, default=Path('output/artwork-demo'))
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output/'song.json').write_text(json.dumps(SONG, ensure_ascii=False, indent=2))
     if args.kind == 'compose':
+        from couple_background import compose_background_files
+        plan = json.loads((args.output/'background-plan.json').read_text())
+        temporary = args.output/'background-source.tmp.png'
+        compose_background_files(args.output, plan, temporary)
+        temporary.replace(args.output/'background-source.png')
+        (args.output/'background-plan.json').write_text(json.dumps(plan, indent=2))
         create_artwork(args.output, SONG)
+    elif args.kind.startswith('background'):
+        from couple_background import generate_background, generate_background_part
+        plan = image_plan(SONG)[0]
+        if args.kind == 'background':
+            generate_background(args.output, plan, args.output/'background-source.png')
+        else:
+            generate_background_part(args.output, plan, args.kind.split('-', 1)[1])
+        (args.output/'background-plan.json').write_text(json.dumps(plan, indent=2))
     else:
         from image_cpu import generate
         plan = next(plan for plan in image_plan(SONG) if plan['kind'] == args.kind)
         # Review an illustration experiment without changing production's photo default.
-        scene = ('amber bookshop window, blue moonlit sky' if args.kind == 'background'
-                 else 'pink flowering garden, golden sunset')
+        scene = 'pink flowering garden, golden sunset'
         plan['prompt'] = (
             'Gouache illustration. Exactly two adults, chest-up, hands below frame. '
             'Left: handsome man, short black hair, square jaw, clean-shaven, plain blue kurta. '

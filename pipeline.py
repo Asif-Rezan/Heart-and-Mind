@@ -309,10 +309,10 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
       Complement the title instead of copying it. No channel name, fake claims or punctuation bait.
       Mood reference only, do not copy mechanically: {hook}.
     background_prompt: 20-25 English words describing ONE beautiful music-video frame.
-      Start with the people and their emotional action, then the lyric-specific setting,
+      For non-romantic moods start with the people and their emotional action, then the lyric-specific setting,
       weather and lighting. Keep the romance or emotional story visible; avoid empty generic scenery.
-      For love/reunion: one fully clothed adult South Asian man and one adult South Asian woman standing
-      side by side with separate bodies and a visible gap; both clean-shaven. No hugging or kissing. For separation: an adult with a meaningful keepsake or a couple visibly apart.
+      For love/reunion: describe ONLY the empty setting, its props, weather and light. No people,
+      clothing, faces or interactions: the adult man and woman will be generated separately. For separation: an adult with a meaningful keepsake or a couple visibly apart.
       For healing: an adult moving toward warm light with a hopeful expression.
       Medium-wide framing: people large enough to recognize, on the right, with room on the left
       and lower edge for the existing song overlay. One setting, natural anatomy, realistic skin,

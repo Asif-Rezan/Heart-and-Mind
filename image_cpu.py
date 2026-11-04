@@ -14,7 +14,7 @@ class ImageSafetyBlocked(RuntimeError):
     """The model's safety checker rejected a generated image."""
 
 
-def safer_prompt(prompt):
+def safer_prompt(prompt, people=True):
     """Keep the scene's setting and props while removing graphic/sexual details."""
     replacements = [
         (r'\b(?:bloodied|bloody|gory|gore|bleeding|bloodstains?)\b', 'dramatic'),
@@ -28,18 +28,21 @@ def safer_prompt(prompt):
     for pattern, replacement in replacements:
         prompt = re.sub(pattern, replacement, prompt, flags=re.I)
     # Preserve the scene's visual anchor before the encoders' token limit.
-    return prompt + ' Respectful fully clothed adults, no violence.'
+    return prompt + (' Respectful fully clothed adults, no violence.' if people
+                     else ' Empty unoccupied scenery, no people, no violence.')
 
-def recovery_prompt(prompt):
+def recovery_prompt(prompt, people=True):
     """Keep the musical mood with a restrained fully clothed composition."""
-    return safer_prompt(prompt + ' Respectful portrait, casual everyday clothing, calm expressions.')
+    detail = (' Respectful portrait, casual everyday clothing, calm expressions.' if people
+              else ' Peaceful empty scenery, no human figures.')
+    return safer_prompt(prompt + detail, people=people)
 
 
 # Pinned to the same public model as the Rezan After Dark reference project.
 MODEL = 'segmind/SSD-1B'
 REVISION = '60987f37e94cd59c36b1cba832b9f97b57395a10'
 _pipeline = None
-def generate(prompt, path, seed, allow_text=False, style="photo"):
+def generate(prompt, path, seed, allow_text=False, style="photo", width=None, height=None, extra_negative="", people=True, steps=None):
     global _pipeline
     if style not in ("photo", "illustration"):
         raise ValueError("Unsupported image style")
@@ -57,9 +60,9 @@ def generate(prompt, path, seed, allow_text=False, style="photo"):
         _pipeline.to('cpu')
         _pipeline.enable_attention_slicing()
         _pipeline.enable_vae_slicing()
-    width = int(os.getenv('CPU_IMAGE_WIDTH', '1024'))
-    height = int(os.getenv('CPU_IMAGE_HEIGHT', '576'))
-    steps = int(os.getenv('CPU_IMAGE_STEPS', '16'))
+    width = int(width if width is not None else os.getenv('CPU_IMAGE_WIDTH', '1024'))
+    height = int(height if height is not None else os.getenv('CPU_IMAGE_HEIGHT', '576'))
+    steps = int(steps if steps is not None else os.getenv('CPU_IMAGE_STEPS', '16'))
     if width % 8 or height % 8 or not 256 <= width <= 1536 or not 256 <= height <= 1536:
         raise ValueError('CPU image dimensions must be multiples of eight in 256–1536')
     if not 1 <= steps <= 50:
@@ -67,8 +70,8 @@ def generate(prompt, path, seed, allow_text=False, style="photo"):
     pipeline = _pipeline
     start = time.monotonic()
     image = None
-    initial_prompt = safer_prompt(prompt)
-    rewritten = recovery_prompt(prompt)
+    initial_prompt = safer_prompt(prompt, people=people)
+    rewritten = recovery_prompt(prompt, people=people)
     for attempt in range(10):
         # Five seeds per composition; keep input sanitization and output checks.
         candidate = initial_prompt if attempt < 5 else rewritten
@@ -77,7 +80,7 @@ def generate(prompt, path, seed, allow_text=False, style="photo"):
         lettering = 'misspelled title, gibberish, random extra words, ' if allow_text else 'text, letters, '
         style_negative = ('photograph, photorealistic, camera, realistic skin pores, hands, fingers, full body, exaggerated nose, distorted jaw, asymmetrical eyes, ' if style == 'illustration'
                           else 'anime, cartoon, watercolor, flat colors, line art, cel shading, ')
-        result = pipeline(prompt=candidate, negative_prompt=lettering + style_negative + 'monochrome, grayscale, sepia, faded colors, underexposed, dark faces, silhouette, backlit face, group, crowd, third person, duplicate faces, blurry, low detail, poor quality, 3D render, CGI, fused bodies, merged torsos, conjoined people, overlapping faces, fused faces, beard, mustache, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, letterbox bars, inset picture, solid black panel, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
+        result = pipeline(prompt=candidate, negative_prompt=lettering + (extra_negative + ', ' if extra_negative else '') + style_negative + 'monochrome, grayscale, sepia, faded colors, underexposed, dark faces, silhouette, backlit face, group, crowd, third person, duplicate faces, blurry, low detail, poor quality, 3D render, CGI, fused bodies, merged torsos, conjoined people, overlapping faces, fused faces, beard, mustache, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, letterbox bars, inset picture, solid black panel, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
             num_inference_steps=steps, guidance_scale=7.0,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007))
         if any(getattr(result, 'nsfw_content_detected', None) or []):

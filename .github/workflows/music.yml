@@ -227,6 +227,9 @@ jobs:
             output/*/background-source.png
             output/*/thumbnail-source.png
             output/*/image-manifest.json
+            output/*/background-man*
+            output/*/background-woman*
+            output/*/background-scenery*
           retention-days: 7
   publish:
     needs: [lyrics, music, images]

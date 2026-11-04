@@ -85,3 +85,15 @@ CPU synthesis configures the native `ACESTEP_GENERATION_TIMEOUT` to 18,000 secon
 New songs alternate solo male/female vocal directions by Asia/Dhaka calendar date: October 28, 2026 is male, October 29 female, then repeat. Lyrics and the Hindi editing pass follow that narrator. Saved song checkpoints retain their original voice across retries; existing audio is not changed. Vocal gender is guided through the music caption, so generated audio still needs listening review.
 
 Manual workflow dispatch can select `vocal_gender=male` or `female` for a new song; `auto` remains the default for scheduled runs. This one-off choice does not shift the daily calendar rotation. Use a new run ID when choosing a different voice; saved songs cannot be relabeled.
+
+Romantic video backgrounds now generate three independent layers: unoccupied scenery,
+one adult man in a blue kurta, and one adult woman in a red sari. CPU U2Net segmentation
+removes each portrait background before placing the two cutouts in separate boxes on the
+right, leaving the left free for video overlays. The shared style and frontal lighting
+reduce visual differences; facial quality and segmentation edges still need visual review.
+Individual PNG/JSON checkpoints allow interrupted generation to resume. Thumbnail inference
+is unchanged. The artwork demo generates the three layers in parallel and, by default,
+reuses the approved thumbnail from run `41812491890`; supply `thumbnail_run` with another
+unexpired approved demo run or leave it blank to generate a new thumbnail. `source_run`
+can recompose a completed layered demo. This downloads a CPU U2Net model on first use;
+there is no paid inference call.

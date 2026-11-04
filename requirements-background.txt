@@ -1,0 +1,2 @@
+# CPU segmentation; portraits are generated separately before compositing.
+rembg[cpu]==2.0.67
