@@ -33,14 +33,14 @@ def main():
         from image_cpu import generate
         plan = next(plan for plan in image_plan(SONG) if plan['kind'] == args.kind)
         # Review an illustration experiment without changing production's photo default.
-        scene = ('moonlit bookshop window, amber lantern, teal and coral palette' if args.kind == 'background'
-                 else 'flowering garden, pink blossoms, warm sunset, teal and coral palette')
+        scene = ('amber bookshop window, blue moonlit sky' if args.kind == 'background'
+                 else 'pink flowering garden, golden sunset')
         plan['prompt'] = (
-            'Hand-painted gouache storybook illustration, textured paper. '
-            'Exactly two adults: one clean-shaven South Asian man in a blue kurta on the left; '
-            'one South Asian woman in a red sari on the right. '
-            'Separate seated waist-up portraits, visible space between shoulders, hands out of frame. '
-            'Gentle smiles, ' + scene + '. Simple painted faces, fully clothed, no lettering.')
+            'Gouache illustration. Exactly two adults, chest-up, hands below frame. '
+            'Left: handsome man, short black hair, square jaw, clean-shaven, plain blue kurta. '
+            'Right: beautiful woman, long black hair, red sari, gold earrings. '
+            'Two separate shoulders, wide visible gap. Gentle smiles, looking toward viewer. '
+            + scene + '. Rich teal and coral, textured paper, fully clothed, no lettering.')
         plan['style'] = 'illustration'
         plan['allow_text'] = False
         generate(plan['prompt'], args.output/f'{args.kind}-source.png', seed=plan['seed'], allow_text=plan['allow_text'], style=plan['style'])

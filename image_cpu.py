@@ -75,7 +75,7 @@ def generate(prompt, path, seed, allow_text=False, style="photo"):
         if attempt == 5:
             print('Five safety rejections; retrying a restrained music portrait.', flush=True)
         lettering = 'misspelled title, gibberish, random extra words, ' if allow_text else 'text, letters, '
-        style_negative = ('photograph, photorealistic, camera, realistic skin pores, ' if style == 'illustration'
+        style_negative = ('photograph, photorealistic, camera, realistic skin pores, hands, fingers, full body, exaggerated nose, distorted jaw, asymmetrical eyes, ' if style == 'illustration'
                           else 'anime, cartoon, watercolor, flat colors, line art, cel shading, ')
         result = pipeline(prompt=candidate, negative_prompt=lettering + style_negative + 'monochrome, grayscale, sepia, faded colors, underexposed, dark faces, silhouette, backlit face, group, crowd, third person, duplicate faces, blurry, low detail, poor quality, 3D render, CGI, fused bodies, merged torsos, conjoined people, overlapping faces, fused faces, beard, mustache, extra arms, extra legs, deformed hands, duplicate person, tiny distant faces, cropped heads, crossed eyes, plastic skin, crowded composition, split screen, letterbox bars, inset picture, solid black panel, watermark, logo, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
             num_inference_steps=steps, guidance_scale=7.0,
