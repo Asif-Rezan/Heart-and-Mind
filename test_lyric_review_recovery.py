@@ -72,7 +72,12 @@ class ReviewedRecoveryTests(unittest.TestCase):
             with self.subTest(history=history,voice=voice,media=media), tempfile.TemporaryDirectory() as directory:
                 root = self.seed(directory)
                 if media: (root/media).write_bytes(b'existing media')
-                with self.assertRaises(LyricQualityError):
+                # This test deliberately exhausts a one-song catalogue. New reserve
+                # songs should not change duplicate/media rejection coverage.
+                import shutil
+                catalogue=Path(directory)/'catalogue';catalogue.mkdir()
+                shutil.copy2(Path(__file__).parent/'lyrics'/f'{IDENTITY}.json',catalogue/f'{IDENTITY}.json')
+                with patch('lyric_recovery.CATALOG',catalogue), self.assertRaises(LyricQualityError):
                     recover_reviewed_song(root, history, voice)
                 self.assertFalse((root/'song.json').exists())
                 if media: self.assertEqual((root/media).read_bytes(), b'existing media')

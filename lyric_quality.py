@@ -148,6 +148,19 @@ def section_schema():
                     for key,count in SECTION_KEYS})
 
 
+def generation_section_schema():
+    """26 rendered lines must total 182–220 words before editorial critique.
+
+    Four chorus lines are sung three times (12 x 7–9 words); the other
+    fourteen lines use 7–8 words. Preserve the wider legacy validation schema.
+    """
+    from story_constraints import hindi_word_pattern
+    schema = section_schema()
+    for key, stanza in schema['properties'].items():
+        stanza['items']['pattern'] = hindi_word_pattern(7, 9 if key == 'chorus' else 8)
+    return schema
+
+
 def parse_sections(text):
     """Read historical drafts without losing lyrics beside an inline heading."""
     result = {}
