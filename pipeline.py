@@ -329,12 +329,11 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
         temporary.replace(draft_path)
     from story_visual_contract import ENGLISH_PATTERN
     packaging_schema = {'type': 'object', 'additionalProperties': False,
-        'required': ['description', 'tags', 'thumbnail_text', 'background_prompt', 'thumbnail_prompt'],
+        'required': ['description', 'tags', 'background_prompt', 'thumbnail_prompt'],
         'properties': {
             'description': {'type': 'string', 'minLength': 20, 'maxLength': 1200},
             'tags': {'type': 'array', 'minItems': 8, 'maxItems': 12,
                      'items': {'type': 'string', 'minLength': 1, 'maxLength': 40}},
-            'thumbnail_text': {'type': 'string', 'minLength': 3, 'maxLength': 26, 'pattern': '^[A-Za-z0-9 !?]+$'},
             'background_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380, 'pattern':ENGLISH_PATTERN},
             'thumbnail_prompt': {'type': 'string', 'minLength': 40, 'maxLength': 380, 'pattern':ENGLISH_PATTERN},
             'visual_scenes': {'type':'array','minItems':4,'maxItems':8,'items':{'type':'string','minLength':40,'maxLength':160,'pattern':ENGLISH_PATTERN}}}}
@@ -353,11 +352,6 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
       "new Hindi song {year}", the actual musical genre, one suitable listening context,
       "original Hindi music", and "Heart and Mind". Use specific Hindi/English searches,
       not broad unrelated self-help terms. No other singers, films, tools, models or trend bait.
-    thumbnail_text: 2-4 familiar Romanized Hindi words, <=26 ASCII characters, expressing
-      the chorus's emotional promise. Use natural Hindi transliteration, never mixed English
-      slogans such as MILE AGAIN. Prefer a complete relatable phrase over generic love labels.
-      Complement the title instead of copying it. No channel name, fake claims or punctuation bait.
-      Mood reference only, do not copy mechanically: {hook}.
     background_prompt: 16-22 English words describing one beautiful, lyric-specific music-video scene.
       Show the emotional action and the actual location, weather, meaningful prop and light from these lyrics.
       Romance: a beautiful South Asian adult couple sharing a tender moment. Separation: the same young
@@ -377,19 +371,19 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
       Use the full frame for the scene; no blank typography panel, no red paint strokes.
       This is a TEXT-FREE cinematic scene: no Hindi, Romanized Hindi or English lettering, song title, hook,
       year, badge, logo, watermark or signature. Do not ask the image model to draw writing.
-      The thumbnail_text field is retained only as metadata;
-      it is never rendered on the thumbnail or sent to the image model.
     visual_scenes: 4-8 concise English scenes (40-160 characters each) following THIS song's
       actual verse/chorus/bridge emotional progression. Use the same fully clothed adult
       couple (healing: adult woman), the lyric-specific setting and meaningful objects.
       Describe visible actions, not camera/typography. No unrelated drama or wealth.
       They will be illustrated in realistic cinematic 3D storybook style.
     Description: 60-100 words maximum. Tags must EACH be 40 characters or fewer.
-    The thumbnail hook must contain ONLY ASCII English letters, spaces, ! or ?; no Devanagari.
     Keep both scene prompts under 380 characters each. Do not repeat lyrics in the response.
     Song to package: {json.dumps(song, ensure_ascii=False)}'''
     song['lyrics'] = normalize_lyrics(song['lyrics'])
     song.update(request(packaging_prompt, packaging_schema, 3000))
+    # Text-free artwork never uses this legacy metadata. Keep its constrained
+    # value local so an unused hook cannot exhaust retries for accepted lyrics.
+    song['thumbnail_text'] = hook
     song['visual_mood'] = mood  # Chosen locally, never ask the model to reproduce a fixed enum.
     if needs_review:
         song['lyric_quality_version'] = LYRIC_VERSION
