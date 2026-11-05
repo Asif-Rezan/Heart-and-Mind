@@ -12,7 +12,6 @@ CORE = {'title': 'नई सुबह | Nayi Subah | Hindi Soulful Song', 'lyric
         'prompt': 'Hindi cinematic soulful pop with piano and warm expressive vocals', 'duration': 240}
 PACKAGE = {'description': 'A hopeful original Hindi song about starting again. #HindiMusic',
            'tags': ['Nayi Subah', 'नई सुबह', 'Hindi song', 'Hindi soul', 'hopeful song', 'Hindi pop', 'original music', 'Heart and Mind'],
-           'thumbnail_text': 'NAYI SUBAH',
            'background_prompt': 'An adult South Asian woman in a meadow watches the sunrise, hopeful expression, cinematic warm golden light.',
            'thumbnail_prompt': 'Close portrait of a hopeful South Asian adult, glowing sunrise on the right, dark empty left, cinematic photography.'}
 
@@ -58,6 +57,28 @@ class SongGenerationTests(unittest.TestCase):
         self.assertNotIn('lyrics', requests[2]['response_format']['json_schema']['schema']['properties'])
         self.assertIn(CORE['title'], requests[2]['messages'][-1]['content'])
         self.assertLess(requests[2]['max_completion_tokens'], requests[0]['max_completion_tokens'])
+
+    def test_packaging_excludes_unused_hook_and_resumes_accepted_draft(self):
+        from pipeline import SONG_PROFILES
+        for profile in SONG_PROFILES:
+            self.assertRegex(profile[-1], r'^[A-Za-z0-9 !?]{3,26}$')
+        with tempfile.TemporaryDirectory() as temp:
+            draft = Path(temp)/'song-draft.json'
+            with patch('lyrics_cpu.request_story', side_effect=[response(CORE), response({'lyrics': CORE['lyrics']}), RuntimeError('interrupted')]):
+                with self.assertRaises(RuntimeError):
+                    make_song('2026-11-05', [], draft)
+            accepted = json.loads(draft.read_text())
+            def package(endpoint, payload):
+                schema = payload['response_format']['json_schema']['schema']
+                self.assertNotIn('thumbnail_text', schema['properties'])
+                self.assertNotIn('thumbnail_text:', payload['messages'][-1]['content'])
+                Draft202012Validator(schema).validate(PACKAGE)
+                return response(PACKAGE)
+            with patch('lyrics_cpu.request_story', side_effect=package) as request:
+                song = make_song('2026-11-05', [], draft)
+            request.assert_called_once()
+            self.assertEqual(song['lyrics'], accepted['lyrics'])
+            self.assertRegex(song['thumbnail_text'], r'^[A-Za-z0-9 !?]{3,26}$')
 
     def test_valid_lyrics_survive_packaging_failure_and_are_not_regenerated(self):
         with tempfile.TemporaryDirectory() as temp:
