@@ -1,0 +1,80 @@
+e6bf309 Add guarded Drive maintenance for published media (#33)
+be78cd5 Keep unused thumbnail metadata out of model generation (#32)
+6b55841 Merge pull request #31 from Asif-Rezan/codex/natural-storybook-video
+89676e8 Bound generated lyric word counts and recover exhausted lyric checkpoints
+453f482 Use approved natural 3D storybook direction for new music videos
+516418a Recover rejected generated lyrics with reviewed unpublished original songs
+f533dc5 Constrain Hindi lyric lines during decoding and recover rejected drafts
+65cd3a6 Prevent cache-save failures in uncached CPU generation jobs
+33872d2 Merge pull request #27 from Asif-Rezan/codex/parallel-music-and-shorts
+06ef05b Use twenty generation workers and a dedicated energetic Shorts edit
+e7dea2d Generate independent portrait Shorts alongside parallel long music visuals
+03600d6 Use an edited original romantic song for production and separate meter warnings
+1477a7e Constrain Hindi lyric stanzas and recover inline-heading drafts
+821cd1c Review romantic Hindi lyrics for meaning and balanced vocal phrasing
+77c2f23 Restore Hindi music with current 3D art and five-second cinematic edits
+2785ac4 Use the available CI runner label for production artwork review
+ab24de2 Preserve authored story scenes and a shared 3D style through production recovery
+bfe45a4 Merge pull request #25 from Asif-Rezan/codex/fix-outline-novelty
+5bfad43 Reject duplicate plots before chapter generation with bounded outline retries
+8b9bdc3 Merge pull request #24 from Asif-Rezan/codex/story-grounded-artwork
+8a5665b Separate thumbnail choice from single-scene composition [skip story preview]
+3a25aa4 Keep story objects and face style inside CLIP context [skip story preview]
+91fcbe4 Bound safety retries and recover without blocking the worker [skip story preview]
+43e867d Constrain thumbnails to opening beats and exact source evidence
+310f53a Recover literal story scenes and run preview images independently
+56bbf29 Translate narration before composing images and allow ordinary visual staging
+ce8b3b4 Keep artwork production running through planning and image review failures
+d5706df Enforce English visual fields and fix aggregate rejected-plan audit handling
+cb1e9f5 Compile event-first compositions and audit factual scene consistency before images
+4552cdb Harden visual answer matching and document story-based acceptance [skip story preview]
+b5117c3 Normalize nested visual contracts without modifying narrated evidence
+dfa9922 Update remaining visual-plan regression fixture [skip story preview]
+3496277 Ground artwork in narrated events and reject missing-story portrait candidates
+df144af Apply requested fair complexion and refined character appearance consistently
+682bf1d Generate thumbnails at 1344x768 and center-crop to 1920x1080 exports
+e432244 Make thumbnail mystery object lead the composition instead of beauty portrait
+7725808 Balance realistic faces with cinematic 3D storytelling artwork
+f8110ca Correct realistic preview with explicit sculpted cartoon materials
+08fc47e Keep art direction compact so scene details fit image encoders
+5ab31fd Prioritize polished 3D storybook faces and story-driven thumbnail hooks
+06a9f9f Repair premature comment invitations before validating final story CTA
+6254fc7 Strengthen story hooks and motivational arcs with closing subscribe and comment prompts
+21a17f2 Isolate owned image artifacts and recover saved video assembly safely
+4788a2a Preserve complete narration through staged loudness normalization and mixing
+974dfbe Enforce bounded closing comment questions during Hindi decoding
+e3b37d0 Constrain English outline planning and preserve model failure diagnostics
+0bff510 Enforce Hindi edit word caps in native decoding and restore checkpoints deterministically
+49eb483 Reaudit current prose when restored editorial checkpoint is stale
+918afa1 Parallelize sealed story planning across eighteen visual workers and bound editorial retries
+4bdbbc9 Run one-minute samples through the production story pipeline
+f235bf6 Add one-minute AI background story sample with selected Kokoro voice
+86d72e1 Keep selected Kokoro narrator and improve natural Hindi delivery
+8ce5a5b Add pinned Hindi-focused narration and listening comparison
+a991a5a Remove Python puppet animation and keep AI background videos only
+58bf231 Reject repeated narration echoes and compact CPU planning requests
+feda1fb Record verified one-minute GitHub Actions puppet demo
+5fa109c Prefer specific puppet scene locations over village keywords
+d746e2a Add one-minute narrated Python puppet demo workflow
+22033a1 Alternate Python 2D puppet animation and background camera videos daily
+338dc40 Recover wrong-language narration with targeted Hindi translation and typed errors
+b207458 Replace unstable editorial approval loops with checkpointed fixed corrections
+fecb905 Overlap image rendering within a twenty-job generation budget
+305a702 Strengthen story hooks and payoff with narration-aware musical arcs
+7211487 Create short single-voice stories with aligned visuals and dedicated SEO packaging
+d7341e7 Require YouTube video-update authorization before story generation
+38b569b Harden Drive publication backups against transient upload failures
+dd26031 Diagnose publication API failures and recover saved story videos
+f6b8501 Confirm production assembly failure and expose safe word-count diagnostics
+a53ed3d Recover aggregate story word budgets during assembly
+35e10f0 Validate duration across complete stories instead of rewriting short chapters
+0245e9e Document verified scene recovery and new workflow run
+8e44ce7 Fix natural Hindi scene recovery and bound Kokoro speech chunks
+df348b8 Keep budget repairs in narration and record the chapter recovery run
+c98f6bb Repair only invalid chapter scenes and determine speakers before generation
+1283e20 Show verified Drive cleanup as a separate job after story publication
+2182c1f Record successful outline recovery and require FFmpeg media checks in CI
+2d5463b Record parallel story recovery run and fix commit
+acce1c7 Fix overlong story plans and parallelize 18 image workers, chapters, scores and rendering
+f04ba24 Record full Hindi narration validation and correct production run
+6595148 Record Heart and Mind story migration commit for easy rollback

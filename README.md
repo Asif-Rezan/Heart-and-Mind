@@ -1,3 +1,22 @@
+# Current-version backup — 2026-11-09
+
+Original Hindi album baseline: `e6bf309529968fc834df14e7414d11061e3b3313`.
+Rollback tag: `before-hindi-kids-reference-2026-11-09`.
+[Original README](docs/archive/before-hindi-kids-reference-2026-11-09-README.md)
+and [commit log](docs/archive/before-hindi-kids-reference-2026-11-09-commits.txt).
+
+Restore without rewriting history:
+
+```sh
+git switch -c codex/restore-hindi-album
+git restore --source before-hindi-kids-reference-2026-11-09 -- .
+git commit -m "Restore Heart and Mind Hindi album generator"
+```
+
+This restores tracked code, not cloud credentials, settings or published media.
+
+---
+
 # Heart and Mind — Hindi music videos
 
 The active pipeline creates original Hindi songs again: Qwen drafts lyrics or an
