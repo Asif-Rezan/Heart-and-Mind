@@ -10,7 +10,7 @@ from pathlib import Path
 import time
 
 from jsonschema import Draft202012Validator, ValidationError
-from hindi import LYRIC_PATTERN as HINDI_LYRIC_PATTERN
+from hindi import LYRIC_PATTERN as HINDI_LYRIC_PATTERN, PUBLIC_PATTERN
 
 MODEL_ID = 'Qwen/Qwen3-4B-Instruct-2507'
 GGUF_REPO = 'unsloth/Qwen3-4B-Instruct-2507-GGUF'
@@ -148,7 +148,7 @@ def request_story(endpoint, payload):
         if isinstance(node, dict):
             node.pop('minLength', None)
             node.pop('maxLength', None)
-            if node.get('pattern') not in (LYRIC_WORD_PATTERN, HINDI_LYRIC_PATTERN):
+            if node.get('pattern') not in (LYRIC_WORD_PATTERN, HINDI_LYRIC_PATTERN, PUBLIC_PATTERN):
                 node.pop('pattern', None)
             for value in node.values():
                 remove_string_bounds(value)

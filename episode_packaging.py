@@ -2,6 +2,7 @@
 import copy
 import hashlib
 from pathlib import Path
+from hindi import PUBLIC_PATTERN
 import json
 from jsonschema import Draft202012Validator, ValidationError
 
@@ -158,7 +159,12 @@ def package_facts(song):
 
 
 def field_specs(song):
-    spec=schema(song)['properties']
+    spec=copy.deepcopy(schema(song)['properties'])
+    if song.get('language')=='hi':
+        spec['title_candidates']['items']['pattern']=PUBLIC_PATTERN
+        for kind in ('video','shorts'):
+            for field in ('title','description'):
+                spec[kind]['properties'][field]['pattern']=PUBLIC_PATTERN
     fields={'title_candidates':spec['title_candidates']}
     for group in ('video','shorts','thumbnail'):
         fields.update({group+'.'+key:value for key,value in spec[group]['properties'].items()})
@@ -191,7 +197,8 @@ def package_problems(package,song,recent):
         errors=list(Draft202012Validator(spec).iter_errors(value))
         if errors:
             problems[path]='schema: '+', '.join(sorted({str(e.validator) for e in errors}))
-            continue
+            if any(e.validator!='pattern' for e in errors):
+                continue
         if song.get('language')=='hi' and (path=='title_candidates' or path in
                 ('video.title','video.description','shorts.title','shorts.description')):
             from hindi import require_hindi
@@ -218,6 +225,11 @@ def initial_schema(song):
     # Structural grammar stays constrained; one overlong field must not cause a
     # full-package retry inside the low-level model wrapper.
     value=copy.deepcopy(schema(song))
+    if song.get('language')=='hi':
+        value['properties']['title_candidates']['items']['pattern']=PUBLIC_PATTERN
+        for kind in ('video','shorts'):
+            for field in ('title','description'):
+                value['properties'][kind]['properties'][field]['pattern']=PUBLIC_PATTERN
     def loosen(node):
         if isinstance(node,dict):
             for key in ('minLength','maxLength','uniqueItems'):

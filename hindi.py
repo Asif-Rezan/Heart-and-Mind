@@ -5,6 +5,9 @@ import unicodedata
 LANGUAGE = 'hi'
 WORD = f'[{chr(0x0900)}-{chr(0x0963)}{chr(0x0971)}-{chr(0x097f)}]+'
 LYRIC_PATTERN = '^' + WORD + '( ' + WORD + '){3,11}[।!?]?$'
+# Public prose permits Devanagari, numbers and ordinary punctuation. The only
+# Latin alternatives are exact channel branding and the YouTube format hashtag.
+PUBLIC_PATTERN = r"^([ऀ-ॿ0-9 \n\r\t.,!?:;|/#&()'\"%+–—‘’“”_-]|Heart and Mind|#Shorts)+$"
 
 
 def normalized(text):

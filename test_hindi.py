@@ -24,6 +24,13 @@ class HindiLanguageTests(unittest.TestCase):
                     ' '.join(['नन्हे'] * 13)]:
             self.assertIsNone(re.fullmatch(hindi.LYRIC_PATTERN, bad))
 
+    def test_public_grammar_blocks_english_acronyms_and_hashtags_before_inference(self):
+        import re
+        for text in ['एआई निर्मित संगीत।\n#हिंदीबालगीत', 'प्यारे दोस्तों का नाच | Heart and Mind #Shorts']:
+            self.assertIsNotNone(re.fullmatch(hindi.PUBLIC_PATTERN,text))
+        for text in ['बच्चों का AI गीत', 'प्यारे दोस्त #KidsSongs', 'नन्हे दोस्त 朋友']:
+            self.assertIsNone(re.fullmatch(hindi.PUBLIC_PATTERN,text))
+
     def test_public_language_accepts_brand_but_rejects_other_scripts(self):
         hindi.require_hindi('प्यारे दोस्तों का नाच | Heart and Mind #Shorts')
         for text in ['Happy animal dance', 'नन्हे दोस्त dance करें', 'नन्हे दोस्त 朋友']:

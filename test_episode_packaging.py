@@ -101,6 +101,17 @@ class PackageFieldRepairTests(unittest.TestCase):
         from test_hindi import HindiPipelineTests
         return HindiPipelineTests().song()
 
+    def test_initial_and_repair_schemas_constrain_hindi_but_keep_visuals_english(self):
+        from episode_packaging import initial_schema, field_specs
+        from hindi import PUBLIC_PATTERN
+        song=self.song()
+        native=initial_schema(song)['properties']
+        for kind in ('video','shorts'):
+            for field in ('title','description'):
+                self.assertEqual(native[kind]['properties'][field]['pattern'],PUBLIC_PATTERN)
+                self.assertEqual(field_specs(song)[kind+'.'+field]['pattern'],PUBLIC_PATTERN)
+        self.assertNotIn('pattern',native['thumbnail']['properties']['focus'])
+
     def test_overlong_thumbnail_repairs_only_focus_and_preserves_public_text(self):
         song=self.song();bad=fixture_package(song)
         original=copy.deepcopy(bad)

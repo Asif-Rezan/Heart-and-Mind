@@ -82,6 +82,14 @@ class BoundsTests(unittest.TestCase):
             self.assertEqual(failure['details'],{'field':'description'})
             self.assertNotIn('secret token',(Path(directory)/'output/private-error/failure.json').read_text())
 
+    def test_hindi_public_pattern_is_retained_in_native_grammar(self):
+        from hindi import PUBLIC_PATTERN
+        result,model=self.request({'description':'एआई निर्मित संगीत और चित्र।'},
+            {'description':{'type':'string','maxLength':1800,'pattern':PUBLIC_PATTERN}},[])
+        schema=model.create_chat_completion.call_args.kwargs['response_format']['schema']
+        self.assertEqual(schema['properties']['description']['pattern'],PUBLIC_PATTERN)
+        self.assertNotIn('maxLength',schema['properties']['description'])
+
     def test_compact_word_constraint_is_retained_in_native_grammar(self):
         from lyrics_cpu import LYRIC_WORD_PATTERN
         result,model=self.request({'lyric':'Tiny bunny hops beside flowers'},

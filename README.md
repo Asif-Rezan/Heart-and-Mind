@@ -154,3 +154,12 @@ resume and compact episode facts. Real CPU timing is recorded after verification
 a speedup factor is not claimed from mock tests. Hindi preflight is now manual
 to avoid launching expensive model inference on every code push, and supports
 `source_run` plus `saved_run_id` to reuse accepted lyrics from an earlier preflight.
+
+
+Public metadata now also uses a compact native Devanagari grammar: ordinary
+punctuation/digits and exact `Heart and Mind`/`#Shorts` are permitted, while English
+acronyms and hashtags are blocked during sampling. Technical thumbnail focus
+remains English. This prevents repeated description repair for English leakage
+instead of relying only on prompt instructions. The pinned local llama.cpp
+converter successfully compiled this grammar. It avoids large native prose
+length expansions; final Python length/language checks still apply.
