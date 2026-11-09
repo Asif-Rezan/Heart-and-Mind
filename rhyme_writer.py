@@ -62,7 +62,7 @@ def novelty_reason(lines, history):
     return None
 
 
-def request_json(schema, prompt, seed, budget=2600):
+def request_json(schema, prompt, seed, budget=2600, *, validate_text=True):
     payload={'model':MODEL_ID,'temperature':.85,
         'max_completion_tokens':budget,
         'bounded_metadata_fields':['description','title','characters','visual_world'],
@@ -75,7 +75,7 @@ def request_json(schema, prompt, seed, budget=2600):
             response=request_story('chat/completions',payload)
             candidate = json.loads(response['choices'][0]['message']['content'])
             try:
-                return validate_generated_text(candidate)
+                return validate_generated_text(candidate) if validate_text else candidate
             except ValueError as error:
                 payload['messages'].append({'role': 'user', 'content': 'Language repair: write every sung and public field in Hindi Devanagari only. Keep only technical visual fields in English. Return the complete matching JSON.'})
                 raise StoryGenerationError(str(error), code='hindi_language', retryable=True) from error

@@ -1,5 +1,7 @@
 """Original story-grounded public metadata from the existing local Qwen model."""
+import copy
 import hashlib
+from pathlib import Path
 import json
 from jsonschema import Draft202012Validator, ValidationError
 
@@ -143,67 +145,166 @@ def packaging_issue(error):
     return {'constraint':'semantic','reason':str(error)}
 
 
-def generate_package(song, history=(), seed_offset=0):
+def package_facts(song):
+    """Keep all unique verse lyrics; supply opening actions once for Shorts/thumbnail."""
+    from rhyme_writer import chorus_line, CHORUS
+    chorus=song.get('chorus') or list(CHORUS)
+    return dict(title=song['title'], story_summary=song.get('story_summary',''),
+        characters=song.get('visual_identity',{}), duration=song['duration'], chorus=chorus,
+        verse_lyrics=list(dict.fromkeys(s['lyric'] for s in song['scenes']
+                                       if not chorus_line(s['lyric'],chorus))),
+        opening=[dict(index=s['index'],lyric=s['lyric'],
+                      action=s.get('visual_action',s['prompt'])[:120]) for s in song['scenes'][:8]])
+
+
+def field_specs(song):
+    spec=schema(song)['properties']
+    fields={'title_candidates':spec['title_candidates']}
+    for group in ('video','shorts','thumbnail'):
+        fields.update({group+'.'+key:value for key,value in spec[group]['properties'].items()})
+    return fields
+
+
+def get_field(value,path):
+    for key in path.split('.'):
+        value=value[key]
+    return value
+
+
+def set_field(value,path,text):
+    keys=path.split('.')
+    for key in keys[:-1]:
+        value=value[key]
+    value[keys[-1]]=text
+
+
+def package_problems(package,song,recent):
+    """Return field paths, never discard accepted fields for another field's failure."""
+    specs=field_specs(song)
+    problems={}
+    for path,spec in specs.items():
+        try:
+            value=get_field(package,path)
+        except (KeyError,TypeError):
+            problems[path]='missing field'
+            continue
+        errors=list(Draft202012Validator(spec).iter_errors(value))
+        if errors:
+            problems[path]='schema: '+', '.join(sorted({str(e.validator) for e in errors}))
+            continue
+        if song.get('language')=='hi' and (path=='title_candidates' or path in
+                ('video.title','video.description','shorts.title','shorts.description')):
+            from hindi import require_hindi
+            try:
+                for text in value if isinstance(value,list) else [value]:
+                    require_hindi(text,path)
+            except ValueError:
+                problems[path]='Use Hindi Devanagari only; only Heart and Mind and #Shorts may use Latin letters.'
+    if not any(key in problems for key in ('title_candidates','video.title')):
+        candidates=package['title_candidates']
+        if not any(c not in recent and not lookalike(c) for c in candidates):
+            problems['title_candidates']='Write fresh titles without recent titles or other channels song names.'
+    for kind in ('video','shorts'):
+        try:
+            if lookalike(package[kind]['title']):
+                problems[kind+'.title']='Do not imitate another channel song name.'
+        except (KeyError,TypeError):
+            pass
+    return problems
+
+
+def initial_schema(song):
+    # Content bounds are checked below, after preserving the complete response.
+    # Structural grammar stays constrained; one overlong field must not cause a
+    # full-package retry inside the low-level model wrapper.
+    value=copy.deepcopy(schema(song))
+    def loosen(node):
+        if isinstance(node,dict):
+            for key in ('minLength','maxLength','uniqueItems'):
+                node.pop(key,None)
+            for child in node.values(): loosen(child)
+        elif isinstance(node,list):
+            for child in node: loosen(child)
+    loosen(value)
+    return value
+
+
+def generate_package(song, history=(), seed_offset=0, draft_path=None):
     from rhyme_writer import request_json
     from lyrics_cpu import StoryGenerationError
     identity=source_identity(song)
-    facts={k:song.get(k) for k in ('title','description','story_summary','visual_identity','duration')}
-    from rhyme_writer import chorus_line, CHORUS
-    chorus=song.get('chorus') or list(CHORUS)
-    facts['verse_lyrics']=[s['lyric'] for s in song['scenes'] if not chorus_line(s['lyric'],chorus)]
-    facts['chorus']=chorus
-    facts['scenes']=[dict(index=s['index'],lyric=s['lyric'],action=s.get('visual_action',s['prompt'])[:180]) for s in candidate_scenes(song)]
-    prompt=(
-        'Create an original truthful YouTube title/thumbnail package for this Hindi Devanagari kids nursery rhyme. '
-        'Write all public titles, descriptions and title candidates in natural Hindi Devanagari. Keep only the proper brand Heart and Mind and optional #Shorts in Latin script. Thumbnail focus must stay English for the image model. '
-        'Use only the supplied lyrics, cast, setting and actions. No invented animals, lessons, events, '
-        'educational guarantees, views, popularity, trend/search-volume claims or celebrity/cartoon brands. '
-        'The sung chorus hook is this episode\'s own and may appear in the title. Public metadata must differ between episodes. '
-        'SEO title rules: write three distinct title candidates of 45-70 characters. Start with the main '
-        'search phrase parents type, built from the real animal and action, e.g. "नन्हे खरगोश का नाच | हिंदी बालगीत". '
-        'Then a pipe and a broad phrase such as हिंदी बालगीत, बच्चों के गाने या नन्हों का नाच, optionally '
-        '"| Heart and Mind" at the end. Never use other channels\' song names or sound-alikes such as '
-        'Dodi Dodi, Duri Duri, Duty Duty or Dum Dum. No ALL CAPS, emoji spam or clickbait. Choose the '
-        'strongest honest title-thumbnail pair for video.title, exactly one of title_candidates. '
-        'SEO description rules: the first 150 characters repeat the main search phrase naturally and say '
-        'what children see and do; then 2-4 short sentences summarizing the real story, cast and dance moves, '
-        'a line that music and illustrations are AI-made, and finally exactly three relevant hashtags such as '
-        '#हिंदीबालगीत #बच्चोंकेगीत and one animal hashtag. Do not write timestamps; real chapters are added. '
-        'No unrelated song names, subscription requests, keyword lists or spam. '
-        'Generate 8-15 distinct tags: the main search phrase, animal plus song/dance variants, toddler and '
-        'nursery rhyme terms, and Heart and Mind; each at most 40 characters, combined under 450 characters. '
-        'For shorts, write a separate title, description and tags based ONLY on scenes 0-7 (first 40 seconds), '
-        'not later events. A short may use #Shorts once. '
-        'For thumbnail, use scene_index 0 when it is the only allowed value: the video opens on that exact '
-        'dance scene, so the thumbnail must show the same cast, setting, lighting and colors. '
-        'Write a compact focus describing the existing characters/emotion and real prop/action to emphasize; '
-        'do not introduce a new cast, outfit, environment or disconnected disco-party scene. '
-        'Aim for readable large faces, clear silhouettes, one focal interaction, color contrast and simple '
-        'composition at mobile size. Keep the same soft cute 3D storybook style and dreamy natural scene, '
-        'no text, logos or split panels. Do not claim a numerical CTR score. '
-        'Avoid these recent public titles: '+json.dumps([h.get('public_title',h.get('title','')) for h in history[-20:]],ensure_ascii=False)+
-        '\nActual episode: '+json.dumps(facts,ensure_ascii=False))
+    facts=package_facts(song)
     recent={h.get('public_title',h.get('title','')) for h in history}
-    # Stage-level retries pass a new offset so they don't replay identical seeds.
     base=(int(identity[:8],16)+seed_offset*104729) % (2**31-10000)
-    for attempt in range(3):
-        result=request_json(schema(song),prompt,base+attempt,budget=2800)
-        result.update(version=VERSION,source_sha256=identity)
-        try:
-            repair_package(result,recent)
+    path=Path(draft_path) if draft_path else None
+    result=None
+    if path and path.exists():
+        saved=json.loads(path.read_text())
+        if saved.get('identity')==identity and saved.get('version')==VERSION:
+            result=saved.get('candidate')
+    def save():
+        if path:
+            path.parent.mkdir(parents=True,exist_ok=True)
+            temp=path.with_suffix('.tmp')
+            temp.write_text(json.dumps(dict(identity=identity,version=VERSION,candidate=result),ensure_ascii=False,indent=2))
+            temp.replace(path)
+    if result is None:
+        prompt=(
+            'Create truthful YouTube metadata for this original Hindi kids rhyme. '
+            'All public titles, descriptions and title candidates MUST use Hindi Devanagari, including hashtags and AI disclosure. '
+            'Only the proper brand Heart and Mind and optional #Shorts may use Latin letters. '
+            'No invented animals, events, educational guarantees, celebrity brands, stock song names, subscribe requests or popularity claims. '
+            'Create 3 distinct 45-70 character title_candidates based on the actual animal/action, e.g. नन्हे खरगोश का नाच | हिंदी बालगीत. '
+            'video.title must exactly equal one candidate. Descriptions: 2-4 short Hindi sentences, main search phrase near the start, '
+            'real story/action, Hindi disclosure that music/illustrations are AI-made, exactly 3 relevant Hindi hashtags. '
+            'Do not add timestamps; real chapters are appended locally. Tags: 8-12 distinct relevant phrases, each <=40 characters, total <450. '
+            'Shorts title/description/tags describe ONLY opening scenes 0-7 (first 40 seconds), never later events. '
+            'Thumbnail scene_index must be an allowed schema value. focus must be ENGLISH, 60-120 characters, hard maximum 180: '
+            'describe existing opening faces, emotion, prop/action; same cute pastel 3D cast/setting, no text, no new props or characters. '
+            'Avoid recent titles: '+json.dumps([h.get('public_title',h.get('title','')) for h in history[-20:]],ensure_ascii=False)+
+            '\nEpisode facts: '+json.dumps(facts,ensure_ascii=False,separators=(',',':')))
+        result=request_json(initial_schema(song),prompt,base,budget=2200,validate_text=False)
+        save()
+    specs=field_specs(song)
+    for attempt in range(4):
+        repair_package(result,recent)
+        problems=package_problems(result,song,recent)
+        if not problems:
+            result.update(version=VERSION,source_sha256=identity)
             validate_package(result,song)
-            if result['video']['title'] in recent:
-                raise ValueError('Public title repeats an earlier episode')
-            for kind in ('video','shorts'):
-                if lookalike(result[kind]['title']):
-                    raise ValueError('Title imitates another channel song name; use this episode story')
             add_chapters(result,song)
+            save()
             return result
-        except (ValueError,KeyError,ValidationError) as error:
-            print(json.dumps({'check':'episode packaging retry','attempt':attempt+1,
-                **packaging_issue(error)}),flush=True)
-            prompt += '\nRepair the package: '+str(error)
-    raise StoryGenerationError('Episode packaging validation exhausted; saved lyrics retained',
+        save()
+        print(json.dumps({'check':'episode packaging field repair','attempt':attempt+1,
+                          'fields':sorted(problems),'constraints':problems}),flush=True)
+        if attempt==3:
+            break
+        keys=list(problems)
+        # Field-only repairs do not resend the original package or full storyboard.
+        if all(k.startswith('thumbnail.') for k in keys):
+            context={'characters':facts['characters'],'opening':facts['opening'][:1]}
+        elif all(k.startswith('shorts.') for k in keys):
+            context={'characters':facts['characters'],'opening':facts['opening']}
+        else:
+            context={k:v for k,v in facts.items() if k!='opening'}
+            if any(k.startswith(('shorts.','thumbnail.')) for k in keys):
+                context['opening']=facts['opening']
+        repair_schema={'type':'object','additionalProperties':False,'required':keys,
+                       'properties':{k:specs[k] for k in keys}}
+        prompt=('Repair ONLY the named metadata fields; retain the real cast/story. '
+            'Public text must be natural Hindi Devanagari, including hashtags and AI disclosure; only Heart and Mind and #Shorts may use Latin. '
+            'thumbnail.focus must be English, 60-120 characters, never over 180; no invented props or cast. '
+            'For Shorts use only supplied opening scenes (first 40 seconds). Return keys exactly as requested. '
+            'Constraints: '+json.dumps(problems,ensure_ascii=False)+
+            '\nRejected fields: '+json.dumps({k:get_field(result,k) for k in keys},ensure_ascii=False)+
+            '\nRelevant facts: '+json.dumps(context,ensure_ascii=False,separators=(',',':')))
+        patched=request_json(repair_schema,prompt,base+attempt+1,
+                             budget=min(2200,400+400*len(keys)),validate_text=False)
+        for key in keys:
+            set_field(result,key,patched[key])
+        save()
+    raise StoryGenerationError('Episode packaging field repair exhausted; accepted metadata and lyrics retained',
                                code='episode_packaging',retryable=True)
 
 

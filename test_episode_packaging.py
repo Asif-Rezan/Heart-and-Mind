@@ -58,12 +58,12 @@ class EpisodePackagingTests(unittest.TestCase):
         from lyrics_cpu import StoryGenerationError
         song=self.song();bad=fixture_package(song)
         bad['video']['tags']=['spam']*6
-        with patch('rhyme_writer.request_json',return_value=bad) as model:
+        with patch('rhyme_writer.request_json',side_effect=[bad]+[{'video.tags':['spam']*6} for _ in range(3)]) as model:
             with patch('builtins.print') as log:
                 with self.assertRaises(StoryGenerationError):generate_package(song)
-        self.assertEqual(model.call_count,3)
-        retries=[c.args[0] for c in log.call_args_list if 'episode packaging retry' in c.args[0]]
-        self.assertEqual(len(retries),3)
+        self.assertEqual(model.call_count,4)
+        retries=[c.args[0] for c in log.call_args_list if 'episode packaging field repair' in c.args[0]]
+        self.assertEqual(len(retries),4)
         self.assertIn('minItems',retries[0])
 
     def test_fixable_slips_are_repaired_without_another_model_call(self):
@@ -94,3 +94,65 @@ class EpisodePackagingTests(unittest.TestCase):
                 generate_package(song,seed_offset=offset)
             seeds.append(model.call_args.args[2])
         self.assertNotEqual(seeds[0],seeds[1])
+
+
+class PackageFieldRepairTests(unittest.TestCase):
+    def song(self):
+        from test_hindi import HindiPipelineTests
+        return HindiPipelineTests().song()
+
+    def test_overlong_thumbnail_repairs_only_focus_and_preserves_public_text(self):
+        song=self.song();bad=fixture_package(song)
+        original=copy.deepcopy(bad)
+        bad['thumbnail']['focus']='Very long visual instruction ' * 12
+        focus='Smiling toddlers and baby animals clap beside the same opening flower bed.'
+        with patch('rhyme_writer.request_json',side_effect=[bad,{'thumbnail.focus':focus}]) as model:
+            result=generate_package(song)
+        self.assertEqual(model.call_count,2)
+        repair=model.call_args
+        self.assertEqual(repair.args[0]['required'],['thumbnail.focus'])
+        self.assertNotIn('verse_lyrics',repair.args[1])
+        self.assertEqual(repair.kwargs['budget'],800)
+        self.assertEqual(result['video']['title'],original['video']['title'])
+        self.assertTrue(result['video']['description'].startswith(original['video']['description']))
+        self.assertEqual(result['shorts'],original['shorts'])
+        self.assertEqual(result['thumbnail']['focus'],focus)
+        validate_package(result,song)
+
+    def test_english_description_repairs_only_that_field_without_relaxing_hindi(self):
+        song=self.song();bad=fixture_package(song)
+        correct=bad['shorts']['description'];bad['shorts']['description']='Happy animal friends dance in the magical garden. This music and its illustrations are AI generated.'
+        with patch('rhyme_writer.request_json',side_effect=[bad,{'shorts.description':correct}]) as model:
+            result=generate_package(song)
+        self.assertEqual(model.call_args.args[0]['required'],['shorts.description'])
+        self.assertNotIn('verse_lyrics',model.call_args.args[1])
+        self.assertEqual(result['shorts']['description'],correct)
+        validate_package(result,song)
+
+    def test_interruption_resumes_saved_package_without_full_regeneration(self):
+        import tempfile
+        from pathlib import Path
+        from lyrics_cpu import StoryGenerationError
+        song=self.song();bad=fixture_package(song)
+        original=bad['video']['title']
+        bad['thumbnail']['focus']='too long ' * 30
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'package-draft.json'
+            with patch('rhyme_writer.request_json',side_effect=[bad,StoryGenerationError('interrupted')]):
+                with self.assertRaises(StoryGenerationError):generate_package(song,draft_path=path)
+            self.assertTrue(path.exists())
+            with patch('rhyme_writer.request_json',return_value={'thumbnail.focus':'Same smiling toddlers and baby animals share the opening scene flower.'}) as model:
+                result=generate_package(song,draft_path=path)
+            model.assert_called_once()
+            self.assertEqual(model.call_args.args[0]['required'],['thumbnail.focus'])
+            self.assertEqual(result['video']['title'],original)
+            validate_package(result,song)
+
+    def test_compact_facts_keep_full_verses_and_short_opening_without_repeated_scene_prose(self):
+        from episode_packaging import package_facts, candidate_scenes
+        import json
+        song=self.song();facts=package_facts(song)
+        self.assertEqual(len(facts['opening']),8)
+        self.assertEqual(len(facts['verse_lyrics']),20)
+        old=dict(facts,scenes=[dict(index=s['index'],lyric=s['lyric'],action=s['prompt'][:180]) for s in candidate_scenes(song)])
+        self.assertLess(len(json.dumps(facts,ensure_ascii=False)),len(json.dumps(old,ensure_ascii=False))*.7)

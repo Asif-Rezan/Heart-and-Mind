@@ -1,5 +1,7 @@
 """Run Qwen3-4B-Instruct-2507 locally; no hosted text API or credentials."""
 import copy
+from contextlib import contextmanager
+import threading
 import hashlib
 import json
 import os
@@ -28,6 +30,24 @@ class StoryGenerationError(RuntimeError):
         self.code=code
         self.details=details or {}
         self.retryable=retryable
+
+
+@contextmanager
+def inference_progress():
+    """Show liveness during long native CPU calls without logging generated text."""
+    done=threading.Event()
+    started=time.monotonic()
+    def pulse():
+        while not done.wait(60):
+            print(json.dumps({'check':'Qwen CPU inference running',
+                'elapsed_seconds':round(time.monotonic()-started)}),flush=True)
+    worker=threading.Thread(target=pulse,daemon=True)
+    worker.start()
+    try:
+        yield
+    finally:
+        done.set()
+        worker.join(timeout=1)
 
 
 def bounded_metadata(data, schema, fields):
@@ -149,10 +169,11 @@ def request_story(endpoint, payload):
             'output_budget':limit, 'attempt':attempt+1}), flush=True)
         started = time.monotonic()
         try:
-            result = model.create_chat_completion(messages=messages,
-                response_format={'type': 'json_object', 'schema': grammar_schema},
-                max_tokens=limit, temperature=max(.2, float(payload.get('temperature', .7)) - .15 * attempt),
-                top_p=.8, top_k=20, repeat_penalty=1.05, seed=seed + attempt)
+            with inference_progress():
+                result = model.create_chat_completion(messages=messages,
+                    response_format={'type': 'json_object', 'schema': grammar_schema},
+                    max_tokens=limit, temperature=max(.2, float(payload.get('temperature', .7)) - .15 * attempt),
+                    top_p=.8, top_k=20, repeat_penalty=1.05, seed=seed + attempt)
         except Exception:
             # Runtime/configuration errors are not content errors; don't spin on them.
             raise StoryGenerationError('Qwen CPU generation failed; inspect runner memory and runtime compatibility') from None

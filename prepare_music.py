@@ -60,7 +60,7 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='female', ret
         if song.get('packaging'):
             validate_package(song['packaging'],song)
         else:
-            song['packaging']=generate_package(song,history,seed_offset=retry)
+            song['packaging']=generate_package(song,history,seed_offset=retry,draft_path=root/'package-draft.json')
             temp=root/'song.packaged.tmp'
             temp.write_text(json.dumps(song,ensure_ascii=False,indent=2))
             temp.replace(root/'song.json')
@@ -75,7 +75,7 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='female', ret
         return
     if stage == 'all' and not song.get('packaging'):
         from episode_packaging import generate_package
-        song['packaging']=generate_package(song,history)
+        song['packaging']=generate_package(song,history,draft_path=root/'package-draft.json')
         (root/'song.json').write_text(json.dumps(song,ensure_ascii=False,indent=2))
     import lyrics_cpu
     if lyrics_cpu._model is not None:

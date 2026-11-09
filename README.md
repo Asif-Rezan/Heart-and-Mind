@@ -129,3 +129,28 @@ Migration commit: `3818138` (pinned reference `44f8a33`, Hindi adaptation).
 The old reference-only motion demo workflow is archived in `docs/archive/reference-dudi-motion-demo.yml.txt`; audio recovery requires explicit destination run IDs instead of stale reference defaults.
 
 No production video has been generated or published as part of this migration verification. A finished Hindi singing/video listening check remains necessary after the first production generation.
+
+
+## Hindi packaging efficiency fix — 2026-11-09
+
+The first real preflight completed the Hindi outline and both verse chapters,
+but metadata validation repeatedly regenerated the entire package for a single
+English public field or overlong thumbnail focus. This is a retry-efficiency
+problem, not a model-download failure.
+
+Packaging now sends unique verse lyrics once and only the first eight opening
+actions for Shorts/thumbnail grounding, instead of repeating 24 long scene
+prompts. It retains the full initial candidate before content validation, then
+asks Qwen to repair only failed fields. Final Hindi, schema, title/thumbnail and
+upload checks remain mandatory. Correct fields are checkpointed in
+`package-draft.json` and reused after interruption; no fabricated Hindi fallback
+or blind lyric truncation is added. Thumbnail-only repair has an 800-token output
+budget and only the opening-scene context. A CPU inference heartbeat reports
+liveness every 60 seconds without printing generated content.
+
+Local regression checks: 231 tests passed, including overlong-thumbnail repair,
+English-description repair, accepted-field preservation, interrupted metadata
+resume and compact episode facts. Real CPU timing is recorded after verification;
+a speedup factor is not claimed from mock tests. Hindi preflight is now manual
+to avoid launching expensive model inference on every code push, and supports
+`source_run` plus `saved_run_id` to reuse accepted lyrics from an earlier preflight.
