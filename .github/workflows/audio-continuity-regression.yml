@@ -5,12 +5,10 @@ on:
       source_run:
         description: Failed generation with saved input and native Shorts audio artifacts
         type: string
-        default: '41435464795'
         required: true
       run_id:
         description: Saved episode identity
         type: string
-        default: kids-20261102-dce5adf7
         required: true
 permissions:
   contents: read

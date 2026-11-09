@@ -181,7 +181,7 @@ def generate_package(song, history=(), seed_offset=0):
         'Aim for readable large faces, clear silhouettes, one focal interaction, color contrast and simple '
         'composition at mobile size. Keep the same soft cute 3D storybook style and dreamy natural scene, '
         'no text, logos or split panels. Do not claim a numerical CTR score. '
-        'Avoid these recent public titles: '+json.dumps([h.get('public_title',h.get('title','')) for h in history[-20:]])+
+        'Avoid these recent public titles: '+json.dumps([h.get('public_title',h.get('title','')) for h in history[-20:]],ensure_ascii=False)+
         '\nActual episode: '+json.dumps(facts,ensure_ascii=False))
     recent={h.get('public_title',h.get('title','')) for h in history}
     # Stage-level retries pass a new offset so they don't replay identical seeds.

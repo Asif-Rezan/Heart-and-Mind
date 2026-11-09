@@ -47,6 +47,24 @@ class HindiLanguageTests(unittest.TestCase):
         with patch('rhyme_writer.request_story', return_value=response):
             self.assertEqual(rhyme_writer.request_json({'type':'object'}, 'Hindi song', 123), value)
 
+    def test_saved_hindi_outline_reaches_next_prompt_as_native_text(self):
+        import rhyme_writer
+        from test_rhyme_writer import fake_model
+        from lyrics_cpu import StoryGenerationError
+        prompts=[]
+        def model(schema,prompt,seed,budget=2600):
+            prompts.append(prompt)
+            if 'chapters' not in schema['properties']:
+                raise StoryGenerationError('Stop after inspecting the verse request')
+            value=fake_model(schema,prompt,seed)
+            value['title']='नन्हे दोस्तों की फूलों वाली सैर'
+            value['description']='नन्हे दोस्त मिलकर फूलों के बगीचे में नाचते हैं।'
+            return value
+        with patch('rhyme_writer.request_json',side_effect=model), self.assertRaises(StoryGenerationError):
+            rhyme_writer.write_rhyme('2026-11-09','unicode-prompt',240,[])
+        self.assertIn('नन्हे दोस्तों की फूलों वाली सैर',prompts[-1])
+        self.assertNotIn('\\u0928',prompts[-1])
+
     def test_hindi_actions_drive_reference_motion(self):
         self.assertIn('clap', hindi.motion_hint('मिलकर सब ताली बजाओ'))
         self.assertIn('jump', hindi.motion_hint('खुशी से कूदो उछलो'))

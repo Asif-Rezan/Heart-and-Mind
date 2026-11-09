@@ -117,5 +117,15 @@ For local checks, install `requirements.txt` and FFmpeg, then run:
 python -m unittest discover -v
 ```
 
-Cloud Hindi preflight and cache warmup results are recorded after verification;
-a full published Hindi kids episode is not claimed before generation finishes.
+## Migration verification log — 2026-11-09
+
+Migration commit: `3818138` (pinned reference `44f8a33`, Hindi adaptation).
+
+- Local and GitHub [component checks](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202675): 226 tests passed, including Hindi guards, native vocal-language wiring and FFmpeg regressions. Actionlint and whitespace checks passed.
+- [Camera/background and multiple-character render](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202705): passed.
+- [Model cache warmup](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202709): lyrics, image and motion jobs passed; real BiRefNet/LaMa inference passed. Three model archives are saved under the existing 10 GB quota.
+- [Real Hindi CPU preflight](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202693): first attempt superseded after a slow verse request; Hindi prompt JSON now retains native Devanagari instead of verbose Unicode escapes. A new preflight verifies the updated prompts.
+
+The old reference-only motion demo workflow is archived in `docs/archive/reference-dudi-motion-demo.yml.txt`; audio recovery requires explicit destination run IDs instead of stale reference defaults.
+
+No production video has been generated or published as part of this migration verification. A finished Hindi singing/video listening check remains necessary after the first production generation.

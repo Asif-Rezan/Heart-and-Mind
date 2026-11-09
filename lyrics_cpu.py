@@ -145,6 +145,8 @@ def request_story(endpoint, payload):
         prompt_tokens=sum(len(model.tokenize(message['content'].encode(),add_bos=False))+16 for message in messages)+32
         if prompt_tokens+limit>CONTEXT_TOKENS:
             raise StoryGenerationError('Qwen context budget exceeded; reduce recent-story context',code='lyrics_context')
+        print(json.dumps({'check':'Qwen request started', 'prompt_tokens':prompt_tokens,
+            'output_budget':limit, 'attempt':attempt+1}), flush=True)
         started = time.monotonic()
         try:
             result = model.create_chat_completion(messages=messages,

@@ -137,8 +137,8 @@ def write_rhyme(day, identity, seconds, history, draft_path=None, verse_count=No
                 'Exactly 4 lines of 4-8 words: line 1 is a playful repeated nonsense or animal sound phrase that fits this cast and story '
                 '(examples of the pattern only, never copy them: "छम छम छम छम नन्ही चिड़िया", "छप छप छप छप पानी"), '
                 'line 2 a simple dance action, line 3 identical to line 1, line 4 a different dance action. '
-                'Bouncy trochaic rhythm with strong beats, easy to clap to. Never reuse another song\'s hook or these recent hooks: '+json.dumps(hooks)+'. '
-                'Do not repeat these recent titles or story premises: '+json.dumps(recent),base+attempt*100)
+                'Bouncy trochaic rhythm with strong beats, easy to clap to. Never reuse another song\'s hook or these recent hooks: '+json.dumps(hooks,ensure_ascii=False)+'. '
+                'Do not repeat these recent titles or story premises: '+json.dumps(recent,ensure_ascii=False),base+attempt*100)
             for fix in range(3):
                 reason=hook_reason(state['outline']['chorus'],history)
                 if not reason:
@@ -146,10 +146,10 @@ def write_rhyme(day, identity, seconds, history, draft_path=None, verse_count=No
                 print(json.dumps({'phase':'repair episode hook','attempt':fix+1,'reason':reason}),flush=True)
                 state['outline']['chorus']=request_json(
                     {'type':'object','additionalProperties':False,'required':['chorus'],'properties':{'chorus':outline_schema['properties']['chorus']}},
-                    'Rewrite only the 4-line dance chorus for this kids episode: '+json.dumps(state['outline'])+
+                    'Rewrite only the 4-line dance chorus for this kids episode: '+json.dumps(state['outline'],ensure_ascii=False)+
                     f'. Problem to fix: {reason}. Rules: 4-8 words per line; line 1 a fun repeated sound phrase (some word repeated) '
                     'matching the cast; line 2 a dance action; line 3 exactly equal to line 1; line 4 a different dance action. '
-                    'No existing song hooks and none of: '+json.dumps(hooks+list(BORROWED_HOOKS)),
+                    'No existing song hooks and none of: '+json.dumps(hooks+list(BORROWED_HOOKS),ensure_ascii=False),
                     base+attempt*100+fix+1)['chorus']
             else:
                 raise StoryGenerationError('Qwen episode hook repair exhausted',code='lyrics_hook_validation',retryable=True,
@@ -178,17 +178,17 @@ def write_rhyme(day, identity, seconds, history, draft_path=None, verse_count=No
                 schema['properties']['verses']['maxItems']=remaining
                 block=request_json(schema,
                     f'Write exactly {remaining} NEW short Hindi Devanagari sung lines for chapter {chapter+1}/{chapters} of this original episode: '
-                    +json.dumps(outline)+'. Current chapter: '+outline['chapters'][chapter]+'. '
+                    +json.dumps(outline,ensure_ascii=False)+'. Current chapter: '+outline['chapters'][chapter]+'. '
                     'Each line occupies five seconds: aim for 4-8 simple singable words, NEVER more than 12. Use single spaces and natural Hindi words in Devanagari, not Romanized Hindi or English. Count words before returning JSON. '
                     'The arranger groups your lines into four-line verses, each followed by a dance chorus: '
-                    +json.dumps(outline['chorus'])+'. Do not put any chorus line in your output; the arranger inserts it. '
+                    +json.dumps(outline['chorus'],ensure_ascii=False)+'. Do not put any chorus line in your output; the arranger inserts it. '
                     'Make every four consecutive lines a small complete verse that rhymes or repeats a fun sound. '
                     'Every verse line must be different. Develop this chapter rather than repeating earlier verses. '
                     'For each line, visual is written in English and describes the same action and setting, featuring the episode characters with their exact appearance from the outline. Describe BOTH human toddlers and cute baby animals at the beginning of every visual. Keep both babies and animals equally prominent with separate full bodies, hands and feet visible, playing or dancing together. Never describe a solo animal composition. Alternate playful dancing, waving and little steps with concrete animal-led discoveries; do not make every scene jump. Name the visible subjects, action, relevant props and setting explicitly. Describe one small event: noticing something, reacting, approaching it and sharing a happy response. Avoid static posing. Use varied dance poses and playful actions rather than repeating one pose. Match the lyric literally where possible, and vary locations as the chapter develops. '
                     'It is a text-free cartoon picture prompt, with no camera instructions or lettering. '
-                    'Previous lines to avoid repeating: '+json.dumps(prior+[row['lyric'] for row in rows])+
-                    '. Fix these rejected-line constraints: '+json.dumps(feedback)+
-                    '. Rewrite only these rejected candidates when supplied, preserving their action and visual meaning: '+json.dumps(rejected)+
+                    'Previous lines to avoid repeating: '+json.dumps(prior+[row['lyric'] for row in rows],ensure_ascii=False)+
+                    '. Fix these rejected-line constraints: '+json.dumps(feedback,ensure_ascii=False)+
+                    '. Rewrite only these rejected candidates when supplied, preserving their action and visual meaning: '+json.dumps(rejected,ensure_ascii=False)+
                     f'. Rewrite attempt {retry}.',
                     (base+attempt*10000+chapter*1000+repair_round+retry+1) % (2**31-1))
                 seen={normalized(line) for line in prior+[row['lyric'] for row in rows]}
