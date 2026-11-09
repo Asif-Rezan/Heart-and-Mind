@@ -1,280 +1,121 @@
-# Current-version backup — 2026-11-09
+# Heart and Mind — Hindi kids rhyme automation
 
-Original Hindi album baseline: `e6bf309529968fc834df14e7414d11061e3b3313`.
-Rollback tag: `before-hindi-kids-reference-2026-11-09`.
-[Original README](docs/archive/before-hindi-kids-reference-2026-11-09-README.md)
-and [commit log](docs/archive/before-hindi-kids-reference-2026-11-09-commits.txt).
+The active generator follows `Asif-Rezan/youtube-motivation-automation` at
+`44f8a3384a4e4e02d4f67e94929195cbe225c637`, adapted to Hindi Devanagari.
+The original Hindi album implementation is preserved in the rollback tag below.
 
-Restore without rewriting history:
+## Version log and rollback
+
+Original production baseline: `e6bf309529968fc834df14e7414d11061e3b3313`.
+Backup/documentation commit: `483d173`. Rollback tag:
+`before-hindi-kids-reference-2026-11-09`.
+
+- [Original README and prior behavior](docs/archive/before-hindi-kids-reference-2026-11-09-README.md)
+- [Original commit log](docs/archive/before-hindi-kids-reference-2026-11-09-commits.txt)
+- [Pinned reference README](docs/archive/motivation-44f8a33-README.md)
+
+To restore the complete original tracked implementation without rewriting history:
 
 ```sh
 git switch -c codex/restore-hindi-album
 git restore --source before-hindi-kids-reference-2026-11-09 -- .
 git commit -m "Restore Heart and Mind Hindi album generator"
+git push origin codex/restore-hindi-album
 ```
 
-This restores tracked code, not cloud credentials, settings or published media.
+Merge that restoration branch to make it active again. Code rollback does not
+restore credentials, cloud variables, deleted media or already published videos.
 
----
+## Reference behavior, in Hindi
 
-# Heart and Mind — Hindi music videos
+- Default 240-second episode; 180–300 seconds allowed in five-second steps.
+- Original chorus-first song, alternating four-line verses and dance choruses,
+  with a fresh Hindi hook, 130 BPM, sweet adult female vocals, immediate opening
+  and a short button ending. The pinned ACE-Step CPU backend receives
+  `vocal_language=hi`; music remains generated singing.
+- The pinned Qwen CPU writer produces Hindi Devanagari lyrics, chorus, title,
+  description, story summary and chapter names. Lyrics have bounded word counts;
+  failed lines are rewritten with saved accepted content, never clipped or
+  replaced with canned English lyrics. Unicode normalization preserves matras
+  and nukta for word counting and novelty checks.
+- Public long-video and Shorts metadata are Hindi. Only the proper channel name
+  `Heart and Mind` and optional `#Shorts` use Latin script. Upload defaults for
+  metadata and audio are both `hi`; category, kids and AI disclosures, scheduling
+  and resumable publication follow the reference.
+- Cute baby animals and two toddler playmates, pastel 3D storybook art, one scene
+  every five seconds, 16 landscape and four portrait workers. Thumbnail uses its
+  own episode's opening scene; first frames animate that thumbnail artwork.
+- Reference character motion, opening punch-in, second dance move per scene,
+  face-preserving animation, 1080p landscape/portrait rendering and standalone
+  Shorts music are retained. Hindi action words are mapped to motion hints.
+- Technical visual descriptions, music-production captions and thumbnail focus
+  stay English for the pinned image/audio models; these are not public narration
+  or English sung lyrics. Images and thumbnails are text-free as in the reference.
 
-The active pipeline creates original Hindi songs again: Qwen drafts lyrics or an
-explicitly selected, repository-reviewed original song supplies them,
-ACE-Step 1.5 sings the full song, and the current realistic cinematic **3D storybook**
-image system supplies the video scenes and thumbnail. New music videos change their
-background image **every five seconds**, measured against the generated audio.
+Generative singing, precise pronunciation, character continuity and lyric/audio
+alignment still require a finished-video listening/viewing check. Matching the
+pipeline does not promise identical generated media or word-level lip sync.
 
-## Active version: music + current 3D visuals
+## Destination accounts and storage
 
-Implementation checkpoint: [`checkpoint/music-return-3d-5s-2026-11-03`](https://github.com/Asif-Rezan/Heart-and-Mind/tree/checkpoint/music-return-3d-5s-2026-11-03).
+The repository remains `Asif-Rezan/Heart-and-Mind`. Existing encrypted Google
+secrets and repository variables are not replaced or copied from the reference.
+`EXPECTED_CHANNEL_ID` comes only from this repository's secret/variable; there is
+no fallback to another channel. Existing OAuth setup remains in
+`setup_accounts.py` and the Heart and Mind privacy document is retained/updated.
 
-- Music restoration source: [`0fca9240b5edf786f09a806401a62dcc386eb0f6`](https://github.com/Asif-Rezan/Heart-and-Mind/commit/0fca9240b5edf786f09a806401a62dcc386eb0f6), the saved Hindi music version.
-- Original source archive: [`legacy/hindi-music/`](legacy/hindi-music/).
-- Music synthesis remains the saved `music_cpu.py` implementation, pinned source,
-  model revisions, CPU settings and vocal handling. No narration engine replaces singing.
-- Daily direction alternates male/female vocals by Dhaka calendar date; manual
-  `vocal_gender=male` or `female` applies only to a fresh song identity.
-- New songs target the previous focused arrangement of about **195 seconds**.
-  Actual audio is checked to remain within **180–360 seconds**.
-- Graphics retain the current protected cinematic 3D/CGI style, attractive realistic
-  adult faces, fair complexion, age-appropriate appearance and lyric-specific setting.
-  Adult visual leads use stable ages/outfits within the song. Faces are generated,
-  so exact identity across every image is not guaranteed.
-- Background sources: **1024×576**, 20 CPU diffusion steps. Each five-second slot has
-  its own image seed, with progression through the songwriter's visual scenes.
-- Thumbnail: **1344×768** native generation, centered 16:9 crop, **1920×1080 JPEG**
-  export. The scene is text-free and tied to the actual song's emotional promise.
-- Video: **1920×1080, 25 fps**, slow alternating camera push/pull and pans,
-  0.4-second dissolves beginning at five-second boundaries, subtle color/vignette
-  treatment and rhythmic light variation, plus a genuinely audio-reactive waveform.
-  Full audio duration is retained and encoded as AAC at 320 kb/s.
-- Scene progression is editorial pacing through the song, **not word-level lyric
-  transcription or lip synchronization**. Existing singing/lyrics are preserved.
+The existing `heart_and_mind_root=v1` Drive root and original account guard are
+retained. New checkpoints/history live in an isolated
+`heart_and_mind_hindi_kids_root=v1` child folder, so archived adult-album runs are
+not reused, overwritten or mixed with new kids episodes. Use a fresh run ID;
+previous album/story drafts are not silently translated.
 
-## Lyrics and phrasing revision — 2026-11-03
+Optional Facebook publication is disabled unless `FACEBOOK_PUBLISH_ENABLED=true`.
+If used, configure this channel's `FACEBOOK_PAGE_ID` repository variable and
+`FACEBOOK_PAGE_ACCESS_TOKEN` secret. No reference Page ID is inherited.
 
-The user paused music automation for lyrics work, then authorized a new generation.
-The first revised run (`41592294627`) stopped at lyric quality review before music. The
-earlier return run failed before songwriting: regression tests needed `ffprobe`.
-The lyrics job now installs FFmpeg before tests; no song was generated or published.
+## Error handling and model caches
 
-New lyrics focus on romance, longing, separation, reunion, tenderness and healing
-after lost love, rather than motivational advice. The songwriter and revision pass
-receive the same tempo, 4/4 meter and breathable two-bar phrasing brief. Verse lines
-should share a melodic shape, with natural near-rhyme and an exact repeated chorus.
+The reference creative pipeline includes the verified operational fixes from the
+other destinations: bounded music-quality retries, native audio edge repair,
+saved-part recovery, worker memory/time limits, atomic/checksum-verified motion
+model downloads and official release/API fallback for HTTP 504. The pinned
+llama-cpp-python installer retries official wheels and can compile the same CPU
+release from PyPI during a GitHub wheel outage. Bounded runner package setup is
+retained.
 
-`lyric_quality.py` checks section/line counts, chorus identity, repeated verse filler,
-word load and approximate written vowel lengths. A separate model critique also
-checks relationship meaning, idiomatic Hindi, natural rhyme and singable phrasing.
-It sends specific failures back for at most three revisions, saves
-`lyrics-quality.json`, and blocks music creation
-if these checks still fail. New song metadata carries the checked lyric hash and
-report; resumed preparation rechecks the text. Historical unversioned songs are
-not silently rewritten beneath existing audio.
+The existing/free 10 GB cache policy stores SSD-1B, Qwen and motion weights
+(approximately 9.15 GiB compressed combined). Keys use exact model revisions and
+checksums, shared across runs and image shards; caches save before inference.
+ACE-Step's approximately 4.6 GiB archive is left runner-local to avoid evicting
+the models used by twenty image workers. Competing pip caches are disabled.
+GitHub may expire inactive caches; verified downloads handle misses. No paid
+capacity or billing setting is changed.
 
-This is a **written-phrasing heuristic**, not exact Hindi scansion, an acoustic beat
-score or proof of good poetry. Schwa deletion, held notes, melody and emotional
-delivery still need listening review. No new full song has been auditioned for this
-revision. The previous music-return implementation remains saved at commit
-[`77c2f23`](https://github.com/Asif-Rezan/Heart-and-Mind/commit/77c2f236157ccca2efcd50cc7d0a9ad0ef292e89)
-and its existing checkpoint tag. The test lyric in `tests/fixtures/romantic_lyrics.txt` exercises the checks;
-it is not hardcoded as the generator’s song.
+Source-only legacy projects, obsolete fixed English public metadata and one-off
+recovery triggers targeting reference run IDs are excluded from active code.
+Original versions remain in the rollback tag/reference archive.
 
+## Generate and verify
 
-### Production lyric recovery — 2026-11-03
+Run **Heart and Mind Hindi kids rhyme generation** with a fresh `run_id`.
+`AUTOMATION_ENABLED=true` enables the reference's daily 03:00 Asia/Dhaka schedule.
+`PUBLISH_ENABLED=true` enables publication, following the reference's first 06:00
+New York slot at least 72 hours after upload. The dispatch form can choose
+public/scheduled mode and an explicit future publication time.
 
-Run `41592294627` produced inline section headings and only two chorus lines, plus
-awkward Hindi, so review rejected it. The old parser incorrectly reported zero
-words for inline headings. It now reads that layout without losing the first line,
-but missing lines or weak wording still cannot pass.
+Use **Verify real Hindi reference episode (no publishing)** to generate a real
+Hindi lyric/storyboard/public package on CPU without Drive or YouTube publication.
+Use **Verify and warm pinned model caches** for actual model download/cache and
+BiRefNet/LaMa inference checks. Component checks include real FFmpeg regression
+renders, Hindi language/grammar, vocal-language wiring, metadata, novelty,
+checkpoint recovery and guarded publication tests.
 
-New model responses use six structured line arrays with exact section lengths.
-The program renders section headings and repeats the four-line chorus locally;
-the model no longer has to reproduce the full eight-section text layout. Creative
-instructions are shorter, and revisions can discard nonsensical imagery rather
-than being told to preserve a defective hook. Review reports use version 3 and
-emit static, useful failure diagnostics without dumping the song into job logs.
-Existing failed draft artifacts can be supplied as `prepared_run` for recovery.
-
-### Reviewed production song after the second lyric rejection — 2026-11-03
-
-Run `41594691413` had correct section layout but weak, nonsensical Hindi. It stopped
-before music after the written-vowel heuristic found a bridge difference of 8 units
-(14 vs 22). Such estimates cannot prove acoustic rhythm: they are now warnings
-passed to editorial critique, rather than a rigid meter veto. Structural errors,
-word overload, inconsistent choruses and failed meaning/rhyme critique still block
-an automatically drafted song. The 4B model's poetry remains fallible; these changes
-are not proof that future automatic lyrics will be good.
-
-For the next video, `lyrics/tum-laut-aao-2026-11-03.json` contains a newly authored,
-Codex-edited 199-word original romantic song with natural Hindi, male narrator,
-consistent तुम address, exact chorus repeats, 86 BPM directions and lyric-specific
-3D scene/thumbnail prompts. Its editorial provenance is explicitly recorded as an
-authored review, **not a model approval or a human listening review**. It passes the
-structural and written-phrasing checks without warnings. Synthesized audio has not
-yet been auditioned.
-
-Set workflow input `authored_song=tum-laut-aao-2026-11-03` with a **fresh** run ID.
-The lyrics stage loads this exact reviewed file, rechecks publication history and
-phrasing, records its SHA-256, and never asks the text model to rewrite it. All audio,
-images, five-second video editing and publication guards use the normal pipeline.
-Leave `prepared_run` empty. Omit `authored_song` for the automatic drafting path.
-An authored source cannot replace different saved lyrics/audio under an existing ID.
-
-## Daily automation and manual runs
-
-Active workflow: [`.github/workflows/music-hindi-songs.yml`](.github/workflows/music-hindi-songs.yml),
-**Hindi album music generation and public publishing**.
-
-The existing daily schedule remains **03:00 Asia/Dhaka** (`0 21 * * *` UTC), gated by
-`AUTOMATION_ENABLED=true`. The story workflow is now manual-only so it cannot compete
-with the music schedule. Its full graph remains available for historical recovery.
-Existing Google credentials, destination channel, private Drive backup, duplicate
-checks, AI disclosure and verified-public cleanup are retained. `PUBLISH_ENABLED=false`
-keeps the result as a generated artifact instead of uploading it.
-
-For an immediate new song, run the music workflow on `main` with:
-
-- `run_id`: a fresh identity such as `music-2026-11-03-return-01`. Empty uses the Dhaka date.
-- `vocal_gender`: `auto`, `male`, or `female`.
-- `authored_song`: optional reviewed song identity from `lyrics/`; empty uses model drafting.
-- `prepared_run`: leave empty for a new song. To resume an unfinished song, provide
-  its previous numeric music workflow run and reuse the **same** run ID/voice.
-
-Generation order: lyrics/history/channel checks → parallel ACE-Step full song and
-**14 image workers**, plus independent Shorts music and **4 portrait workers** →
-measured edits → checksum-verified uploads on Heart and Mind → fresh public-HD
-verification and Drive cleanup.
-Publishing requires completed local assets and cannot silently start another music
-synthesis job. A rerun never reuploads an already confirmed published identity.
-
-Each worker packages only its own images/manifests; restored foreign worker files
-cannot overwrite another owner's output. Image/model/review/scene hashes invalidate
-stale caches. Rendering reuses only hash-matched clips and verifies final duration.
-Failed image reviews retain explicit recovery status rather than stopping the whole
-song. Such recovery is not proof of semantic quality or a measured CTR improvement.
-More images require more CPU time than the historical two-picture visualizer;
-completion also depends on shared runner availability.
-
-For local/manual staging using existing dependencies and model setup:
+For local checks, install `requirements.txt` and FFmpeg, then run:
 
 ```sh
-python prepare_music.py --run-id MUSIC_ID --stage lyrics --check-history --motion-video
-python prepare_music.py --run-id MUSIC_ID --stage music --motion-video
-python prepare_music.py --run-id MUSIC_ID --stage images --motion-video
-python prepare_music.py --run-id MUSIC_ID --stage render --motion-video
-python pipeline.py --run-id MUSIC_ID --require-prepared --defer-drive-cleanup
+python -m unittest discover -v
 ```
 
-Use the workflow for its pinned ACE-Step source checkout, CPU dependencies, memory
-preparation and credentials. The old two-image renderer remains available for saved
-legacy songs without the new `video_format` marker.
-
-## Story version checkpoint and change log — 2026-11-03
-
-Saved before returning to music:
-
-- Previous deployed story version: `bfe45a4057a8b17ea4c6eb814a7cba085395b1ff`.
-  Tag: [`checkpoint/story-production-before-music-2026-11-03`](https://github.com/Asif-Rezan/Heart-and-Mind/tree/checkpoint/story-production-before-music-2026-11-03).
-- Story code including the current graphics recovery/style fixes: `2785ac49f57949c8485f079a409fc93af3d504a8`.
-  Tag: [`checkpoint/story-graphics-before-music-2026-11-03`](https://github.com/Asif-Rezan/Heart-and-Mind/tree/checkpoint/story-graphics-before-music-2026-11-03).
-  This graphics checkpoint was a review branch, distinct from the deployed story commit.
-- [Verbatim pre-music README](docs/story-readme-before-music-2026-11-03.md) (historical
-  relative paths refer to the repository root).
-- [Saved full 40-commit story log](docs/story-commit-log-before-music-2026-11-03.txt).
-- [Original Hindi music commit log](docs/hindi-music-commit-log.txt).
-
-Changes in this music return:
-
-1. Restore original Hindi songwriting/singing and daily music automation.
-2. Keep the current production 3D image backend, safety/recovery, protected style
-   prompts and full-HD thumbnail export instead of resetting the repository.
-3. Generate a new background at each measured five-second slot and edit the images
-   into a moving music-video sequence with pans, zooms, dissolves and waveform.
-4. Keep story generation manual-only and preserve the exact story checkpoints.
-5. Preserve duplicate-upload protection, destination validation and cleanup guards.
-
-Inspect either story checkpoint in a separate checkout without rewriting shared history:
-
-```sh
-git fetch origin --tags
-git worktree add ../heart-story-saved checkpoint/story-graphics-before-music-2026-11-03
-```
-
-Historical story recovery commands, earlier voice/puppet checkpoints and production
-incident logs are retained in the saved README and the tagged repository versions.
-Rollback restores tracked source; it does not roll back secrets, uploads or Drive data.
-
-## Verification
-
-The test suite covers the saved music engine, publication/channel safeguards,
-current image style/recovery, five-second fractional-duration timelines, separate
-full-HD thumbnails, worker-owned artifacts, and actual FFmpeg motion/dissolve/audio
-rendering. Tests do not predict YouTube views, CTR, or audience retention.
-
-
-## Parallel long video and independent Shorts
-
-Every music run now starts the long audio worker and fourteen image workers directly
-from the saved lyrics. Image identities use the requested duration; the final edit
-still uses the measured audio and five-second cuts. A fractional audio overrun uses
-the final scene again, without forcing all image workers to wait for synthesis.
-
-The same run calls `music-short.yml` to make one companion Short. Its reviewed
-chorus and bridge receive a **new 45-second ACE-Step synthesis** with a hook-first
-arrangement; no long-song audio is clipped. Four image workers generate fresh
-576×1024 portrait scenes, then the edit exports 1080×1920. Shorts use a dedicated
-edit: an immediate hook card, audio-energy cuts
-near the tempo grid, alternating two/four-beat shots, punch-in/pull-out/panning,
-restrained accent flashes and large readable lyric cards inside the portrait safe
-area. These cards are editorial excerpts, not forced-aligned karaoke timestamps.
-
-Long music, long images, Short music and Short images can all run concurrently, subject to GitHub's runner
-quota. The generation fan-out is 14 long-image workers + 4 portrait workers +
-2 separate music workers = 20 jobs. The Short uses the same song hook, rather than
-claiming to be a new song.
-
-The companion has a separate `-short` run identity, artifacts and durable Drive
-publication state. It publishes publicly on the verified Heart and Mind channel,
-with synthetic-media disclosure, `#Shorts`, measured duration/dimension checks and
-the same ambiguous-upload protection as long videos. YouTube selects its thumbnail
-frame; the uploader does not attempt an unsupported Shorts custom-thumbnail change.
-Temporary Drive media is removed only after fresh public HD/metadata verification.
-`PUBLISH_ENABLED=false` disables both uploads. A failed companion does not block
-long-video publication, and its state never overwrites the long-song history.
-
-To attach a companion to a long run already in progress, dispatch **Independent
-portrait music Short** with `source_run` (the numeric GitHub run ID containing
-`music-input-<source_run>`) and `parent_run` (its saved song identity). Use the same
-values to retry; never change the parent source under a published companion ID.
-Long parent IDs receive a stable shortened companion identity.
-
-### Recovery after rejected generated lyrics
-
-With `--check-history`, a saved failed semantic review or exhausted lyric revisions
-can select an unused repository song marked `recovery_eligible: true`. Candidates
-must pass `load_authored_song` editorial/structure checks, match the saved narrator
-voice, and have neither a title nor lyric hash in publication history. The current
-reserve includes the original female-narrated song `ek-chhatri-mein-2026-11-04`.
-This is an agent-authored editorial review, not a human or audio listening approval.
-
-Recovery preserves the rejected draft and report under `rejected-lyrics/`, records
-its selected source in `lyrics-recovery.json`, and checkpoints accepted lyrics for
-subsequent stages. Existing WAV/MP4 media is never relabelled. History/network
-failures are not treated as lyric rejection. If no eligible unused song remains,
-`lyrics_recovery_unavailable` stops generation with instructions to replenish the
-reviewed reserve or repair the draft. Recovery does not reuse a published song.
-
-
-Lyric generation now constrains non-chorus lines to 7–8 Hindi words and chorus
-lines to 7–9 words during native decoding. With locally repeated choruses this
-bounds the complete song at 182–220 sung words; meaning/rhyme critique and the
-existing final validation still apply. Historical song validation remains wider.
-Rejected drafts first try an unused reviewed song of the saved narrator's voice.
-If that finite catalogue is exhausted, preparation attempts bounded repair of the
-saved draft instead of failing before repair. Existing audio/video cannot be
-silently assigned different lyrics, and publication-history checks still reject
-reused songs. `generation-failure.json` and the Actions job summary show the failed
-stage, word count and recovery inputs without logging generated prose or secrets.
-Resume by supplying the same `run_id` and the failed run as `prepared_run`.
+Cloud Hindi preflight and cache warmup results are recorded after verification;
+a full published Hindi kids episode is not claimed before generation finishes.

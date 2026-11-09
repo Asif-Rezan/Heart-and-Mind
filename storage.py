@@ -1,4 +1,4 @@
-import os, json, hashlib, time, random
+import os, json, hashlib, time
 from pathlib import Path
 
 def required(name):
@@ -16,15 +16,6 @@ def drive_transient(error):
         ssl.SSLError, http.client.IncompleteRead, http.client.RemoteDisconnected)) or status in (408, 429, 500, 502, 503, 504)
 
 
-DRIVE_UPLOAD_MAX_FAILURES = 8
-
-
-def drive_retry_delay(failures):
-    # Stagger twenty parallel shards rather than retrying Drive in lockstep.
-    ceiling = min(2 ** failures, 60)
-    return random.uniform(ceiling / 2, ceiling)
-
-
 def drive_retry(call):
     for attempt in range(5):
         try:
@@ -34,7 +25,7 @@ def drive_retry(call):
                 raise
             print(json.dumps({'check': 'Drive request', 'retry': attempt + 1,
                 'error_type': type(error).__name__}), flush=True)
-            time.sleep(drive_retry_delay(attempt + 1))
+            time.sleep(min(2 ** (attempt + 1), 16))
 
 
 class Store:
@@ -44,17 +35,40 @@ class Store:
         from googleapiclient.discovery import build
         self.client = build('drive', 'v3', credentials=Credentials.from_authorized_user_info(
             json.loads(required('DRIVE_TOKEN_JSON'))), cache_discovery=False)
-        user = drive_retry(lambda: self.client.about().get(fields='user(emailAddress)').execute())['user']
+        user = self.client.about().get(fields='user(emailAddress)').execute()['user']
         if user['emailAddress'].lower() != 'asifrezanit@gmail.com':
             raise RuntimeError('Wrong Drive account')
-        self.folder = os.getenv('DRIVE_FOLDER_ID')
-        if not self.folder:
-            raise RuntimeError('DRIVE_FOLDER_ID is required for this separate channel')
-        info = drive_retry(lambda: self.client.files().get(fileId=self.folder, fields='mimeType,trashed,appProperties').execute())
-        if (info.get('trashed') or info['mimeType'] != 'application/vnd.google-apps.folder'
-                or info.get('appProperties', {}).get('heart_and_mind_root') != 'v1'):
+        root = required('DRIVE_FOLDER_ID')
+        self.check_owned_folder(root, user['emailAddress'])
+        info = drive_retry(lambda: self.client.files().get(fileId=root, fields='appProperties').execute())
+        if info.get('appProperties', {}).get('heart_and_mind_root') != 'v1':
             raise RuntimeError('DRIVE_FOLDER_ID must identify the dedicated Heart and Mind folder')
-        self.check_private(self.folder)
+        # Isolate kids checkpoints from the archived pipeline's history and runs.
+        query = (f"'{root}' in parents and trashed=false and "
+                 "mimeType='application/vnd.google-apps.folder' and "
+                 "appProperties has { key='heart_and_mind_hindi_kids_root' and value='v1' }")
+        result = drive_retry(lambda: self.client.files().list(
+            q=query, fields='nextPageToken,files(id)', pageSize=100).execute())
+        folders = result.get('files', [])
+        if result.get('nextPageToken') or len(folders) > 1:
+            raise RuntimeError('Multiple kids rhyme folders require reconciliation')
+        if folders:
+            self.folder = folders[0]['id']
+        else:
+            self.folder = self.client.files().create(body={
+                'name': 'Kids Rhymes - Heart and Mind', 'parents': [root],
+                'mimeType': 'application/vnd.google-apps.folder',
+                'appProperties': {'heart_and_mind_hindi_kids_root': 'v1'}}, fields='id').execute()['id']
+        self.check_owned_folder(self.folder, user['emailAddress'])
+
+    def check_owned_folder(self, folder, email):
+        info = drive_retry(lambda: self.client.files().get(fileId=folder,
+            fields='mimeType,trashed,owners(emailAddress)').execute())
+        if info.get('trashed') or info.get('mimeType') != 'application/vnd.google-apps.folder':
+            raise RuntimeError('DRIVE_FOLDER_ID must identify an accessible active folder')
+        if {owner.get('emailAddress', '').lower() for owner in info.get('owners', [])} != {email.lower()}:
+            raise RuntimeError('Configured Drive folder must belong to the authenticated account')
+        self.check_private(folder)
 
     def check_private(self, file_id):
         permissions = drive_retry(lambda: self.client.permissions().list(fileId=file_id,
@@ -84,12 +98,12 @@ class Store:
             return default
         return json.loads(drive_retry(lambda: self.client.files().get_media(fileId=file_id).execute()))
 
-    def check_quota(self, size):
+    def check_quota(self, size, reserve_bytes=100 * 1024**2):
         quota = drive_retry(lambda: self.client.about().get(fields='storageQuota').execute())['storageQuota']
         if 'limit' not in quota:
             raise RuntimeError('Cannot verify free storage allowance; stop before upload')
         limit = min(int(quota['limit']), 15 * 1024**3)
-        if int(quota.get('usage', 0)) + size + 100 * 1024**2 > limit:
+        if int(quota.get('usage', 0)) + size + reserve_bytes > limit:
             raise RuntimeError('Free storage allowance nearly full; no paid upgrade will be requested')
 
     def metadata(self, key, file_id):
@@ -128,7 +142,10 @@ class Store:
         file_id = file_id or reserved
         if file_id and self.verified(file_id, key, size, checksum):
             return {'id': file_id}
-        self.check_quota(size)
+        if key.endswith('/cleanup.json') and size <= 256*1024:
+            self.check_quota(size, reserve_bytes=0)
+        else:
+            self.check_quota(size)
         if creating and not file_id:
             file_id = drive_retry(lambda: self.client.files().generateIds(count=1, space='drive').execute())['ids'][0]
         journal.parent.mkdir(parents=True, exist_ok=True)
@@ -142,15 +159,12 @@ class Store:
                 return self.client.files().create(body=metadata, media_body=media, fields='id')
             return self.client.files().update(fileId=file_id, media_body=media, fields='id')
 
-        request, failures, uploaded = new_request(), 0, 0
+        request, failures = new_request(), 0
         while True:
             try:
                 if media.resumable():
-                    progress, result = request.next_chunk(num_retries=0)
+                    _, result = request.next_chunk(num_retries=0)
                     if result is None:
-                        current = getattr(progress, 'resumable_progress', 0)
-                        if isinstance(current, int) and current > uploaded:
-                            uploaded, failures = current, 0
                         continue
                 else:
                     request.execute(num_retries=0)
@@ -168,13 +182,11 @@ class Store:
                 if status == 409:
                     raise RuntimeError('Drive creation conflict; refusing overwrite') from error
                 failures += 1
-                if failures >= DRIVE_UPLOAD_MAX_FAILURES:
+                if failures >= 5:
                     raise
-                delay = drive_retry_delay(failures)
                 print(json.dumps({'check': 'Drive upload', 'retry': failures,
-                    'error_type': type(error).__name__, 'http_status': status,
-                    'wait_seconds': round(delay, 2)}), flush=True)
-                time.sleep(delay)
+                    'error_type': type(error).__name__}), flush=True)
+                time.sleep(min(2 ** failures, 16))
                 if status in (404, 410):
                     # Expired resumable session: reuse the reserved ID, never a new file.
                     request = new_request()

@@ -3,11 +3,12 @@ import copy
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import time
 
 from jsonschema import Draft202012Validator, ValidationError
-from story_constraints import is_hindi_word_pattern, is_hindi_cta_pattern
+from hindi import LYRIC_PATTERN as HINDI_LYRIC_PATTERN
 
 MODEL_ID = 'Qwen/Qwen3-4B-Instruct-2507'
 GGUF_REPO = 'unsloth/Qwen3-4B-Instruct-2507-GGUF'
@@ -15,16 +16,54 @@ GGUF_REVISION = 'a06e946bb6b655725eafa393f4a9745d460374c9'
 GGUF_FILE = 'Qwen3-4B-Instruct-2507-Q4_K_M.gguf'
 GGUF_SHA256 = '3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597'
 CONTEXT_TOKENS = 16384
+# A small, bounded word grammar is safe to retain; large prose bounds are not.
+LYRIC_WORD_PATTERN = r'^[A-Za-z]+( [A-Za-z]+){3,11}[.!?]?$'
 _model = None
 
 
 class StoryGenerationError(RuntimeError):
-    """Only static, privacy-safe messages may be emitted in public job logs."""
-    def __init__(self,message,code='story_model_runtime_failure',details=None):
+    """Static message plus safe structured diagnostics; never raw model/API text."""
+    def __init__(self, message, *, code='lyrics_generation', details=None, retryable=False):
         super().__init__(message)
         self.code=code
         self.details=details or {}
-        self.public_message=message
+        self.retryable=retryable
+
+
+def bounded_metadata(data, schema, fields):
+    """Constrain opted-in planning prose, never truncate sung lyrics or scene actions."""
+    result=copy.deepcopy(data)
+    changed=[]
+    if not isinstance(result,dict):
+        return result,changed
+    for field in fields:
+        # Only known non-lyrical prose is permitted, even if callers opt in.
+        # Visual identity is normalized before verses are written, so all scenes
+        # use the same saved description; never shorten individual scene actions.
+        if field not in ('description', 'title', 'characters', 'visual_world') or not isinstance(result.get(field),str):
+            continue
+        spec=schema.get('properties',{}).get(field,{})
+        maximum=spec.get('maxLength')
+        if type(maximum) is not int or maximum<1:
+            continue
+        value=' '.join(result[field].split())
+        if len(value)<=maximum:
+            result[field]=value
+            continue
+        prefix=value[:maximum]
+        if field in ('description', 'characters', 'visual_world'):
+            stops=[m.end() for m in re.finditer(r'[.!?](?=\s|$)',prefix)]
+            minimum=max(spec.get('minLength',0),maximum//2)
+            if stops and stops[-1]>=minimum:
+                value=prefix[:stops[-1]]
+            else:
+                value=prefix.rsplit(' ',1)[0].rstrip(' ,;:')
+                value=value[:maximum-1].rstrip(' ,;:.')+'.'
+        else:
+            value=prefix if len(value)==maximum or value[maximum].isspace() else prefix.rsplit(' ',1)[0]
+        result[field]=value
+        changed.append(field)
+    return result,changed
 
 
 def verify_model(path):
@@ -44,7 +83,8 @@ def load_model():
     for attempt in range(3):
         try:
             path = hf_hub_download(repo_id=GGUF_REPO, filename=GGUF_FILE,
-                revision=GGUF_REVISION, token=False, force_download=attempt > 0)
+                revision=GGUF_REVISION, token=False, force_download=attempt > 0,
+                cache_dir=os.getenv('LYRICS_MODEL_CACHE', '.models/lyrics'))
             if not verify_model(path):
                 raise StoryGenerationError('Qwen model checksum verification failed')
             break
@@ -88,12 +128,7 @@ def request_story(endpoint, payload):
         if isinstance(node, dict):
             node.pop('minLength', None)
             node.pop('maxLength', None)
-            # Only our small, bounded Hindi word grammar is safe in the native parser.
-            if node.get('pattern') == r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$':
-                # A simple ASCII subset enforces English planning during decoding,
-                # avoiding the large Unicode negated ranges in the original pattern.
-                node['pattern'] = r'^[ -~]*[A-Za-z][ -~]*$'
-            elif not (is_hindi_word_pattern(node.get('pattern')) or is_hindi_cta_pattern(node.get('pattern'))):
+            if node.get('pattern') not in (LYRIC_WORD_PATTERN, HINDI_LYRIC_PATTERN):
                 node.pop('pattern', None)
             for value in node.values():
                 remove_string_bounds(value)
@@ -106,11 +141,10 @@ def request_story(endpoint, payload):
         raise StoryGenerationError('Lyrics seed must be a nonnegative 31-bit integer')
     model = load_model()
     for attempt in range(3):
-        # Retry feedback also consumes context; recheck before every inference.
-        prompt_tokens = sum(len(model.tokenize(message['content'].encode(), add_bos=False)) + 16
-                            for message in messages) + 32
-        if prompt_tokens + limit > CONTEXT_TOKENS:
-            raise StoryGenerationError('Qwen context budget exceeded; reduce recent-story context')
+        # Retry instructions also consume context; check before every inference.
+        prompt_tokens=sum(len(model.tokenize(message['content'].encode(),add_bos=False))+16 for message in messages)+32
+        if prompt_tokens+limit>CONTEXT_TOKENS:
+            raise StoryGenerationError('Qwen context budget exceeded; reduce recent-story context',code='lyrics_context')
         started = time.monotonic()
         try:
             result = model.create_chat_completion(messages=messages,
@@ -120,52 +154,52 @@ def request_story(endpoint, payload):
         except Exception:
             # Runtime/configuration errors are not content errors; don't spin on them.
             raise StoryGenerationError('Qwen CPU generation failed; inspect runner memory and runtime compatibility') from None
-        issue, field, bound = None, '$', None
-        failed_pattern = None
+        issue, field, bound, actual = None, '$', None, None
         try:
             choice = result['choices'][0]
             if choice.get('finish_reason') != 'stop':
                 issue = 'incomplete_output'
                 raise ValueError('Incomplete output')
-            validator.validate(json.loads(choice['message']['content']))
+            original=json.loads(choice['message']['content'])
+            candidate,adjusted=bounded_metadata(original,schema,payload.get('bounded_metadata_fields',[]))
+            validator.validate(candidate)
+            if candidate != original:
+                choice['message']['content']=json.dumps(candidate,ensure_ascii=False)
+            if adjusted:
+                print(json.dumps({'check':'metadata length normalized','fields':adjusted}),flush=True)
         except ValidationError as error:
             issue = error.validator
-            failed_pattern = error.schema.get('pattern')
             path = list(error.absolute_path)
             if path and path[0] in schema.get('properties', {}):
-                field = '.'.join(str(part) for part in path)
+                field = path[0]
             if isinstance(error.validator_value, int):
                 bound = error.validator_value
+            if isinstance(error.instance,(str,list,dict)):
+                actual=len(error.instance)
         except (ValueError, TypeError, KeyError, IndexError):
             issue = issue or 'invalid_json_or_response'
         if issue:
             # Report schema constraints and counters, never generated content or raw errors.
             print(json.dumps({'check': 'Qwen JSON validation retry', 'attempt': attempt + 1,
-                'constraint': issue, 'field': field, 'bound': bound,
+                'constraint': issue, 'field': field, 'bound': bound, 'actual_length': actual,
                 'completion_tokens': result.get('usage', {}).get('completion_tokens')}), flush=True)
             if attempt == 2:
-                raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts',code='story_model_response_invalid',
-                    details=dict(constraint=issue,field=field,bound=bound,attempt_limit=3)) from None
+                raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts',
+                    code='lyrics_schema_validation',details={'constraint':issue,'field':field,'bound':bound,'actual_length':actual,'attempts':3},retryable=True) from None
             correction = f'The previous response failed {issue} for field {field}.'
             if bound is not None:
-                correction += f' The required {issue} is {bound}.'
-            if issue == 'pattern' and failed_pattern == r'^[^\u0900-\u097f]*[A-Za-z][^\u0900-\u097f]*$':
-                correction += (f' Field {field} must be English only, with Latin-letter names and NO Devanagari. '
-                    'Write summary, characters, world and every chapters entry in English. '
-                    'Only title, description and spoken text use Hindi. Keep the English planning concise.')
-            if issue == 'pattern' and is_hindi_word_pattern(failed_pattern):
-                correction += ' Spoken Hindi must follow the exact word range in its schema: single spaces, Devanagari words, no quotations or ASCII numbers. Shorten overloaded lines or expand short lines; do not repeat the rejected wording. Do not append exposition.'
-            if issue == 'pattern' and is_hindi_cta_pattern(failed_pattern):
-                correction += ' The closing line must start with आप, ask a story-specific Hindi question, and end exactly with ? टिप्पणी में बताइए। within the word limit.'
+                correction += f' The required {issue} is {bound}; the prior length was {actual}.'
+                if issue=='maxLength':
+                    correction += f' Write this field in no more than {max(1,int(bound*.65))} characters including spaces. Characters are not words.'
+            if issue == 'pattern':
+                correction += ' Every lyric must have 4 to 12 Hindi Devanagari words, single spaces, no Romanized Hindi. Aim for 6 words.'
             if issue == 'incomplete_output':
                 correction += ' Shorten prose and lyric lines so the entire JSON fits the output budget.'
             messages.append({'role': 'user', 'content': correction +
                 ' Regenerate the complete JSON matching the supplied schema. Follow every field length limit. '
-                'Every spoken text or lyrics field must be Hindi Devanagari; thumbnail_text and image prompts must follow '
-                'their own ASCII/English rules. Do not add fields or commentary.'})
+                'Follow the original task language requirements for every field. Do not add fields or commentary.'})
             continue
         print(json.dumps({'check': 'Qwen lyrics JSON', 'passed': True,
             'seconds': round(time.monotonic() - started, 1),
-            'prompt_tokens': result.get('usage', {}).get('prompt_tokens',prompt_tokens),
             'completion_tokens': result.get('usage', {}).get('completion_tokens')}), flush=True)
         return result

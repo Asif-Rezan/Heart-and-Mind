@@ -87,25 +87,18 @@ def runtime(source):
     return torch, CpuHandler, GenerationParams, GenerationConfig, generate_music
 
 
-def validate_audio_duration(song, seconds):
-    from pipeline import validate_duration
-    if song.get('media_kind')=='shorts':
-        if not 30 <= seconds <= 59:
-            raise ValueError('Measured Shorts audio must be 30-59 seconds')
-    else:
-        validate_duration(seconds)
-
-
 def synthesize(song, target, source, model_root):
-    from pipeline import validate_song, duration
-    validate_song(song, allow_short=True)
+    from pipeline import validate_song, validate_duration, duration
+    # Segment requests are derived from a validated full-song manifest.
+    if not song.get('_segment'):
+        validate_song(song)
     checkpoints(model_root)
     os.environ['ACESTEP_CHECKPOINTS_DIR'] = str(model_root.resolve())
     os.environ['ACESTEP_INIT_LLM'] = 'false'
     os.environ['CUDA_VISIBLE_DEVICES'] = ''
     os.environ['ACESTEP_VAE_DECODE_CHUNK_SIZE'] = '128'
     torch, Handler, Params, Config, infer = runtime(source)
-    torch.set_num_threads(min(4, os.cpu_count() or 1))
+    torch.set_num_threads(min(3, max(1, (os.cpu_count() or 1) - 1)))
     torch.set_num_interop_threads(1)
     handler = Handler()
     print(json.dumps({'phase':'loading music model', 'model':MODEL, 'device':'cpu'}), flush=True)
@@ -116,30 +109,52 @@ def synthesize(song, target, source, model_root):
     if not ready or handler.device != 'cpu':
         raise RuntimeError('ACE-Step CPU initialization failed')
     params = Params(caption=song['prompt'], lyrics=song['lyrics'],
-        duration=song['duration'], vocal_language='hi', instrumental=False,
-        inference_steps=8, thinking=False, use_cot_metas=False,
+        duration=song['duration'], bpm=song.get('bpm'), reference_audio=reference_audio(), vocal_language='hi', instrumental=False,
+        inference_steps=inference_steps(), thinking=False, use_cot_metas=False,
         use_cot_caption=False, use_cot_language=False)
     config = Config(batch_size=1, audio_format='wav', allow_lm_batch=False)
     print(json.dumps({'phase':'synthesizing music', 'device':'cpu',
-        'duration':song['duration'], 'steps':8}), flush=True)
+        'duration':song['duration'], 'steps':inference_steps()}), flush=True)
     with torch.inference_mode(), generation_progress():
         result = infer(handler, None, params, config, save_dir=str(target.parent/'cpu-audio'))
     if not result.success or not result.audios:
         raise RuntimeError('ACE-Step CPU music synthesis failed')
     audio = Path(result.audios[0]['path'])
-    validate_audio_duration(song, duration(audio))
+    if abs(duration(audio) - song['duration']) > 2:
+        raise RuntimeError('Generated segment duration differs from requested duration')
     temporary = target.with_suffix('.part.wav')
     shutil.copyfile(audio, temporary)
     temporary.replace(target)
     print(json.dumps({'phase':'music ready', 'duration':duration(target), 'device':'cpu'}), flush=True)
 
 
+def inference_steps():
+    """The pinned turbo checkpoint is distilled for 8 steps; allow bounded tuning."""
+    steps = int(os.getenv('ACESTEP_INFERENCE_STEPS', '8'))
+    if not 1 <= steps <= 20:
+        raise ValueError('ACESTEP_INFERENCE_STEPS must be 1-20 for the turbo model')
+    return steps
+
+
+def reference_audio():
+    value = os.getenv('REFERENCE_AUDIO_PATH')
+    if value and not Path(value).is_file():
+        raise ValueError('REFERENCE_AUDIO_PATH does not exist')
+    return str(Path(value).resolve()) if value else None
+
+
 def generate(song, target, state, save):
+    from kids_rhymes import generate_music
+    return generate_music(song, target, state, save)
+
+
+def generate_segment(song, target, state, save):
     # Local CPU generation has no remote task to duplicate. A failed or killed
     # runner can regenerate the same saved lyrics without resubmitting to a service.
-    from pipeline import duration
+    from pipeline import validate_duration, duration
     if target.exists():
-        validate_audio_duration(song, duration(target))
+        if abs(duration(target) - song['duration']) > 2:
+            raise ValueError('Invalid saved segment duration')
         return
     source = Path(os.environ.get('ACESTEP_SOURCE_DIR', '.vendor/ace-step')).resolve()
     model_root = Path(os.environ.get('ACESTEP_CHECKPOINTS_DIR', '.models/acestep')).resolve()
@@ -147,15 +162,18 @@ def generate(song, target, state, save):
     save()
     request = target.parent/'cpu-song-input.json'
     request.write_text(json.dumps(song, ensure_ascii=False))
+    from worker_limits import run_worker, WorkerFailure
     try:
-        subprocess.run([sys.executable, '-u', str(Path(__file__).resolve()),
+        run_worker([sys.executable, '-u', str(Path(__file__).resolve()),
             '--song', str(request.resolve()), '--target', str(target.resolve()),
-            '--source', str(source), '--models', str(model_root)], check=True, timeout=WORKER_TIMEOUT)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        state.update(generation_started=False, generation_failed='Local CPU worker failed; saved lyrics retained')
+            '--source', str(source), '--models', str(model_root)], timeout=WORKER_TIMEOUT,
+            diagnostic=target.parent/'worker-resources.txt')
+        if abs(duration(target) - song['duration']) > 2:
+            raise ValueError('Invalid generated segment duration')
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, WorkerFailure, OSError, ValueError) as exc:
+        state.update(generation_started=False, generation_failed=str(exc), audio_ready=False)
         save()
-        raise RuntimeError('Local ACE-Step CPU worker failed; resume the saved run') from None
-    validate_audio_duration(song, duration(target))
+        raise RuntimeError('Local ACE-Step CPU worker failed; saved lyrics and parts retained: ' + str(exc)) from exc
     state.pop('generation_failed', None)
     state.update(audio_ready=True, generation_started=False)
     save()

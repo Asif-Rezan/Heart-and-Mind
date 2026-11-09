@@ -1,5 +1,0 @@
-# YAML dependency graph checks for the production workflow.
-PyYAML==6.0.3
-
-# Lightweight WAV I/O for production-path narration/mix/render smoke tests.
-soundfile>=0.13.1,<0.14

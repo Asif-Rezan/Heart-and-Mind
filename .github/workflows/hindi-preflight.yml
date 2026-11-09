@@ -1,0 +1,49 @@
+name: Verify real Hindi reference episode (no publishing)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - hindi.py
+      - hindi_preflight.py
+      - rhyme_writer.py
+      - episode_packaging.py
+      - .github/workflows/hindi-preflight.yml
+permissions:
+  contents: read
+concurrency:
+  group: hindi-language-preflight
+  cancel-in-progress: false
+jobs:
+  hindi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      VIDEO_DURATION_SECONDS: '240'
+      OMP_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+      RUN_ID: hindi-check-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned CPU writer and regression tools
+        run: |
+          bash scripts/install-runner-packages.sh ffmpeg
+          python install_lyrics_dependencies.py
+      - run: python -m unittest -v
+      - uses: ./.github/actions/model-cache
+        with:
+          family: lyrics
+      - name: Generate and validate a real Hindi episode and public package
+        run: python -u hindi_preflight.py --run-id "$RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hindi-preflight-${{ github.run_id }}
+          path: output/
+          retention-days: 7

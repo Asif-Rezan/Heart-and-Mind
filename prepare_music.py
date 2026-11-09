@@ -1,9 +1,11 @@
 """Prepare song assets; optionally verify publication history before generation."""
 import argparse
+from motion_video import render_is_current
 import datetime as dt
 import gc
 import json
 import re
+import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from pipeline import make_song, render, duration, validate_duration, validate_song, song_duplicate_reason, pipeline_failure_message
@@ -11,7 +13,7 @@ from music_cpu import generate
 import os
 
 
-def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motion_video=False, authored_song=None):
+def prepare(run_id, stage='all', check_history=False, vocal_gender='female', retry=0):
     if vocal_gender not in ('auto', 'male', 'female'):
         raise ValueError('Vocal choice must be auto, male or female')
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', run_id):
@@ -25,98 +27,67 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
         temporary.write_text(json.dumps(state))
         temporary.replace(checkpoint)
     history = []
+    lyric_history = []
+    store = None
     if check_history:
         from storage import Store
         print(json.dumps({'phase': 'verify publication history'}), flush=True)
-        history = Store().load('history.json', [])
+        store = Store()
+        history = store.load('history.json', [])
+        lyric_history = store.load('lyrics-history.json', [])
+        history += lyric_history
         # A rerun of an already published identity must resume, not regenerate it.
         history = [entry for entry in history if entry.get('run') != run_id]
-    selected = None
-    if authored_song:
-        from authored_song import load_authored_song
-        selected = load_authored_song(authored_song)
-        if song_duplicate_reason(selected, history):
-            from pipeline import DuplicateSongError
-            raise DuplicateSongError()
-        if (root/'song.json').exists():
-            saved = json.loads((root/'song.json').read_text())
-            if any(saved.get(key) != selected.get(key) for key in ('lyrics','prompt','vocal_gender')):
-                raise ValueError('Authored song differs from saved media; use a fresh run ID')
-        elif (root/'song.wav').exists() or (root/'song-draft.json').exists():
-            raise ValueError('Authored song needs a fresh run ID, not a different saved draft')
-    if check_history and (root/'song.json').exists():
-        existing = validate_song(json.loads((root/'song.json').read_text()))
-        if song_duplicate_reason(existing, history):
-            core = {key: existing[key] for key in ('title', 'lyrics', 'prompt', 'duration', 'vocal_gender', 'song_date')
-                    if key in existing}
-            (root/'song-draft.json').write_text(json.dumps(core, ensure_ascii=False))
-            (root/'song.json').unlink()
     if (root/'song.json').exists():
         song = validate_song(json.loads((root/'song.json').read_text()))
     else:
-        day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
-        if selected:
-            song = selected
-        else:
-            from lyric_quality import LyricQualityError, LyricRecoveryUnavailable
-            from lyrics_cpu import StoryGenerationError
-            from lyric_recovery import recover_reviewed_song, rejected_checkpoint
-            from pipeline import vocal_gender_for_day
-            voice = vocal_gender_for_day(day) if vocal_gender == 'auto' else vocal_gender
-            draft = root/'song-draft.json'
-            if draft.exists():
-                voice = json.loads(draft.read_text()).get('vocal_gender', voice)
-            song = None
-            if check_history and rejected_checkpoint(root):
-                try:
-                    song = recover_reviewed_song(root, history, voice)
-                except LyricRecoveryUnavailable:
-                    # A finite catalogue is not the only recovery path. Repair the
-                    # saved draft with the bounded decoder instead of stopping here.
-                    print(json.dumps({'phase':'lyrics recovery','strategy':'bounded-draft-repair',
-                                      'reason':'reviewed-catalogue-exhausted'}),flush=True)
-            if song is None:
-                try:
-                    song = make_song(day, history, draft, generation_id=run_id, vocal_gender_override=vocal_gender)
-                except (LyricQualityError, StoryGenerationError) as error:
-                    recoverable = isinstance(error,LyricQualityError) or error.code == 'story_model_response_invalid'
-                    if not check_history or not recoverable:
-                        raise
-                    song = recover_reviewed_song(root, history, voice)
-            if song.get('authored_source'):
-                selected = song
+        song = make_song(dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat(), history, root/'song-draft.json', generation_id=run_id, vocal_gender_override=vocal_gender)
         (root/'song.json').write_text(json.dumps(song, ensure_ascii=False, indent=2))
-        if selected:
-            (root/'lyrics-quality.json').write_text(json.dumps(song['lyric_quality'],ensure_ascii=False,indent=2))
-    if song.get('lyric_quality_version'):
-        from lyric_quality import assess
-        report = assess(song['lyrics'])
-        if not report['passed']:
-            raise ValueError('Saved lyrics failed phrasing checks; revise before generating music')
-    if motion_video:
-        from music_video import FORMAT
-        song['video_format']=FORMAT
-        (root/'song.json').write_text(json.dumps(song,ensure_ascii=False,indent=2))
     if vocal_gender != 'auto' and song.get('vocal_gender') != vocal_gender:
         raise ValueError('Saved song voice differs from the request; use a new run ID')
     if stage == 'lyrics':
+        from hindi import validate_song_language
+        validate_song_language(song)
+        from rhyme_writer import VERSION, verse_lines, novelty_reason
+        if song.get('lyric_writer', {}).get('version') != VERSION:
+            raise ValueError('Saved lyrics use the old template writer; use a new run ID')
+        lines = verse_lines(song)
+        reason = novelty_reason(lines, history)
+        if reason or song_duplicate_reason(song, history):
+            from pipeline import DuplicateSongError
+            raise DuplicateSongError()
+        from episode_packaging import generate_package, validate_package
+        if song.get('packaging'):
+            validate_package(song['packaging'],song)
+        else:
+            song['packaging']=generate_package(song,history,seed_offset=retry)
+            temp=root/'song.packaged.tmp'
+            temp.write_text(json.dumps(song,ensure_ascii=False,indent=2))
+            temp.replace(root/'song.json')
+        if store:
+            entry = dict(run=run_id, title=song['title'], story_summary=song['story_summary'],
+                visual_identity=song.get('visual_identity', {}), public_title=song['packaging']['video']['title'],
+                verse_lines=lines, hook=song.get('hook',''), hash=__import__('hashlib').sha256(song['lyrics'].encode()).hexdigest())
+            lyric_history = [h for h in lyric_history if h.get('run') != run_id]
+            lyric_history.append(entry)
+            store.save('lyrics-history.json', lyric_history)
         print(json.dumps({'phase':'lyrics ready', 'run_id':run_id}), flush=True)
         return
+    if stage == 'all' and not song.get('packaging'):
+        from episode_packaging import generate_package
+        song['packaging']=generate_package(song,history)
+        (root/'song.json').write_text(json.dumps(song,ensure_ascii=False,indent=2))
     import lyrics_cpu
     if lyrics_cpu._model is not None:
         lyrics_cpu._model.close()
         lyrics_cpu._model = None
     gc.collect()
     if stage == 'images':
-        if motion_video:
-            from music_video import generate_images
-            generate_images(root,song)
-        else:
-            from song_images import generate_song_images
-            generate_song_images(root, song)
+        from song_images import generate_song_images
+        generate_song_images(root, song)
         print(json.dumps({'phase': 'images ready', 'run_id': run_id}), flush=True)
         return
-    if stage == 'all' and not motion_video:
+    if stage == 'all':
         from song_images import generate_song_images
         generate_song_images(root, song)
         import image_cpu
@@ -127,18 +98,56 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='auto', motio
             raise RuntimeError('Music artifact missing; publishing cannot generate through a remote service')
         generate(song, root/'song.wav', state, save)
     validate_duration(duration(root/'song.wav'))
-    if motion_video:
-        from music_video import prepare_timeline,generate_images
-        prepare_timeline(root,song)
-        if stage=='all':generate_images(root,song)
     if stage == 'music':
         print(json.dumps({'phase':'music ready', 'run_id':run_id}), flush=True)
         return
-    if motion_video or not (root/'video.mp4').exists():
+    if not render_is_current(root):
         render(root)
     validate_duration(duration(root/'video.mp4'))
     print(json.dumps({'run_id': run_id, 'phase': 'prepared', 'title': song['title'],
         'duration': duration(root/'video.mp4')}), flush=True)
+
+def prepare_with_retries(run_id, stage='all', check_history=False, vocal_gender='female'):
+    """Resume saved lyrics only for explicitly retryable model/content failures."""
+    from lyrics_cpu import StoryGenerationError
+    for attempt in range(3):
+        try:
+            result=prepare(run_id,stage,check_history=check_history,vocal_gender=vocal_gender,retry=attempt)
+            failure=Path('output')/run_id/'failure.json'
+            if failure.exists():
+                try:
+                    previous=json.loads(failure.read_text())
+                except (OSError,ValueError):
+                    previous={}
+                if previous.get('stage')==stage:
+                    failure.unlink(missing_ok=True)
+            if attempt:
+                print(json.dumps({'phase':'lyrics stage recovered','attempt':attempt+1}),flush=True)
+            return result
+        except StoryGenerationError as error:
+            record_failure(run_id,stage,error)
+            if stage != 'lyrics' or not error.retryable or attempt == 2:
+                raise
+            print(json.dumps({'phase':'resume saved lyrics after retryable failure',
+                'attempt':attempt+1,'maximum_attempts':3,'error_code':error.code}),flush=True)
+            time.sleep(5*(attempt+1))
+
+
+def record_failure(run_id,stage,error):
+    """Persist safe diagnostics even if the first model response never completed."""
+    if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}',run_id):
+        return
+    root=Path('output')/run_id
+    root.mkdir(parents=True,exist_ok=True)
+    info={'stage':stage,'error_type':type(error).__name__,
+        'error_code':getattr(error,'code','pipeline_error'),
+        'retryable':getattr(error,'retryable',False),
+        'details':getattr(error,'details',{}),
+        'message':pipeline_failure_message(error)}
+    temp=root/'failure.tmp'
+    temp.write_text(json.dumps(info,indent=2))
+    temp.replace(root/'failure.json')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -146,17 +155,14 @@ if __name__ == '__main__':
     parser.add_argument('--stage', choices=['all', 'lyrics', 'music', 'images', 'render'], default='all')
     parser.add_argument('--check-history', action='store_true',
                         help='Verify title and lyrics against Drive publication history before costly stages')
-    parser.add_argument('--authored-song', help='Reviewed song identity from the repository lyrics/ directory')
-    parser.add_argument('--motion-video',action='store_true',help='Use current 3D visuals, five-second changes and cinematic editing')
-    parser.add_argument('--vocal-gender', choices=['auto', 'male', 'female'], default='auto')
+    parser.add_argument('--vocal-gender', choices=['auto', 'male', 'female'], default='female')
     args = parser.parse_args()
     try:
-        prepare(args.run_id, args.stage, check_history=args.check_history, vocal_gender=args.vocal_gender,motion_video=args.motion_video,authored_song=args.authored_song)
+        prepare_with_retries(args.run_id, args.stage, check_history=args.check_history, vocal_gender=args.vocal_gender)
     except Exception as error:
-        from music_failure import save_failure
         try:
-            save_failure(args.run_id,args.stage,error)
+            record_failure(args.run_id,args.stage,error)
         except OSError:
-            print('Generation diagnostics could not be saved; inspect the failed runner.',flush=True)
+            print("Could not save failure checkpoint; original failure follows.",flush=True)
         print(pipeline_failure_message(error), flush=True)
         raise SystemExit(1)
