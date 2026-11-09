@@ -124,7 +124,7 @@ Migration commit: `3818138` (pinned reference `44f8a33`, Hindi adaptation).
 - Local and GitHub [component checks](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42604681632): 227 tests passed, including Hindi guards, native vocal-language wiring and FFmpeg regressions. Actionlint and whitespace checks passed.
 - [Camera/background and multiple-character render](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202705): passed.
 - [Model cache warmup](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202709): lyrics, image and motion jobs passed; real BiRefNet/LaMa inference passed. Three model archives are saved under the existing 10 GB quota.
-- [Real Hindi CPU preflight](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202693): first attempt superseded after a slow verse request; Hindi prompt JSON now retains native Devanagari instead of verbose Unicode escapes. Updated [preflight 42604681634](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42604681634) is running against `1d02052`: all 227 tests passed, the Qwen cache restored successfully, and the real Hindi outline passed on its first attempt. Full verse/public-package validation is pending; do not treat this as an end-to-end Hindi media pass.
+- [Real Hindi CPU preflight](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202693): first attempt superseded after a slow verse request; Hindi prompt JSON now retains native Devanagari instead of verbose Unicode escapes. Updated [preflight 42604681634](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42604681634) is running against `1d02052`: all 227 tests passed, the Qwen cache restored successfully, and the real Hindi outline passed on its first attempt. This run was superseded by the metadata field-repair/grammar fixes below; the final real Hindi preflight passed. A finished singing/video quality check remains separate.
 
 The old reference-only motion demo workflow is archived in `docs/archive/reference-dudi-motion-demo.yml.txt`; audio recovery requires explicit destination run IDs instead of stale reference defaults.
 
@@ -163,3 +163,12 @@ remains English. This prevents repeated description repair for English leakage
 instead of relying only on prompt instructions. The pinned local llama.cpp
 converter successfully compiled this grammar. It avoids large native prose
 length expansions; final Python length/language checks still apply.
+
+
+## Verified Hindi retry improvements and new full run — 2026-11-09
+
+- Field repair/checkpoint implementation: `9af5500`; native public Hindi grammar: `5565a49`.
+- Local regression suite: **234 tests passed**. [GitHub component checks](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42611372457) passed.
+- Actual same-episode metadata prompt fell from **5,822 to 2,764 tokens** (about 53% smaller). The first package response took **186.3 seconds**, versus **639.8 seconds** in the earlier run; output sizes and sampled text differ, so this is an observed run comparison, not a guaranteed speedup.
+- Prompt-only language repairs still leaked Latin text. The compact native public-text grammar then resolved the saved description fields: [real Hindi preflight 42611404651](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42611404651) **completed successfully**, restoring accepted lyrics and metadata from the prior run. The full preflight checks Hindi text, 240-second/48-scene form, chorus-first opening, public long/Shorts metadata and opening-scene thumbnail wiring. It performs no publication or audio/image inference.
+- At the user's request, [full production generation 42612096973](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42612096973) was started from `5565a49`, fresh ID `heart-hindi-20261109-01`, female vocal, metadata/audio language `hi`, default 240 seconds and scheduled upload mode. It is in progress; completion/publication and finished audio quality are not yet claimed.
