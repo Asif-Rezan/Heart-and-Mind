@@ -74,3 +74,14 @@ Twenty scene workers are individual named reusable-workflow jobs (`Cartoon scene
 ### 2026-11-10 — direct public publication
 
 New full cartoons and manual Shorts default to public visibility; no automatic 72-hour delay or scheduled timestamp is applied. The default upload settings and production/recovery workflow fallbacks are public. Facebook feed/Reels also support direct publication from a verified public YouTube checkpoint, retaining Heart and Mind Page identity validation. Facebook requires published-state evidence, not merely ready processing. Existing saved upload IDs preserve their checkpointed visibility/schedule when resumed. Verified public-HD Drive cleanup remains enabled.
+
+
+### 2026-11-10 — researched SEO metadata and capitalized power words
+
+Fresh cartoon episodes now generate a story-specific keyword plan, research up to two English/US YouTube search queries using the existing OAuth credentials, then generate three title candidates and a natural description. The selected title includes its primary keyword and 1–2 explicitly CAPITALIZED power words (for example UNEXPECTED, BRAVE or CLEVER). A verbatim story excerpt must support every candidate's promise; prompts prohibit unrelated trends, competitor-title copying and unsupported SECRET/HIDDEN claims. Title selection uses readability/relevance heuristics, not invented ranking metrics.
+
+`seo-draft.json` preserves candidate titles, keyword plan, dated query/source/results and the chosen metadata. Search results are topic signals, not exact search volume or competition scores. Network/quota errors safely fall back to story-derived keywords and record only error types; the story/audio job continues. External result text is explicitly treated as untrusted data. Each search uses bounded HTTP timeouts and one transport retry. Accepted research/metadata are reused on resume. This integration uses YouTube Data API search results, not Google Trends or channel Analytics; those would require separate integrations.
+
+Description openings include the primary phrase naturally, followed by a truthful plot summary, AI disclosure, 2–3 relevant hashtags and four chapters calculated from real speech-derived scene timestamps. Tags use relevant primary/supporting phrases. Existing prepared episodes keep their saved metadata; the feature applies to new story identities, or resumes a new story's interrupted SEO stage without rewriting accepted dialogue. Publication visibility, twenty scene branches and verified Drive cleanup are unchanged.
+
+References: [YouTube description guidance](https://support.google.com/youtube/answer/12948449), [official search.list API](https://developers.google.com/youtube/v3/docs/search/list).

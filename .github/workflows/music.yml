@@ -105,8 +105,10 @@ jobs:
             echo 'Saved cartoon does not match run_id or contains no resumable story checkpoint.'
             exit 1
           }
-      - name: Write original English story
+      - name: Write English story and research SEO metadata
         env:
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
           RUN_ID: ${{ steps.identity.outputs.run_id }}
         run: python -u cartoon.py --run-id "$RUN_ID" --topic "$TOPIC" --stage story
       - name: Synthesize three Kokoro voices and mix original instrumental score

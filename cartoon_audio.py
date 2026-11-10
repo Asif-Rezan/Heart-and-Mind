@@ -134,6 +134,8 @@ def prepare_audio(root, engine=None):
         cursor_frames += frames; tracks.append(audio); timeline.append(scene)
         print(json.dumps({'phase':'cartoon speech ready','shot':scene['index'],'speaker':scene['speaker'],'frames':frames,'cached':cached}), flush=True)
     song.update(scenes=timeline, duration=cursor_frames/FPS, audio_engine=VERSION)
+    from cartoon_seo import add_chapters
+    add_chapters(song)
     validate_manifest(song, timed=True)
     write_wave(root/'song.wav', np.concatenate(tracks))
     atomic(root/'song.json', song)

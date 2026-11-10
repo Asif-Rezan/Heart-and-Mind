@@ -15,11 +15,17 @@ def prepare(run_id, stage, topic):
     if stage == 'story':
         from storage import Store
         history = Store().load('history.json',[]) if os.getenv('DRIVE_TOKEN_JSON') else []
-        if (root/'song.json').exists():
+        fresh = not (root/'song.json').exists()
+        if not fresh:
             song = validate_manifest(json.loads((root/'song.json').read_text()))
             draft = json.loads((root/'cartoon-draft.json').read_text())
             if draft['identity']['topic'] != topic: raise ValueError('Saved topic differs; use a new run ID')
         else: song = plan(root,run_id,topic,history)
+        if fresh or song.get('seo_pending'):
+            from cartoon_seo import optimize
+            song['seo_pending']=True
+            atomic(root/'song.json',song)
+            optimize(root,song,history)
         import lyrics_cpu
         if lyrics_cpu._model is not None: lyrics_cpu._model.close(); lyrics_cpu._model = None
         gc.collect()
