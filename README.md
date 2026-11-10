@@ -206,3 +206,8 @@ repository; no token or Page identity from another channel is copied.
 Validation: 239 local tests passed, including disabled production flags and
 scheduled/public receipt distinctions; active workflows passed actionlint.
 Actual recovery results are recorded after the platform checks complete.
+
+The recovery workflow also uses a per-episode recovery lock. The former
+repository-wide generation lock left upload-only recovery pending behind another
+episode's expensive synthesis. Recoveries for the same episode remain serialized;
+this recovery does not restart or cancel the active daily episode.
