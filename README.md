@@ -227,3 +227,8 @@ secret/Page identity is still missing and must be configured before a Facebook
 upload can be completed.
 
 Final local validation after the Facebook fail-fast guard: **241 tests passed**; actionlint and whitespace checks passed. Full-video recovery is still queued for a GitHub-hosted runner; no full-video upload is claimed until its platform verification succeeds.
+
+
+### English family cartoon migration backup — 2026-11-10
+
+Current Hindi rhyme production source is preserved at `56aa49c` and tag `before-english-family-cartoon-2026-11-10`. The complete README is archived at [the pre-cartoon README](docs/archive/before-english-family-cartoon-2026-11-10-README.md). Restore with `git restore --source before-english-family-cartoon-2026-11-10 -- .`, then commit and push the restoration. Credentials, external settings and published videos are not rolled back by Git.
