@@ -37,6 +37,7 @@ env:
   HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
 jobs:
   story:
+    name: Write English story and synthesize Kokoro voices
     if: github.event_name == 'workflow_dispatch' || vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -118,81 +119,169 @@ jobs:
           name: cartoon-input-${{ github.run_id }}
           path: output/
           retention-days: 7
-  images:
+  scene_01:
+    name: Cartoon scene 01
     needs: story
-    runs-on: ubuntu-24.04
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      max-parallel: 20
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-    env:
-      RUN_ID: ${{ needs.story.outputs.run_id }}
-      IMAGE_SHARD: ${{ matrix.shard }}
-      IMAGE_SHARDS: '20'
-      OMP_NUM_THREADS: '3'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install bounded CPU illustration and motion runtime
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          bash scripts/install-runner-packages.sh ffmpeg
-          pip install --no-cache-dir torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install --no-cache-dir --retries 3 --timeout 45 -r requirements.txt -r requirements-images-cpu.txt -r requirements-motion-cpu.txt
-      - uses: actions/download-artifact@v4
-        with:
-          name: cartoon-input-${{ github.run_id }}
-          path: output/
-      - uses: ./.github/actions/model-cache
-        with:
-          family: images
-      - uses: ./.github/actions/model-cache
-        with:
-          family: motion
-      - name: Find saved cartoon shard
-        id: recovery
-        if: inputs.prepared_run != ''
-        uses: actions/github-script@v7
-        env:
-          SOURCE_RUN: ${{ inputs.prepared_run }}
-          SHARD: ${{ matrix.shard }}
-        with:
-          script: |
-            if (!/^\d+$/.test(process.env.SOURCE_RUN)) throw new Error('prepared_run must be numeric');
-            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
-              ...context.repo, run_id: Number(process.env.SOURCE_RUN), per_page: 100
-            });
-            const name = `cartoon-assets-${process.env.SOURCE_RUN}-${process.env.SHARD}`;
-            core.setOutput('available', artifacts.some(a => a.name === name && !a.expired));
-      - name: Restore saved stage assets when resuming
-        if: inputs.prepared_run != '' && steps.recovery.outputs.available == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: cartoon-assets-${{ inputs.prepared_run }}-${{ matrix.shard }}
-          run-id: ${{ inputs.prepared_run }}
-          github-token: ${{ github.token }}
-          path: output/
-      - name: Generate scene illustrations and voice-timed acting
-        run: python -u cartoon.py --run-id "$RUN_ID" --stage images
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cartoon-assets-${{ github.run_id }}-${{ matrix.shard }}
-          path: |
-            output/*/scene-*-source.*
-            output/*/thumbnail-source.png
-            output/*/characters/**
-            output/*/cartoon-motion/**
-            output/*/cartoon-failure.json
-          retention-days: 7
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 0
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_02:
+    name: Cartoon scene 02
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 1
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_03:
+    name: Cartoon scene 03
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 2
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_04:
+    name: Cartoon scene 04
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 3
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_05:
+    name: Cartoon scene 05
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 4
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_06:
+    name: Cartoon scene 06
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 5
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_07:
+    name: Cartoon scene 07
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 6
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_08:
+    name: Cartoon scene 08
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 7
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_09:
+    name: Cartoon scene 09
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 8
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_10:
+    name: Cartoon scene 10
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 9
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_11:
+    name: Cartoon scene 11
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 10
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_12:
+    name: Cartoon scene 12
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 11
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_13:
+    name: Cartoon scene 13
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 12
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_14:
+    name: Cartoon scene 14
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 13
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_15:
+    name: Cartoon scene 15
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 14
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_16:
+    name: Cartoon scene 16
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 15
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_17:
+    name: Cartoon scene 17
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 16
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_18:
+    name: Cartoon scene 18
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 17
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_19:
+    name: Cartoon scene 19
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 18
+      prepared_run: ${{ inputs.prepared_run }}
+  scene_20:
+    name: Cartoon scene 20
+    needs: story
+    uses: ./.github/workflows/cartoon-scene.yml
+    with:
+      run_id: ${{ needs.story.outputs.run_id }}
+      shard: 19
+      prepared_run: ${{ inputs.prepared_run }}
   publish:
-    needs: [story, images]
+    name: Assemble cartoon and publish to YouTube
+    needs: [story, scene_01, scene_02, scene_03, scene_04, scene_05, scene_06, scene_07, scene_08, scene_09, scene_10, scene_11, scene_12, scene_13, scene_14, scene_15, scene_16, scene_17, scene_18, scene_19, scene_20]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -242,6 +331,7 @@ jobs:
           path: output/*/*.json
           retention-days: 7
   facebook:
+    name: Publish cartoon to Facebook
     needs: [story, publish]
     if: vars.FACEBOOK_PUBLISH_ENABLED == 'true' && vars.PUBLISH_ENABLED == 'true'
     uses: ./.github/workflows/facebook.yml

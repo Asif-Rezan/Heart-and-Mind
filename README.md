@@ -64,3 +64,8 @@ First cartoon run `42793148672` stopped during outline creation: `summary` faile
 ### 2026-11-10 — restore twenty parallel workers and post-publication cleanup
 
 New episodes have twenty story shots and a twenty-worker image/motion matrix with `max-parallel: 20`. Each worker generates and animates one shot. Existing accepted sixteen-shot checkpoints remain compatible. YouTube publication waits for every image worker; the original guarded Drive cleanup sweep runs after successful publication and shares the existing cleanup lock. Scheduled/private/not-yet-HD videos remain in Drive until the hourly verified-public sweep makes them eligible. Actual simultaneous execution still depends on GitHub's account-wide runner capacity. Already running workflows retain their original commit and worker count.
+
+
+### Workflow graph visibility
+
+Twenty scene workers are individual named reusable-workflow jobs (`Cartoon scene 01` through `Cartoon scene 20`), so GitHub displays separate branches rather than a collapsed matrix. Each depends on the completed story/voice stage. Assembly/YouTube publication depends on all twenty, followed by the optional Facebook branch and the verified Drive cleanup branch. Existing in-progress runs keep their original workflow graph.

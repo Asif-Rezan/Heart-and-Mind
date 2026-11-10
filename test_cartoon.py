@@ -166,10 +166,15 @@ class ParallelWorkflowTests(unittest.TestCase):
         import yaml
         workflow=yaml.safe_load(Path('.github/workflows/music.yml').read_text())
         jobs=workflow['jobs']
-        self.assertEqual(jobs['images']['strategy']['max-parallel'],20)
-        self.assertEqual(jobs['images']['strategy']['matrix']['shard'],list(range(20)))
-        self.assertEqual(jobs['images']['env']['IMAGE_SHARDS'],'20')
-        self.assertEqual(set(jobs['publish']['needs']),{'story','images'})
+        workers={key:job for key,job in jobs.items() if key.startswith('scene_')}
+        self.assertEqual(len(workers),20)
+        self.assertEqual(sorted(job['with']['shard'] for job in workers.values()),list(range(20)))
+        for job in workers.values():
+            self.assertEqual(job['needs'],'story')
+            self.assertEqual(job['uses'],'./.github/workflows/cartoon-scene.yml')
+        self.assertEqual(set(jobs['publish']['needs']),{'story',*workers})
+        child=yaml.safe_load(Path('.github/workflows/cartoon-scene.yml').read_text())
+        self.assertEqual(child['jobs']['render']['env']['IMAGE_SHARDS'],'20')
         self.assertEqual(set(jobs['cleanup']['needs']),{'story','publish'})
         self.assertIn("needs.publish.result == 'success'",jobs['cleanup']['if'])
         self.assertTrue(any('cleanup_drive.py --sweep' in step.get('run','') for step in jobs['cleanup']['steps']))
