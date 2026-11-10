@@ -31,6 +31,12 @@ def render_identity(root):
 
 def render_is_current(root):
     root=Path(root)
+    try:
+        if json.loads((root/"song.json").read_text()).get("format") == "english-family-cartoon-v1":
+            from cartoon_render import is_current
+            return is_current(root)
+    except (OSError,ValueError):
+        return False
     if not (root/'video.mp4').is_file() or not (root/'render-state.json').is_file():
         return False
     try:

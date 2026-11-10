@@ -324,6 +324,12 @@ def public_metadata(song, kind='video'):
     """New episodes use their saved package; old unpublished artifacts use their story."""
     if kind not in ('video','shorts'):
         raise ValueError('Unknown upload format')
+    if song.get('format') == 'english-family-cartoon-v1':
+        from cartoon_story import validate_manifest
+        validate_manifest(song, timed=True)
+        if kind != 'video':
+            raise ValueError('Cartoon Shorts require their own edited story; rhyme Shorts are disabled')
+        return {key:song[key] for key in ('title','description','tags')}
     if song.get('public_metadata_version') == VERSION:
         return {key:song[key] for key in ('title','description','tags')}
     package=song.get('packaging')

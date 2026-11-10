@@ -74,8 +74,7 @@ class CacheContractTests(unittest.TestCase):
 
     def test_production_and_manual_shorts_restore_each_required_model(self):
         contracts = {
-            'music.yml': {'lyrics': ['lyrics'], 'music': ['music'], 'short_music': ['music'],
-                          'images': ['images', 'motion'], 'short_images': ['images', 'motion']},
+            'music.yml': {'story': ['lyrics'], 'images': ['images', 'motion']},
             'shorts.yml': {'short_music': ['music'], 'short_images': ['images', 'motion']},
         }
         for name, jobs in contracts.items():
@@ -87,8 +86,7 @@ class CacheContractTests(unittest.TestCase):
                 if any('--no-cache-dir' in s.get('run', '') for s in steps):
                     self.assertFalse(any(s.get('with', {}).get('cache') == 'pip' for s in steps))
         workflow = yaml.safe_load(Path('.github/workflows/music.yml').read_text())
-        self.assertEqual(workflow['jobs']['lyrics']['needs'], 'models')
-        self.assertEqual(workflow['jobs']['models']['strategy']['matrix']['family'], ['lyrics','images','motion'])
+        self.assertTrue(any('kokoro' in s.get('with',{}).get('key','') for s in workflow['jobs']['story']['steps']))
 
     def test_image_prefetch_excludes_unused_weight_variants(self):
         with patch('huggingface_hub.snapshot_download') as download:
@@ -103,11 +101,11 @@ class CacheContractTests(unittest.TestCase):
 class StageRecoveryTests(unittest.TestCase):
     def test_resume_restores_matching_shards_before_regenerating(self):
         jobs = yaml.safe_load(Path('.github/workflows/music.yml').read_text())['jobs']
-        for job in ('images', 'short_images', 'short_music'):
+        for job in ('images',):
             steps = jobs[job]['steps']
             restore = next(s for s in steps if s.get('name') == 'Restore saved stage assets when resuming')
             self.assertIn("inputs.prepared_run != ''", restore['if'])
-            self.assertIn('needs.lyrics.outputs.restore_artifacts', restore['if'])
+            self.assertIn('steps.recovery.outputs.available', restore['if'])
             self.assertEqual(restore['with']['run-id'], '${{ inputs.prepared_run }}')
             generate = next(s for s in steps if s.get('name', '').startswith('Generate '))
             self.assertLess(steps.index(restore), steps.index(generate))

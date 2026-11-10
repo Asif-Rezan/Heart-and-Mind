@@ -124,17 +124,16 @@ class HindiPipelineTests(unittest.TestCase):
             self.assertEqual(params.call_args.kwargs['vocal_language'],'hi')
             self.assertEqual(params.call_args.kwargs['bpm'],130)
 
-    def test_defaults_and_all_workflow_language_bindings_are_hindi(self):
+    def test_active_cartoon_defaults_are_english_while_hindi_recovery_remains(self):
         import yaml
         from upload_settings import load_settings
-        with patch.dict(os.environ, {}, clear=True):
-            settings=load_settings()
-        self.assertEqual(settings['language'],'hi');self.assertEqual(settings['audio_language'],'hi')
-        for path in Path('.github/workflows').glob('*.yml'):
-            self.assertNotIn("inputs.video_language || 'en'",path.read_text())
-            self.assertNotIn("inputs.audio_language || 'en'",path.read_text())
-        jobs=yaml.safe_load(Path('.github/workflows/music.yml').read_text())['jobs']
-        self.assertEqual(jobs['publish']['env']['VIDEO_LANGUAGE'], "${{ inputs.video_language || 'hi' }}")
+        with patch.dict(os.environ, {}, clear=True): settings=load_settings()
+        self.assertEqual(settings['language'],'en')
+        self.assertEqual(settings['audio_language'],'en')
+        workflow=yaml.safe_load(Path('.github/workflows/music.yml').read_text())
+        self.assertEqual(workflow['env']['VIDEO_LANGUAGE'],'en')
+        self.assertEqual(workflow['env']['AUDIO_LANGUAGE'],'en')
+        self.assertTrue(Path('hindi_preflight.py').exists())
 
     def test_destination_setup_and_channel_do_not_point_to_reference(self):
         self.assertIn("Asif-Rezan/Heart-and-Mind",Path('setup_accounts.py').read_text())

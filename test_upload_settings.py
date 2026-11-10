@@ -13,7 +13,7 @@ class UploadSettingsTests(unittest.TestCase):
         self.assertEqual(body['status']['privacyStatus'],'public')
         self.assertTrue(body['status']['selfDeclaredMadeForKids'])
         self.assertTrue(body['status']['containsSyntheticMedia'])
-        self.assertEqual(body['snippet']['categoryId'],'10')
+        self.assertEqual(body['snippet']['categoryId'],'1')
         self.assertNotIn('publishAt',body['status'])
 
     def test_schedule_and_timezone(self):

@@ -1,9 +1,9 @@
 {
   "mode": "scheduled",
   "publish_at": null,
-  "language": "hi",
-  "audio_language": "hi",
-  "category_id": "10",
+  "language": "en",
+  "audio_language": "en",
+  "category_id": "1",
   "made_for_kids": true,
   "contains_synthetic_media": true,
   "license": "youtube",

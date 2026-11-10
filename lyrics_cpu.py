@@ -215,7 +215,8 @@ def request_story(endpoint, payload):
                 if issue=='maxLength':
                     correction += f' Write this field in no more than {max(1,int(bound*.65))} characters including spaces. Characters are not words.'
             if issue == 'pattern':
-                correction += ' Every lyric must have 4 to 12 Hindi Devanagari words, single spaces, no Romanized Hindi. Aim for 6 words.'
+                correction += (' Use plain English ASCII text and normal punctuation in every field.' if payload.get('language') == 'en' else
+                    ' Every lyric must have 4 to 12 Hindi Devanagari words, single spaces, no Romanized Hindi. Aim for 6 words.')
             if issue == 'incomplete_output':
                 correction += ' Shorten prose and lyric lines so the entire JSON fits the output budget.'
             messages.append({'role': 'user', 'content': correction +

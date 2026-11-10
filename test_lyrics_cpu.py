@@ -71,6 +71,19 @@ class QwenTests(unittest.TestCase):
             s.request_story('chat/completions', self.payload())
         self.assertEqual(model.create_chat_completion.call_count, 2)
 
+    def test_english_cartoon_pattern_retry_never_requests_hindi_lyrics(self):
+        payload = dict(self.payload(), language='en')
+        payload['response_format']['json_schema']['schema'] = {
+            'type':'object','properties':{'text':{'type':'string','pattern':r'^[A-Za-z ]+$'}},
+            'required':['text'],'additionalProperties':False}
+        model = self.model(create_chat_completion=Mock(side_effect=[
+            self.result(json.dumps({'text':'Hello!'})), self.result(json.dumps({'text':'Hello friend'}))]))
+        with patch.object(s,'load_model',return_value=model):
+            s.request_story('chat/completions',payload)
+        retry = model.create_chat_completion.call_args.kwargs['messages'][-1]['content']
+        self.assertIn('plain English',retry)
+        self.assertNotIn('Hindi',retry)
+
     def test_context_overflow_stops_before_inference(self):
         model = self.model()
         model.tokenize.return_value = [1] * s.CONTEXT_TOKENS

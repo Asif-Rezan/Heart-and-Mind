@@ -1,234 +1,56 @@
-# Heart and Mind — Hindi kids rhyme automation
+# Heart and Mind — English family story cartoons
 
-The active generator follows `Asif-Rezan/youtube-motivation-automation` at
-`44f8a3384a4e4e02d4f67e94929195cbe225c637`, adapted to Hindi Devanagari.
-The original Hindi album implementation is preserved in the rollback tag below.
+The active `music.yml` workflow now creates one shared English educational adventure cartoon for children and adults. It replaces the Hindi nursery-rhyme generation path. Narration, natural dialogue, humor, a believable mistake and its consequences carry the lesson; there are no separate child/adult cuts or obligatory dance choruses.
 
 ## Version log and rollback
 
-Original production baseline: `e6bf309529968fc834df14e7414d11061e3b3313`.
-Backup/documentation commit: `483d173`. Rollback tag:
-`before-hindi-kids-reference-2026-11-09`.
+- **Before this migration:** Hindi rhyme production commit `56aa49c`, preserved as tag `before-english-family-cartoon-2026-11-10`. Backup documentation commit `ea190ac` was pushed before implementation.
+- [Complete pre-cartoon README](docs/archive/before-english-family-cartoon-2026-11-10-README.md)
+- [Pre-cartoon production workflow](docs/archive/before-english-family-cartoon-music.yml.txt)
+- The earlier Hindi album baseline remains `e6bf309529968fc834df14e7414d11061e3b3313`, tag `before-hindi-kids-reference-2026-11-09`.
 
-- [Original README and prior behavior](docs/archive/before-hindi-kids-reference-2026-11-09-README.md)
-- [Original commit log](docs/archive/before-hindi-kids-reference-2026-11-09-commits.txt)
-- [Pinned reference README](docs/archive/motivation-44f8a33-README.md)
-
-To restore the complete original tracked implementation without rewriting history:
+To restore the previous Hindi rhyme implementation without rewriting Git history:
 
 ```sh
-git switch -c codex/restore-hindi-album
-git restore --source before-hindi-kids-reference-2026-11-09 -- .
-git commit -m "Restore Heart and Mind Hindi album generator"
-git push origin codex/restore-hindi-album
+git switch -c codex/restore-hindi-rhymes
+git restore --source before-english-family-cartoon-2026-11-10 -- .
+git commit -m "Restore pre-cartoon Hindi rhyme production"
+git push origin codex/restore-hindi-rhymes
 ```
 
-Merge that restoration branch to make it active again. Code rollback does not
-restore credentials, cloud variables, deleted media or already published videos.
+Merge that restoration branch to activate it. Git restores tracked source, not credentials, repository variables, deleted cloud media or published videos.
 
-## Reference behavior, in Hindi
+## Current generation flow
 
-- Default 240-second episode; 180–300 seconds allowed in five-second steps.
-- Original chorus-first song, alternating four-line verses and dance choruses,
-  with a fresh Hindi hook, 130 BPM, sweet adult female vocals, immediate opening
-  and a short button ending. The pinned ACE-Step CPU backend receives
-  `vocal_language=hi`; music remains generated singing.
-- The pinned Qwen CPU writer produces Hindi Devanagari lyrics, chorus, title,
-  description, story summary and chapter names. Lyrics have bounded word counts;
-  failed lines are rewritten with saved accepted content, never clipped or
-  replaced with canned English lyrics. Unicode normalization preserves matras
-  and nukta for word counting and novelty checks.
-- Public long-video and Shorts metadata are Hindi. Only the proper channel name
-  `Heart and Mind` and optional `#Shorts` use Latin script. Upload defaults for
-  metadata and audio are both `hi`; category, kids and AI disclosures, scheduling
-  and resumable publication follow the reference.
-- Cute baby animals and two toddler playmates, pastel 3D storybook art, one scene
-  every five seconds, 16 landscape and four portrait workers. Thumbnail uses its
-  own episode's opening scene; first frames animate that thumbnail artwork.
-- Reference character motion, opening punch-in, second dance move per scene,
-  face-preserving animation, 1080p landscape/portrait rendering and standalone
-  Shorts music are retained. Hindi action words are mapped to motion hints.
-- Technical visual descriptions, music-production captions and thumbnail focus
-  stay English for the pinned image/audio models; these are not public narration
-  or English sung lyrics. Images and thumbnails are text-free as in the reference.
+1. The pinned Qwen CPU model writes an original English outline and sixteen sequential shots, in four checkpointed batches. Each shot contains one speaker, complete spoken text, a matching illustration, emotion and a grounded action. Accepted batches survive interruptions. Duplicate dialogue, missing cast, invalid word counts and mismatched resumed requests stop clearly.
+2. Kokoro 82M synthesizes three stable American English voices on CPU: narrator `af_heart`, Mira `af_bella`, Theo `am_michael`. These are natural adult synthetic voices. Model revision `f3ff3571791e39611d31c381e3a41a3af07b4987` and library `0.9.4` are pinned. Weights and voice packs use that exact revision, with a shared GitHub Actions cache.
+3. Speech is measured before illustration/animation. Every scene gets its own frame-aligned duration and short reaction space. Complete narration is retained; speech is never forced into the old five-second rhyme slots. The writing target is 2–3 minutes; accepted complete media must be 2–5 minutes and each shot at most 25 seconds. Out-of-range/silent speech is rejected rather than clipped or silently replaced.
+4. An original, evolving synthesized instrumental score sits quietly beneath the voices, with optional gentle discovery/footstep cues. This score uses local synthesis, not ACE-Step singing or downloaded stock songs. Spoken pauses are intentional and do not use the old music-only silence rejection rule.
+5. Eight bounded CPU illustration/motion shards create the story's settings and fixed recurring cast: Mira in a teal jacket and Theo in an amber vest. Approaching a waiting friend, following a leader and approaching a visible ball are explicit actions. Other shots use restrained reaction/idle movement. Cast geometry and available space bound travel; characters do not drift simply because a shot needs motion.
+6. Cutout acting runs once over the actual spoken shot duration, with gentle camera movement and conservative blinks. Assembly blends a held outgoing frame into each incoming shot over 160 ms, preserving all dialogue timing. Output is 1920×1080 with AAC speech/music. Thumbnail uses the actual opening scene.
+7. Existing Heart and Mind account verification, Drive backup, resumable YouTube upload and verified publication receipts are reused. Metadata/audio language are English; category is Film & Animation. The previous scheduled publication policy and audience/disclosure settings remain in place. Rhyme Shorts are not automatically generated from cartoon dialogue.
 
-Generative singing, precise pronunciation, character continuity and lyric/audio
-alignment still require a finished-video listening/viewing check. Matching the
-pipeline does not promise identical generated media or word-level lip sync.
+This is narrated cutout animation, not full 3D acting or phoneme lip-sync. Expressions largely come from scene illustrations; uncertain face rigs are left untouched. A scene with an unusable segmentation mask falls back to camera motion and records that fallback. Prompted clothes/faces improve continuity but do not guarantee identical generated characters. Left/right cutout geometry grounds interactions; the engine does not recognize character names from pixels or synthesize physical handovers/pickups.
 
-## Destination accounts and storage
+## Run or resume
 
-The repository remains `Asif-Rezan/Heart-and-Mind`. Existing encrypted Google
-secrets and repository variables are not replaced or copied from the reference.
-`EXPECTED_CHANNEL_ID` comes only from this repository's secret/variable; there is
-no fallback to another channel. Existing OAuth setup remains in
-`setup_accounts.py` and the Heart and Mind privacy document is retained/updated.
+GitHub Actions → **Heart and Mind English family cartoon** → **Run workflow**:
 
-The existing `heart_and_mind_root=v1` Drive root and original account guard are
-retained. New checkpoints/history live in an isolated
-`heart_and_mind_hindi_kids_root=v1` child folder, so archived adult-album runs are
-not reused, overwritten or mixed with new kids episodes. Use a fresh run ID;
-previous album/story drafts are not silently translated.
+- `run_id`: a fresh identity such as `cartoon-map-20261110-01`.
+- `topic`: the shared story theme; default is a funny misunderstanding resolved through cooperation.
+- `upload_mode` / `publish_at`: existing scheduled/public controls.
+- `prepared_run`: optional numeric ID of a previous **cartoon** run. Reuse the same `run_id` and topic; expired/mismatched artifacts fail clearly. The story/speech checkpoint and available matching image shards are restored; matching audio/clip hashes avoid repeated inference. Hindi rhyme checkpoints belong to the archived generation path.
 
-Optional Facebook publication is disabled unless `FACEBOOK_PUBLISH_ENABLED=true`.
-If used, configure this channel's `FACEBOOK_PAGE_ID` repository variable and
-`FACEBOOK_PAGE_ACCESS_TOKEN` secret. No reference Page ID is inherited.
+Partial story, speech, image/motion and publication diagnostics are uploaded even when a stage fails, retained for seven days. Kokoro candidates are validated before becoming reusable speech checkpoints. Encoder output is committed only after duration/frame checks. Failed YouTube uploads retain the existing ambiguous-upload guard, so retries cannot blindly duplicate a video.
 
-## Error handling and model caches
+For local development use Python 3.12, FFmpeg/ffprobe, espeak-ng, the base requirements and the stage-specific requirements. `requirements-cartoon.txt` pins Kokoro and explicitly installs its English pronunciation model. The workflow installs CPU PyTorch separately and verifies regression tests before model generation. Run `python -m unittest -v` and actionlint before pushing.
 
-The reference creative pipeline includes the verified operational fixes from the
-other destinations: bounded music-quality retries, native audio edge repair,
-saved-part recovery, worker memory/time limits, atomic/checksum-verified motion
-model downloads and official release/API fallback for HTTP 504. The pinned
-llama-cpp-python installer retries official wheels and can compile the same CPU
-release from PyPI during a GitHub wheel outage. Bounded runner package setup is
-retained.
+## Accounts, caches and legacy tools
 
-The existing/free 10 GB cache policy stores SSD-1B, Qwen and motion weights
-(approximately 9.15 GiB compressed combined). Keys use exact model revisions and
-checksums, shared across runs and image shards; caches save before inference.
-ACE-Step's approximately 4.6 GiB archive is left runner-local to avoid evicting
-the models used by twenty image workers. Competing pip caches are disabled.
-GitHub may expire inactive caches; verified downloads handle misses. No paid
-capacity or billing setting is changed.
+Repository and destination remain `Asif-Rezan/Heart-and-Mind`; no other channel's credentials or Page token are copied. Existing `PUBLISH_ENABLED`, `AUTOMATION_ENABLED`, Google secrets and channel verification still apply. Facebook remains optional and requires this project's Page ID/access-token configuration. Changing the cartoon format does not configure that missing account connection.
 
-Source-only legacy projects, obsolete fixed English public metadata and one-off
-recovery triggers targeting reference run IDs are excluded from active code.
-Original versions remain in the rollback tag/reference archive.
+The existing lyrics/image/motion model caches are retained, with a small additional Kokoro cache. Repository cache quota stays at the owner-approved 10 GB; eviction can cause a future download. No ACE-Step model is needed by the active cartoon workflow. Manual Hindi/Shorts/recovery tools remain for old content; they do not define the new daily cartoon format. Use the active workflow with `prepared_run` for cartoon generation recovery.
 
-## Generate and verify
+## Validation for the migration
 
-Run **Heart and Mind Hindi kids rhyme generation** with a fresh `run_id`.
-`AUTOMATION_ENABLED=true` enables the reference's daily 03:00 Asia/Dhaka schedule.
-`PUBLISH_ENABLED=true` enables publication, following the reference's first 06:00
-New York slot at least 72 hours after upload. The dispatch form can choose
-public/scheduled mode and an explicit future publication time.
-
-Use **Verify real Hindi reference episode (no publishing)** to generate a real
-Hindi lyric/storyboard/public package on CPU without Drive or YouTube publication.
-Use **Verify and warm pinned model caches** for actual model download/cache and
-BiRefNet/LaMa inference checks. Component checks include real FFmpeg regression
-renders, Hindi language/grammar, vocal-language wiring, metadata, novelty,
-checkpoint recovery and guarded publication tests.
-
-For local checks, install `requirements.txt` and FFmpeg, then run:
-
-```sh
-python -m unittest discover -v
-```
-
-## Migration verification log — 2026-11-09
-
-Migration commit: `3818138` (pinned reference `44f8a33`, Hindi adaptation).
-
-- Local and GitHub [component checks](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42604681632): 227 tests passed, including Hindi guards, native vocal-language wiring and FFmpeg regressions. Actionlint and whitespace checks passed.
-- [Camera/background and multiple-character render](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202705): passed.
-- [Model cache warmup](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202709): lyrics, image and motion jobs passed; real BiRefNet/LaMa inference passed. Three model archives are saved under the existing 10 GB quota.
-- [Real Hindi CPU preflight](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42601202693): first attempt superseded after a slow verse request; Hindi prompt JSON now retains native Devanagari instead of verbose Unicode escapes. Updated [preflight 42604681634](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42604681634) is running against `1d02052`: all 227 tests passed, the Qwen cache restored successfully, and the real Hindi outline passed on its first attempt. This run was superseded by the metadata field-repair/grammar fixes below; the final real Hindi preflight passed. A finished singing/video quality check remains separate.
-
-The old reference-only motion demo workflow is archived in `docs/archive/reference-dudi-motion-demo.yml.txt`; audio recovery requires explicit destination run IDs instead of stale reference defaults.
-
-No production video has been generated or published as part of this migration verification. A finished Hindi singing/video listening check remains necessary after the first production generation.
-
-
-## Hindi packaging efficiency fix — 2026-11-09
-
-The first real preflight completed the Hindi outline and both verse chapters,
-but metadata validation repeatedly regenerated the entire package for a single
-English public field or overlong thumbnail focus. This is a retry-efficiency
-problem, not a model-download failure.
-
-Packaging now sends unique verse lyrics once and only the first eight opening
-actions for Shorts/thumbnail grounding, instead of repeating 24 long scene
-prompts. It retains the full initial candidate before content validation, then
-asks Qwen to repair only failed fields. Final Hindi, schema, title/thumbnail and
-upload checks remain mandatory. Correct fields are checkpointed in
-`package-draft.json` and reused after interruption; no fabricated Hindi fallback
-or blind lyric truncation is added. Thumbnail-only repair has an 800-token output
-budget and only the opening-scene context. A CPU inference heartbeat reports
-liveness every 60 seconds without printing generated content.
-
-Local regression checks: 231 tests passed, including overlong-thumbnail repair,
-English-description repair, accepted-field preservation, interrupted metadata
-resume and compact episode facts. Real CPU timing is recorded after verification;
-a speedup factor is not claimed from mock tests. Hindi preflight is now manual
-to avoid launching expensive model inference on every code push, and supports
-`source_run` plus `saved_run_id` to reuse accepted lyrics from an earlier preflight.
-
-
-Public metadata now also uses a compact native Devanagari grammar: ordinary
-punctuation/digits and exact `Heart and Mind`/`#Shorts` are permitted, while English
-acronyms and hashtags are blocked during sampling. Technical thumbnail focus
-remains English. This prevents repeated description repair for English leakage
-instead of relying only on prompt instructions. The pinned local llama.cpp
-converter successfully compiled this grammar. It avoids large native prose
-length expansions; final Python length/language checks still apply.
-
-
-## Verified Hindi retry improvements and new full run — 2026-11-09
-
-- Field repair/checkpoint implementation: `9af5500`; native public Hindi grammar: `5565a49`.
-- Local regression suite: **234 tests passed**. [GitHub component checks](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42611372457) passed.
-- Actual same-episode metadata prompt fell from **5,822 to 2,764 tokens** (about 53% smaller). The first package response took **186.3 seconds**, versus **639.8 seconds** in the earlier run; output sizes and sampled text differ, so this is an observed run comparison, not a guaranteed speedup.
-- Prompt-only language repairs still leaked Latin text. The compact native public-text grammar then resolved the saved description fields: [real Hindi preflight 42611404651](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42611404651) **completed successfully**, restoring accepted lyrics and metadata from the prior run. The full preflight checks Hindi text, 240-second/48-scene form, chorus-first opening, public long/Shorts metadata and opening-scene thumbnail wiring. It performs no publication or audio/image inference.
-- At the user's request, [full production generation 42612096973](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42612096973) was started from `5565a49`, fresh ID `heart-hindi-20261109-01`, female vocal, metadata/audio language `hi`, default 240 seconds and scheduled upload mode. It is in progress; completion/publication and finished audio quality are not yet claimed.
-
-
-## Publication switch incident and recovery — 2026-11-10
-
-Run `42612096973` successfully rendered the 240-second video and its Short, but
-both YouTube upload steps were **skipped**, not uploaded or scheduled. The
-repository had only `AUTOMATION_ENABLED=true`; `PUBLISH_ENABLED` was absent.
-Facebook jobs were also skipped: there was no Facebook enable variable, Page ID
-or `FACEBOOK_PAGE_ACCESS_TOKEN` secret. A job named `publish` succeeding therefore
-proved rendering, not platform publication.
-
-`PUBLISH_ENABLED=true` has now been configured. Production/Shorts entry points and
-finished-video recovery explicitly reject a disabled publishing switch before
-model generation/publication rather than silently claiming success. Dedicated
-no-publishing preview workflows remain available. Verified upload receipts show
-the YouTube link and distinguish **scheduled, not public yet** from public,
-including the release time in Asia/Dhaka. The reference 72-hour/New York 06:00
-schedule policy is retained.
-
-Recovery of the saved full video: [42758431952](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42758431952),
-source `42612096973`, identity `heart-hindi-20261109-01`. No new AI generation is
-needed. The existing Short can reuse its saved portrait/music assets through
-Create and publish a rhyme Short with both prepared flags true.
-
-The original baseline tag and all 150 earlier commits were searched: no Facebook
-implementation/token reference was found in their Python/workflow files. An older
-README explicitly said story automation had no Shorts/Facebook cross-posting.
-Git cannot restore an encrypted GitHub secret value. Facebook recovery requires
-the intended Heart and Mind Page ID and its Page access token configured in this
-repository; no token or Page identity from another channel is copied.
-
-Validation: 239 local tests passed, including disabled production flags and
-scheduled/public receipt distinctions; active workflows passed actionlint.
-Actual recovery results are recorded after the platform checks complete.
-
-The recovery workflow also uses a per-episode recovery lock. The former
-repository-wide generation lock left upload-only recovery pending behind another
-episode's expensive synthesis. Recoveries for the same episode remain serialized;
-this recovery does not restart or cancel the active daily episode.
-
-
-Recovery progress: [Short upload 42757383766](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42757383766)
-completed successfully. YouTube read-back confirmed [JI9x3Q4u7WA](https://www.youtube.com/shorts/JI9x3Q4u7WA)
-is scheduled for **2026-11-13 17:00 Asia/Dhaka** (11:00 UTC), not public yet.
-The full-video recovery uses the current hosted runner pool after the old
-ubuntu-24.04 request remained queued with all matching runners busy. Earlier
-queued recovery requests `42756811734`/`42757342822` were superseded before upload;
-the active request is `42758431952`. No active daily generation was cancelled.
-
-Manual Facebook-only runs now execute an explicit enable/Page ID/token check,
-instead of silently skipping the entire job when unconfigured. The Facebook
-secret/Page identity is still missing and must be configured before a Facebook
-upload can be completed.
-
-Final local validation after the Facebook fail-fast guard: **241 tests passed**; actionlint and whitespace checks passed. Full-video recovery is still queued for a GitHub-hosted runner; no full-video upload is claimed until its platform verification succeeds.
-
-
-### English family cartoon migration backup — 2026-11-10
-
-Current Hindi rhyme production source is preserved at `56aa49c` and tag `before-english-family-cartoon-2026-11-10`. The complete README is archived at [the pre-cartoon README](docs/archive/before-english-family-cartoon-2026-11-10-README.md). Restore with `git restore --source before-english-family-cartoon-2026-11-10 -- .`, then commit and push the restoration. Credentials, external settings and published videos are not rolled back by Git.
+Real Kokoro synthesis was exercised for all three selected voices. Regression coverage includes checkpointed story resumption, English/cast guards, corrupted speech recovery without regenerating accepted shots, silence rejection, sample/frame-aligned audio mixing, grounded action selection, variable-length actor rendering, and real FFmpeg assembly/decode of a complete 140.8-second test timeline with transitions. A generated episode still needs a finished-video viewing/listening check for creative quality and factual accuracy.

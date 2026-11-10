@@ -103,6 +103,9 @@ def normalize_lyrics(text):
 
 
 def validate_song(song):
+    if song.get("format") == "english-family-cartoon-v1":
+        from cartoon_story import validate_manifest
+        return validate_manifest(song, timed=True)
     for field in ('title', 'lyrics', 'prompt', 'description'):
         if not isinstance(song.get(field), str) or not song[field].strip():
             raise ValueError('Missing song ' + field)
@@ -148,6 +151,10 @@ def validate_duration(seconds):
 
 
 def render(root):
+    manifest = json.loads((Path(root)/"song.json").read_text())
+    if manifest.get("format") == "english-family-cartoon-v1":
+        from cartoon_render import assemble
+        return assemble(root)
     from kids_rhymes import render_video
     render_video(root)
 
@@ -223,6 +230,14 @@ def publish(client, root, song, state, save, upload_thumbnail=True, metadata_kin
     raise TimeoutError('HD processing pending; rerun same run ID')
 
 
+def validate_media_duration(song, measured):
+    if song.get('format') == 'english-family-cartoon-v1':
+        if not 120 <= measured <= 300 or abs(measured-song['duration']) > .1:
+            raise ValueError('Cartoon media does not match its voice-derived timeline')
+    else:
+        validate_duration(measured)
+
+
 def run(run_id, defer_drive_cleanup=False):
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', run_id):
         raise ValueError('Invalid run ID')
@@ -267,7 +282,7 @@ def run(run_id, defer_drive_cleanup=False):
         else:
             from music_cpu import generate
             generate(song, root/'song.wav', state, save)
-    validate_duration(duration(root/'song.wav'))
+    validate_media_duration(song, duration(root/'song.wav'))
     if not state.get('video_id'):
         print(json.dumps({'phase':'back up audio'}),flush=True)
         store.upload(root/'song.wav', f'runs/{run_id}/song.wav')
@@ -275,7 +290,7 @@ def run(run_id, defer_drive_cleanup=False):
             from song_images import generate_song_images
             generate_song_images(root, song)
             render(root)
-        validate_duration(duration(root/'video.mp4'))
+        validate_media_duration(song, duration(root/'video.mp4'))
         import tarfile
         with tarfile.open(root/'storyboard.tar.gz', 'w:gz') as archive:
             for path in sorted(root.glob('scene-*-source.png')) + sorted(root.glob('image-manifest-*.json')):
