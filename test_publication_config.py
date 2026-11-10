@@ -41,3 +41,19 @@ class PublicationConfigTests(unittest.TestCase):
                 validate({'PUBLISH_ENABLED':value},require_enabled=True)
         ready=dict.fromkeys(REQUIRED,'configured');ready['PUBLISH_ENABLED']='true'
         validate(ready,require_enabled=True)
+
+    def test_manual_facebook_requires_explicit_enable_flag(self):
+        from validate_publication_config import validate_facebook
+        with self.assertRaisesRegex(ValueError,'FACEBOOK_PUBLISH_ENABLED'):
+            validate_facebook({})
+
+    def test_manual_facebook_requires_its_own_page_and_token(self):
+        from validate_publication_config import validate_facebook
+        ready=dict(FACEBOOK_PUBLISH_ENABLED='true',FACEBOOK_PAGE_ID='12345',FACEBOOK_PAGE_ACCESS_TOKEN='private-token')
+        validate_facebook(ready)
+        for key in ('FACEBOOK_PAGE_ID','FACEBOOK_PAGE_ACCESS_TOKEN'):
+            bad=dict(ready);del bad[key]
+            with self.assertRaisesRegex(ValueError,key) as caught: validate_facebook(bad)
+            self.assertNotIn('private-token',str(caught.exception))
+        with self.assertRaisesRegex(ValueError,'numeric'):
+            validate_facebook(dict(ready,FACEBOOK_PAGE_ID='wrong-page'))

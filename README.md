@@ -191,7 +191,7 @@ the YouTube link and distinguish **scheduled, not public yet** from public,
 including the release time in Asia/Dhaka. The reference 72-hour/New York 06:00
 schedule policy is retained.
 
-Recovery of the saved full video: [42756811734](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42756811734),
+Recovery of the saved full video: [42758431952](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42758431952),
 source `42612096973`, identity `heart-hindi-20261109-01`. No new AI generation is
 needed. The existing Short can reuse its saved portrait/music assets through
 Create and publish a rhyme Short with both prepared flags true.
@@ -211,3 +211,19 @@ The recovery workflow also uses a per-episode recovery lock. The former
 repository-wide generation lock left upload-only recovery pending behind another
 episode's expensive synthesis. Recoveries for the same episode remain serialized;
 this recovery does not restart or cancel the active daily episode.
+
+
+Recovery progress: [Short upload 42757383766](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42757383766)
+completed successfully. YouTube read-back confirmed [JI9x3Q4u7WA](https://www.youtube.com/shorts/JI9x3Q4u7WA)
+is scheduled for **2026-11-13 17:00 Asia/Dhaka** (11:00 UTC), not public yet.
+The full-video recovery uses the current hosted runner pool after the old
+ubuntu-24.04 request remained queued with all matching runners busy. Earlier
+queued recovery requests `42756811734`/`42757342822` were superseded before upload;
+the active request is `42758431952`. No active daily generation was cancelled.
+
+Manual Facebook-only runs now execute an explicit enable/Page ID/token check,
+instead of silently skipping the entire job when unconfigured. The Facebook
+secret/Page identity is still missing and must be configured before a Facebook
+upload can be completed.
+
+Final local validation after the Facebook fail-fast guard: **241 tests passed**; actionlint and whitespace checks passed. Full-video recovery is still queued for a GitHub-hosted runner; no full-video upload is claimed until its platform verification succeeds.
