@@ -71,7 +71,7 @@ def image_prompt(outline, shot):
         'react': 'A clear expressive reaction, separate full bodies visible. ', 'wait': 'The friends pause thoughtfully. '}[shot['action']]
     return ('Warm 3D family cartoon. Mira: short dark bob, teal jacket, brown trousers. '
             'Theo: curly brown hair, amber vest, navy trousers. Two young adult friends. '
-            +staging+shot['visual']+'. '+outline['setting']+
+            +staging+shot['visual']+'. Expression: '+shot['emotion']+'. '+outline['setting']+
             '. Same faces and clothes, separate full bodies, visible feet, open ground, no text.')
 
 
