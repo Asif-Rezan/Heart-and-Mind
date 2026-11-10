@@ -56,7 +56,7 @@ class StoryTests(unittest.TestCase):
                    'Together, they learn to check their assumptions before blaming each other.')
         value = dict(title='The Upside-Down Map',summary=summary,
             setting='A sunny woodland with a wooden bridge and winding paths.',
-            lesson='Check assumptions and work together.',beats=['The friends discover another piece of their woodland mystery.']*16)
+            lesson='Check assumptions and work together.',beats=['The friends discover another piece of their woodland mystery.']*20)
         validate(value,OUTLINE)
         response={'choices':[{'finish_reason':'stop','message':{'content':json.dumps(value,ensure_ascii=False)}}]}
         model=Mock(tokenize=Mock(return_value=[1]),create_chat_completion=Mock(return_value=response))
@@ -159,3 +159,29 @@ class RenderIntegrationTests(unittest.TestCase):
             valid_clip(target,60,320,180)
             with patch('character_motion.prepare_layers',side_effect=AssertionError('valid layers regenerated')):
                 self.assertEqual(render_shot(root,scene,320,180),target)
+
+
+class ParallelWorkflowTests(unittest.TestCase):
+    def test_twenty_workers_then_verified_publication_and_cleanup(self):
+        import yaml
+        workflow=yaml.safe_load(Path('.github/workflows/music.yml').read_text())
+        jobs=workflow['jobs']
+        self.assertEqual(jobs['images']['strategy']['max-parallel'],20)
+        self.assertEqual(jobs['images']['strategy']['matrix']['shard'],list(range(20)))
+        self.assertEqual(jobs['images']['env']['IMAGE_SHARDS'],'20')
+        self.assertEqual(set(jobs['publish']['needs']),{'story','images'})
+        self.assertEqual(set(jobs['cleanup']['needs']),{'story','publish'})
+        self.assertIn("needs.publish.result == 'success'",jobs['cleanup']['if'])
+        self.assertTrue(any('cleanup_drive.py --sweep' in step.get('run','') for step in jobs['cleanup']['steps']))
+
+    def test_twenty_shot_timeline_and_existing_sixteen_shot_checkpoint_are_valid(self):
+        for count in (16,20):
+            song=fixture()
+            if count==20:
+                for index in range(16,20):
+                    scene=copy.deepcopy(song['scenes'][index-16]);scene['index']=index
+                    scene['text']=scene['text'].replace('number '+str(index-16),'number '+str(index))
+                    song['scenes'].append(scene)
+            for index,scene in enumerate(song['scenes']):scene.update(start=index*8,end=(index+1)*8)
+            song['duration']=count*8
+            validate_manifest(song,timed=True)

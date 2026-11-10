@@ -24,7 +24,7 @@ def obj(properties):
 
 
 OUTLINE = obj(dict(title=text(8, 90), summary=text(100, 700), setting=text(30, 220),
-    lesson=text(15, 180), beats={'type': 'array', 'minItems': 16, 'maxItems': 16, 'items': text(20, 180)}))
+    lesson=text(15, 180), beats={'type': 'array', 'minItems': 20, 'maxItems': 20, 'items': text(20, 180)}))
 SHOT = obj(dict(speaker={'enum': list(CAST)}, text=text(60, 240), visual=text(40, 350),
     action={'enum': ACTIONS}, emotion={'enum': ['curious', 'amused', 'worried', 'surprised', 'relieved', 'thoughtful']},
     sfx={'enum': ['none', 'footsteps', 'discovery']}))
@@ -51,8 +51,8 @@ def request(schema, prompt, seed):
 
 
 def validate_shots(shots):
-    if len(shots) != 16:
-        raise ValueError('A complete family story needs sixteen shots')
+    if len(shots) not in (16, 20):
+        raise ValueError('A complete family story needs twenty shots (or a saved sixteen-shot episode)')
     for shot in shots:
         validate({k: shot[k] for k in SHOT['required']}, SHOT)
         if not 18 <= len(shot['text'].split()) <= 38:
@@ -85,13 +85,19 @@ def plan(root, run_id, topic='A funny everyday misunderstanding resolved through
     seed = int(hashlib.sha256(run_id.encode()).hexdigest()[:7], 16)
     if not draft.get('outline'):
         draft['outline'] = request(OUTLINE, 'Plan a complete 2-3 minute adventure for Mira and Theo. Topic: '+topic+
-            '. Sixteen sequential story beats: opening problem, discovery, believable mistake, funny complication, '
+            '. Twenty sequential story beats: opening problem, discovery, believable mistake, funny complication, '
             'cooperation and earned resolution. One shared story for all ages, no separate adult/child versions. '
             'Use exactly these recurring characters: '+json.dumps(CAST)+'. Avoid these recent titles: '+
             json.dumps([h.get('title') for h in history[-20:]]), seed)
         atomic(draft_path, draft)
-    outline = draft['outline']; validate(outline, OUTLINE)
-    while len(draft['batches']) < 4:
+    outline = draft['outline']
+    # Keep accepted sixteen-shot checkpoints resumable without rewriting their story.
+    outline_schema = json.loads(json.dumps(OUTLINE))
+    outline_schema['properties']['beats'].update(minItems=16, maxItems=20)
+    validate(outline, outline_schema)
+    if len(outline['beats']) not in (16, 20):
+        raise ValueError('Saved outline must have sixteen or twenty complete story beats')
+    while len(draft['batches']) < len(outline['beats'])//4:
         batch = len(draft['batches']); prior = [s for b in draft['batches'] for s in b]
         feedback = ''
         for attempt in range(3):
@@ -129,7 +135,7 @@ def validate_manifest(song, timed=False):
     validate_shots(song['scenes'])
     if not 1 <= len(song['title']) <= 100 or not 1 <= len(song['description']) <= 4400:
         raise ValueError('Invalid cartoon public metadata')
-    if [s['index'] for s in song['scenes']] != list(range(16)):
+    if [s['index'] for s in song['scenes']] != list(range(len(song['scenes']))):
         raise ValueError('Cartoon shot indices must be continuous')
     if timed:
         end = 0

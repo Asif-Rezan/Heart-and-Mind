@@ -31,7 +31,7 @@ def prepare(run_id, stage, topic):
     if stage == 'images':
         from image_cpu import generate
         from cartoon_render import render_shot
-        shard, count = int(os.getenv('IMAGE_SHARD','0')), int(os.getenv('IMAGE_SHARDS','8'))
+        shard, count = int(os.getenv('IMAGE_SHARD','0')), int(os.getenv('IMAGE_SHARDS','20'))
         if not 0 <= shard < count: raise ValueError('Invalid cartoon image shard')
         # Generate all shard illustrations, then release diffusion before segmentation.
         for scene in song['scenes']:

@@ -124,13 +124,13 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 20
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     env:
       RUN_ID: ${{ needs.story.outputs.run_id }}
       IMAGE_SHARD: ${{ matrix.shard }}
-      IMAGE_SHARDS: '8'
+      IMAGE_SHARDS: '20'
       OMP_NUM_THREADS: '3'
     steps:
       - uses: actions/checkout@v4
@@ -251,3 +251,36 @@ jobs:
       kind: video
       non_blocking: false
     secrets: inherit
+
+  cleanup:
+    name: Clean published media from Drive
+    needs: [story, publish]
+    if: ${{ always() && !cancelled() && needs.publish.result == 'success' && vars.PUBLISH_ENABLED == 'true' }}
+    # Cleanup shares a lock only with other cleanup sweeps.
+    concurrency:
+      group: dudi-drive-cleanup
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SONG_RUN_ID: ${{ needs.story.outputs.run_id }}
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Clean eligible public HD episodes and record pending schedules
+        run: python -u cleanup_drive.py --sweep
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drive-cleanup-${{ github.run_id }}
+          path: output/drive-cleanup-report.json
+          retention-days: 14
