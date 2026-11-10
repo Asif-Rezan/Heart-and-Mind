@@ -251,7 +251,7 @@ jobs:
           FACEBOOK_PUBLISH_ENABLED: ${{ vars.FACEBOOK_PUBLISH_ENABLED }}
           FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
           PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED }}
-        run: python validate_publication_config.py
+        run: python validate_publication_config.py --require-enabled
       - name: Explain prepared asset reuse
         env:
           PREPARED_MUSIC: ${{ inputs.prepared_music }}

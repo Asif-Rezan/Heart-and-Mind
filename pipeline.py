@@ -245,6 +245,8 @@ def run(run_id, defer_drive_cleanup=False):
         if not defer_drive_cleanup and state['phase'] == 'published':
             from cleanup_drive import cleanup
             cleanup(store, client, run_id, state)
+        from publication_receipt import report
+        report(state)
         print(state['phase'] + ': ' + state['video_id'])
         return
     if not state.get('song'):
@@ -292,6 +294,8 @@ def run(run_id, defer_drive_cleanup=False):
     if not defer_drive_cleanup and state['phase'] == 'published':
         from cleanup_drive import cleanup
         cleanup(store, client, run_id, state)
+    from publication_receipt import report
+    report(state)
     print(json.dumps({'phase': state['phase'], 'video_id': state['video_id']}))
 
 

@@ -109,7 +109,7 @@ jobs:
           EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-        run: python validate_publication_config.py
+        run: python validate_publication_config.py --require-enabled
       - name: Install lyrics dependencies with pinned CPU source fallback
         timeout-minutes: 45
         run: python install_lyrics_dependencies.py
@@ -508,7 +508,7 @@ jobs:
             output/*/thumbnail.jpg
             output/*/song.json
           retention-days: 7
-      - name: Back up to Drive and publish publicly on Dudi Dam TV
+      - name: Back up to Drive, upload and verify Heart and Mind YouTube visibility
         if: vars.PUBLISH_ENABLED == 'true'
         run: python -u pipeline.py --run-id "$SONG_RUN_ID" --defer-drive-cleanup
       - uses: actions/upload-artifact@v4

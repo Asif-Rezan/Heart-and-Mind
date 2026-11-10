@@ -23,6 +23,8 @@ jobs:
     env:
       SONG_RUN_ID: ${{ inputs.run_id }}
       SOURCE_RUN: ${{ inputs.source_run }}
+      PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED }}
+      FACEBOOK_PUBLISH_ENABLED: ${{ vars.FACEBOOK_PUBLISH_ENABLED }}
       UPLOAD_MODE: scheduled
       YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
       EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
@@ -35,6 +37,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Require enabled YouTube publication
+        run: python validate_publication_config.py --require-enabled
       - name: Validate recovery identity
         shell: bash
         run: |

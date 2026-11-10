@@ -172,3 +172,37 @@ length expansions; final Python length/language checks still apply.
 - Actual same-episode metadata prompt fell from **5,822 to 2,764 tokens** (about 53% smaller). The first package response took **186.3 seconds**, versus **639.8 seconds** in the earlier run; output sizes and sampled text differ, so this is an observed run comparison, not a guaranteed speedup.
 - Prompt-only language repairs still leaked Latin text. The compact native public-text grammar then resolved the saved description fields: [real Hindi preflight 42611404651](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42611404651) **completed successfully**, restoring accepted lyrics and metadata from the prior run. The full preflight checks Hindi text, 240-second/48-scene form, chorus-first opening, public long/Shorts metadata and opening-scene thumbnail wiring. It performs no publication or audio/image inference.
 - At the user's request, [full production generation 42612096973](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42612096973) was started from `5565a49`, fresh ID `heart-hindi-20261109-01`, female vocal, metadata/audio language `hi`, default 240 seconds and scheduled upload mode. It is in progress; completion/publication and finished audio quality are not yet claimed.
+
+
+## Publication switch incident and recovery — 2026-11-10
+
+Run `42612096973` successfully rendered the 240-second video and its Short, but
+both YouTube upload steps were **skipped**, not uploaded or scheduled. The
+repository had only `AUTOMATION_ENABLED=true`; `PUBLISH_ENABLED` was absent.
+Facebook jobs were also skipped: there was no Facebook enable variable, Page ID
+or `FACEBOOK_PAGE_ACCESS_TOKEN` secret. A job named `publish` succeeding therefore
+proved rendering, not platform publication.
+
+`PUBLISH_ENABLED=true` has now been configured. Production/Shorts entry points and
+finished-video recovery explicitly reject a disabled publishing switch before
+model generation/publication rather than silently claiming success. Dedicated
+no-publishing preview workflows remain available. Verified upload receipts show
+the YouTube link and distinguish **scheduled, not public yet** from public,
+including the release time in Asia/Dhaka. The reference 72-hour/New York 06:00
+schedule policy is retained.
+
+Recovery of the saved full video: [42756811734](https://github.com/Asif-Rezan/Heart-and-Mind/actions/runs/42756811734),
+source `42612096973`, identity `heart-hindi-20261109-01`. No new AI generation is
+needed. The existing Short can reuse its saved portrait/music assets through
+Create and publish a rhyme Short with both prepared flags true.
+
+The original baseline tag and all 150 earlier commits were searched: no Facebook
+implementation/token reference was found in their Python/workflow files. An older
+README explicitly said story automation had no Shorts/Facebook cross-posting.
+Git cannot restore an encrypted GitHub secret value. Facebook recovery requires
+the intended Heart and Mind Page ID and its Page access token configured in this
+repository; no token or Page identity from another channel is copied.
+
+Validation: 239 local tests passed, including disabled production flags and
+scheduled/public receipt distinctions; active workflows passed actionlint.
+Actual recovery results are recorded after the platform checks complete.

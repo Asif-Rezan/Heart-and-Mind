@@ -34,3 +34,10 @@ class PublicationConfigTests(unittest.TestCase):
         del ready['YOUTUBE_TOKEN_JSON']
         with redirect_stdout(io.StringIO()), self.assertRaisesRegex(ValueError, 'YOUTUBE_TOKEN_JSON'):
             validate(ready)
+
+    def test_production_rejects_disabled_switch_instead_of_silently_rendering(self):
+        for value in ('','false','TRUE'):
+            with self.assertRaisesRegex(ValueError,'PUBLISH_ENABLED=true'):
+                validate({'PUBLISH_ENABLED':value},require_enabled=True)
+        ready=dict.fromkeys(REQUIRED,'configured');ready['PUBLISH_ENABLED']='true'
+        validate(ready,require_enabled=True)

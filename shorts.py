@@ -157,6 +157,8 @@ def run(run_id, start=0, seconds=40, publish=False):
     save()
     # Shorts use YouTube's video frames; do not call the long-video thumbnail API.
     publish_video(client, target, metadata, state, save, upload_thumbnail=False, metadata_kind='shorts')
+    from publication_receipt import report
+    report(state)
     print(json.dumps({'phase':state['phase'],'short_url':
         'https://www.youtube.com/shorts/' + state['video_id']}), flush=True)
 

@@ -32,6 +32,8 @@ def recover(run_id):
     client=youtube_client()
     # Existing ID is mandatory above; publish takes its verification branch.
     publish(client,matches[0].parent,{},state,save,upload_thumbnail=False)
+    from publication_receipt import report
+    report(state)
     print(json.dumps({'phase':state['phase'],'video_id':state['video_id'],
         'publish_at':state.get('schedule_target')}),flush=True)
 

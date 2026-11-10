@@ -81,7 +81,7 @@ class ShortsTests(unittest.TestCase):
                 def uploaded(client, root, metadata, state, save, upload_thumbnail=True, metadata_kind="video"):
                     self.assertFalse(upload_thumbnail)
                     self.assertEqual(metadata_kind,'shorts')
-                    state.update(video_id='same-video',phase='scheduled')
+                    state.update(video_id='same-video',phase='scheduled',schedule_target='2026-11-14T11:00:00Z')
                     save()
                 publish.side_effect = uploaded
                 shorts.run('episode', publish=True)
