@@ -31,13 +31,17 @@ def schedule_timestamp(value, now=None):
 
 def finish_fields(kind, video_id, session_id, metadata, timestamp):
     fields = dict(upload_phase='finish', title=metadata['title'], description=metadata['description'])
+    # None is direct publication; a timestamp is an explicit scheduled request.
     # Reel API supports an explicit AI disclosure. Also disclose in Page video text.
     if kind == 'short':
-        fields.update(video_id=video_id, video_state='SCHEDULED',
-                      scheduled_publish_time=timestamp, is_ai_generated='true')
+        fields.update(video_id=video_id, video_state='PUBLISHED' if timestamp is None else 'SCHEDULED',
+                      is_ai_generated='true')
+        if timestamp is not None:
+            fields['scheduled_publish_time']=timestamp
     else:
-        fields.update(upload_session_id=session_id, published='false',
-                      scheduled_publish_time=timestamp, unpublished_content_type='SCHEDULED')
+        fields.update(upload_session_id=session_id, published='true' if timestamp is None else 'false')
+        if timestamp is not None:
+            fields.update(scheduled_publish_time=timestamp, unpublished_content_type='SCHEDULED')
     return fields
 
 
@@ -74,7 +78,7 @@ class Facebook:
             raise FacebookError('Facebook token does not belong to Heart and Mind')
 
     def status(self, video_id):
-        return self.request('GET', f'/{VERSION}/{video_id}', params={'fields': 'id,status,scheduled_publish_time,from'})
+        return self.request('GET', f'/{VERSION}/{video_id}', params={'fields': 'id,status,scheduled_publish_time,from,published'})
 
 
 def verify_remote(remote, state):
@@ -84,6 +88,11 @@ def verify_remote(remote, state):
     if any(status.get(key, {}).get('status') == 'error' for key in ('uploading_phase','processing_phase','publishing_phase')) or status.get('video_status') in ('error', 'failed'):
         raise FacebookError('Facebook video processing failed; saved video retained')
     actual = remote.get('scheduled_publish_time')
+    if state.get('publish_at') is None:
+        # Processing readiness alone also describes drafts. Require publication
+        # evidence from the API, not just a successful finish response.
+        published=remote.get('published') is True or status.get('publishing_phase',{}).get('publish_status')=='published'
+        return actual in (None,0,'0') and status.get('video_status')=='ready' and published
     if actual is not None:
         try:
             stamp = int(actual)
@@ -173,14 +182,14 @@ def publish(api, path, kind, metadata, publish_at, state, save, *, attempts=60, 
         save()
     for attempt in range(attempts):
         if verify_remote(api.status(state['video_id']),state):
-            state['phase'] = 'scheduled'
+            state['phase'] = 'published' if state['publish_at'] is None else 'scheduled'
             save()
-            print(json.dumps({'phase':'Facebook scheduled','video_id':state['video_id'],'page_id':PAGE_ID,
+            print(json.dumps({'phase':'Facebook '+state['phase'],'video_id':state['video_id'],'page_id':PAGE_ID,
                               'publish_at':state['publish_at']}),flush=True)
             return
         if attempt+1 < attempts:
             sleep(15)
-    raise FacebookError('Facebook processing or schedule readback pending; resume the same identity')
+    raise FacebookError('Facebook processing or visibility readback pending; resume the same identity')
 
 
 def run(run_id, kind):
@@ -196,12 +205,17 @@ def run(run_id, kind):
         youtube_key = f'runs/{run_id}/state.json'
     youtube = store.load(youtube_key,{})
     target = youtube.get('schedule_target') or youtube.get('upload_settings',{}).get('publish_at')
-    if youtube.get('phase') not in ('scheduled','published') or not target:
-        raise FacebookError('Verified scheduled YouTube checkpoint is required before Facebook publication')
+    if youtube.get('phase') not in ('scheduled','published'):
+        raise FacebookError('Verified YouTube checkpoint is required before Facebook publication')
+    if youtube['phase']=='scheduled' and not target:
+        raise FacebookError('Scheduled YouTube checkpoint requires a publication time')
     key = f'facebook/{run_id}/{kind}/state.json'
     state = store.load(key,{})
     # Retries preserve the frozen target; never silently move an expired schedule.
-    stamp = schedule_timestamp(target) if not state.get('video_id') else int(state['publish_at'])
+    if state.get('video_id'):
+        stamp=state['publish_at']  # Preserve existing public/scheduled identity.
+    else:
+        stamp=None if youtube['phase']=='published' else schedule_timestamp(target)
     from episode_packaging import public_metadata
     snippet=youtube.get('upload_body',{}).get('snippet',{})
     if snippet:
@@ -209,7 +223,7 @@ def run(run_id, kind):
     else:
         song=json.loads((Path('output')/run_id/'song.json').read_text())
         metadata=public_metadata(song,'shorts' if kind=='short' else 'video')
-    metadata['description'] += '\n\nएआई से बना मौलिक संगीत और चित्र।'
+    metadata['description'] += '\n\nCreated with AI-generated music and illustrations.'
     # Keep the original bytes when resuming a pre-existing landscape upload.
     feed_copy=kind=='video' and (not state or state.get('media_format')=='feed-4x5-crop-v1')
     path=root/'video.mp4'

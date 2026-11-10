@@ -30,8 +30,8 @@ on:
       upload_mode:
         description: Publication mode (requires PUBLISH_ENABLED)
         type: choice
-        options: [scheduled, public]
-        default: scheduled
+        options: [public, scheduled]
+        default: public
   workflow_call:
     inputs:
       prepared_music:
@@ -48,7 +48,7 @@ on:
         required: true
       upload_mode:
         type: string
-        default: scheduled
+        default: public
     # Preview rendering needs artifacts only; publication validates secrets at runtime.
     secrets:
       FACEBOOK_PAGE_ACCESS_TOKEN:

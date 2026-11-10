@@ -16,8 +16,8 @@ on:
       upload_mode:
         description: Publication visibility after processing
         type: choice
-        default: scheduled
-        options: [scheduled, public]
+        default: public
+        options: [public, scheduled]
       publish_at:
         description: Optional ISO schedule override; empty preserves the existing schedule policy
         type: string
@@ -286,7 +286,7 @@ jobs:
     timeout-minutes: 60
     env:
       RUN_ID: ${{ needs.story.outputs.run_id }}
-      UPLOAD_MODE: ${{ inputs.upload_mode || 'scheduled' }}
+      UPLOAD_MODE: ${{ inputs.upload_mode || 'public' }}
       PUBLISH_AT: ${{ inputs.publish_at }}
       YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
       EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}

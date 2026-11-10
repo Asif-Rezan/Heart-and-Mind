@@ -25,7 +25,7 @@ jobs:
       SOURCE_RUN: ${{ inputs.source_run }}
       PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED }}
       FACEBOOK_PUBLISH_ENABLED: ${{ vars.FACEBOOK_PUBLISH_ENABLED }}
-      UPLOAD_MODE: scheduled
+      UPLOAD_MODE: public
       YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
       EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
       DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}

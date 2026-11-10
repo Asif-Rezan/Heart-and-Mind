@@ -55,13 +55,13 @@ class UploadSettingsTests(unittest.TestCase):
         video['contentDetails']={'definition':'hd'}
         self.assertEqual(verified_phase(video,body,'channel'),'published')
 
-    def test_automatic_schedule_is_default_and_initial_upload_is_private(self):
+    def test_direct_publication_is_default_and_has_no_schedule(self):
         with patch.dict(os.environ,{},clear=True):
             settings=load_settings()
-        self.assertEqual(settings['mode'],'scheduled')
+        self.assertEqual(settings['mode'],'public')
         self.assertIsNone(settings['publish_at'])
         body=upload_body({'title':'Dudi'},'description',[],settings)
-        self.assertEqual(body['status']['privacyStatus'],'private')
+        self.assertEqual(body['status']['privacyStatus'],'public')
         self.assertNotIn('publishAt',body['status'])
 
     def test_new_york_time_boundaries_and_daylight_saving(self):
@@ -81,7 +81,7 @@ class UploadSettingsTests(unittest.TestCase):
             self.assertEqual(when.astimezone(ZoneInfo('America/New_York')).hour,6)
 
     def test_schedule_after_upload_freezes_target_across_update_retry(self):
-        with patch.dict(os.environ,{},clear=True): settings=load_settings()
+        with patch.dict(os.environ,{},clear=True): settings=load_settings(); settings['mode']='scheduled'
         state={'video_id':'video','upload_settings':settings,
             'upload_completed_at':'2026-10-28T12:00:00Z',
             'upload_body':upload_body({'title':'Dudi'},'description',[],settings)}
@@ -158,7 +158,7 @@ class UploadSettingsTests(unittest.TestCase):
         from googleapiclient.errors import HttpError
         import httplib2
         with patch.dict(os.environ, {'EXPECTED_CHANNEL_ID':'channel'},clear=True):
-            settings=load_settings()
+            settings=load_settings(); settings['mode']='scheduled'
             state={'video_id':'video','upload_settings':settings,
                 'upload_completed_at':'2026-10-29T12:00:00Z',
                 'upload_body':upload_body({'title':'Dudi'},'description',[],settings)}
@@ -190,7 +190,7 @@ class UploadSettingsTests(unittest.TestCase):
             self.assertFalse(state.get('schedule_pending'))
 
     def test_schedule_reconciles_already_applied_time_without_update(self):
-        settings=load_settings()
+        settings=load_settings(); settings['mode']='scheduled'
         state={'video_id':'video','upload_settings':settings,
             'upload_completed_at':'2026-10-29T12:00:00Z',
             'schedule_target':'2026-11-02T11:00:00Z',
@@ -205,7 +205,7 @@ class UploadSettingsTests(unittest.TestCase):
     def test_schedule_quota_denial_is_not_blindly_retried(self):
         from googleapiclient.errors import HttpError
         import httplib2
-        settings=load_settings()
+        settings=load_settings(); settings['mode']='scheduled'
         state={'video_id':'video','upload_settings':settings,
             'upload_completed_at':'2026-10-29T12:00:00Z',
             'upload_body':upload_body({'title':'Dudi'},'description',[],settings)}
@@ -223,7 +223,7 @@ class UploadSettingsTests(unittest.TestCase):
         client.videos.return_value.insert.assert_not_called()
 
     def test_processing_wait_is_bounded_and_preserves_pending_checkpoint(self):
-        settings=load_settings()
+        settings=load_settings(); settings['mode']='scheduled'
         state={'video_id':'video','upload_settings':settings,
             'upload_completed_at':'2026-10-29T12:00:00Z',
             'upload_body':upload_body({'title':'Dudi'},'description',[],settings)}
@@ -240,7 +240,7 @@ class UploadSettingsTests(unittest.TestCase):
 
     def test_processing_longer_than_old_two_minute_window_schedules_same_video(self):
         with patch.dict(os.environ, {'EXPECTED_CHANNEL_ID':'channel'}, clear=True):
-            settings=load_settings()
+            settings=load_settings(); settings['mode']='scheduled'
             state={'video_id':'existing-short','upload_settings':settings,
                 'upload_completed_at':'2026-10-29T12:00:00Z',
                 'upload_body':upload_body({'title':'Dudi'},'description',[],settings)}
@@ -269,7 +269,7 @@ class UploadSettingsTests(unittest.TestCase):
             self.assertGreaterEqual(sleep.call_count,15)
 
     def test_schedule_obeys_shared_deadline_and_keeps_same_id_for_recovery(self):
-        settings=load_settings()
+        settings=load_settings(); settings['mode']='scheduled'
         state={'video_id':'existing-short','upload_settings':settings,
             'upload_completed_at':'2026-10-29T12:00:00Z',
             'upload_body':upload_body({'title':'Dudi'},'description',[],settings)}
