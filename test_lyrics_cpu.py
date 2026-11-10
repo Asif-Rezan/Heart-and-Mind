@@ -81,7 +81,7 @@ class QwenTests(unittest.TestCase):
         with patch.object(s,'load_model',return_value=model):
             s.request_story('chat/completions',payload)
         retry = model.create_chat_completion.call_args.kwargs['messages'][-1]['content']
-        self.assertIn('plain English',retry)
+        self.assertIn('English text',retry)
         self.assertNotIn('Hindi',retry)
 
     def test_context_overflow_stops_before_inference(self):

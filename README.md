@@ -54,3 +54,8 @@ The existing lyrics/image/motion model caches are retained, with a small additio
 ## Validation for the migration
 
 Real Kokoro synthesis was exercised for all three selected voices. Regression coverage includes checkpointed story resumption, English/cast guards, corrupted speech recovery without regenerating accepted shots, silence rejection, sample/frame-aligned audio mixing, grounded action selection, variable-length actor rendering, and real FFmpeg assembly/decode of a complete 140.8-second test timeline with transitions. A generated episode still needs a finished-video viewing/listening check for creative quality and factual accuracy.
+
+
+### 2026-11-10 — English outline punctuation regression
+
+First cartoon run `42793148672` stopped during outline creation: `summary` failed an ASCII-only pattern three times. That pattern also rejected English paragraphs and typographic quotes/dashes. English story fields now accept whitespace, Latin characters and common Unicode punctuation, while retaining string/word-count bounds and excluding other writing systems/control bytes. The saved schema validator remains active; no story is substituted or truncated. A regression exercises multi-paragraph English with curly quotes, an apostrophe and an em dash through the real request/validation path without model retries, and rejects Hindi, Chinese and NUL input.

@@ -46,6 +46,27 @@ class StoryTests(unittest.TestCase):
             self.assertNotIn('toddlers',completed['scenes'][0]['prompt'])
             with self.assertRaisesRegex(ValueError,'differs'):plan(root,'test','changed request')
 
+    def test_english_summary_accepts_paragraphs_and_typographic_punctuation(self):
+        from cartoon_story import OUTLINE, text, request
+        from jsonschema import validate, ValidationError
+        import lyrics_cpu
+        from unittest.mock import Mock
+        summary = ('Mira thinks she knows the way home—but Theo isn’t convinced. '
+                   'They follow a “shortcut” and discover a surprising sign.\n\n'
+                   'Together, they learn to check their assumptions before blaming each other.')
+        value = dict(title='The Upside-Down Map',summary=summary,
+            setting='A sunny woodland with a wooden bridge and winding paths.',
+            lesson='Check assumptions and work together.',beats=['The friends discover another piece of their woodland mystery.']*16)
+        validate(value,OUTLINE)
+        response={'choices':[{'finish_reason':'stop','message':{'content':json.dumps(value,ensure_ascii=False)}}]}
+        model=Mock(tokenize=Mock(return_value=[1]),create_chat_completion=Mock(return_value=response))
+        with patch.object(lyrics_cpu,'load_model',return_value=model):
+            result=request(OUTLINE,'Write an English family story',123)
+        self.assertEqual(result['summary'],summary)
+        self.assertEqual(model.create_chat_completion.call_count,1)
+        for invalid in ('यह कहानी हिंदी में है', '这是中文故事', 'English'+chr(0)+'text'):
+            with self.assertRaises(ValidationError):validate(invalid,text(1,100))
+
     def test_only_grounded_actions_travel_without_dance_or_random_props(self):
         for action in ('react','wait'):
             p=acting_plan(dict(action=action,index=0))

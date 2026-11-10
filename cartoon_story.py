@@ -16,7 +16,7 @@ ACTIONS = ['approach_friend', 'follow_friend', 'approach_ball', 'react', 'wait']
 
 
 def text(minimum, maximum):
-    return {'type': 'string', 'minLength': minimum, 'maxLength': maximum, 'pattern': r'^[\x20-\x7E]+$'}
+    return {'type': 'string', 'minLength': minimum, 'maxLength': maximum, 'pattern': r'^[\x09\x0A\x0D\x20-\x7E\u00A0-\u024F\u1E00-\u1EFF\u2000-\u206F]+$'}
 
 
 def obj(properties):
