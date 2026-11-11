@@ -85,10 +85,32 @@ class CartoonSEOTests(unittest.TestCase):
             self.assertIn('00:35 Checking the map',first)
             self.assertNotIn('00:20 Checking the map',first)
 
-    def test_invalid_candidates_retry_without_researching_again(self):
+    def test_valid_candidates_are_usable_when_another_title_is_rejected(self):
         bad=package();bad['candidates'][0]['story_evidence']='Completely invented scene and dialogue.'
-        writer=Mock(side_effect=[keywords(),bad,package()])
+        writer=Mock(side_effect=[keywords(),bad])
         with tempfile.TemporaryDirectory() as tmp:
             result=optimize(Path(tmp),story(),writer=writer)
-            self.assertEqual(writer.call_count,3)
-            self.assertTrue(result['title'])
+            self.assertEqual(writer.call_count,2)
+            self.assertRegex(result['title'], r'SURPRISING|CLEVER')
+
+    def test_exhausted_seo_attempts_resume_with_saved_story_metadata(self):
+        bad = package()
+        bad['description'] = 'An opening that misses the target keyword. ' * 5
+        writer = Mock(side_effect=[keywords(), bad, {}, bad])
+        song = story()
+        song['seo_pending'] = True
+        original = copy.deepcopy(song)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = optimize(root, song, writer=writer)
+            self.assertEqual(writer.call_count, 4)
+            self.assertEqual(result['title'], original['title'])
+            self.assertTrue(result['description'].startswith(original['story_summary']))
+            self.assertEqual(result['scenes'], original['scenes'])
+            self.assertNotIn('seo_pending', result)
+            description = result['description']
+            add_chapters(result)
+            self.assertEqual(result['description'], description)
+            writer.reset_mock()
+            self.assertEqual(optimize(root, result, writer=writer)['description'], description)
+            writer.assert_not_called()
