@@ -34,6 +34,28 @@ apt_options=(
   -o Acquire::http::Timeout=20
   -o Acquire::https::Timeout=20
 )
-sudo timeout --kill-after=15s 180s apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update
-sudo env DEBIAN_FRONTEND=noninteractive timeout --kill-after=15s 300s \
-  apt-get "${apt_options[@]}" install -y --no-install-recommends "${missing[@]}"
+# Restrict the runner's Ubuntu packages to the signed distro repositories.
+# Other preinstalled repositories can otherwise stall the entire index refresh.
+ubuntu_sources=/etc/apt/sources.list.d/ubuntu.sources
+if [[ -f "$ubuntu_sources" ]]; then
+  apt_options+=(-o "Dir::Etc::sourcelist=$ubuntu_sources" -o 'Dir::Etc::sourceparts=-')
+fi
+
+install_packages() {
+  sudo timeout --kill-after=15s 180s \
+    apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update &&
+  sudo env DEBIAN_FRONTEND=noninteractive timeout --kill-after=15s 300s \
+    apt-get "${apt_options[@]}" install -y --no-install-recommends "${missing[@]}"
+}
+
+if install_packages; then
+  exit 0
+fi
+
+echo '::warning::Ubuntu package setup failed on the primary archive. Retrying on the kernel.org mirror.'
+while IFS= read -r -d '' source; do
+  sudo sed -i -E \
+    -e 's|https?://archive.ubuntu.com/ubuntu|https://mirrors.edge.kernel.org/ubuntu|g' \
+    "$source"
+done < <(find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -print0)
+install_packages
