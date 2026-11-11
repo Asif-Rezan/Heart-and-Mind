@@ -190,3 +190,49 @@ class ParallelWorkflowTests(unittest.TestCase):
             for index,scene in enumerate(song['scenes']):scene.update(start=index*8,end=(index+1)*8)
             song['duration']=count*8
             validate_manifest(song,timed=True)
+
+
+class BatchRepairTests(unittest.TestCase):
+    def setup_draft(self,root,pending):
+        from cartoon_story import VERSION,CAST
+        outline=dict(title='The Map Mixup',summary='Two friends discover a confusing map and work together to find their way home, with a little humor and patience.',
+            setting='A sunny woodland with a bridge and a winding path.',lesson='Check assumptions together',beats=['A complete woodland story beat for the two friends.']*16)
+        atomic(root/'cartoon-draft.json',dict(identity=dict(version=VERSION,run_id='test',topic='topic',cast=CAST),
+            outline=outline,batches=[],pending_batch=pending))
+
+    def test_only_rejected_shot_is_rewritten_and_accepted_dialogue_survives(self):
+        from cartoon_story import SLOTS
+        song=fixture();pending=[{k:s[k] for k in ('speaker','text','visual','action','emotion','sfx')} for s in song['scenes'][:4]]
+        original=copy.deepcopy(pending);pending[1]['text']='Too short.'
+        remaining=[dict(shots=[{k:s[k] for k in ('speaker','text','visual','action','emotion','sfx')} for s in song['scenes'][i:i+4]]) for i in (4,8,12)]
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);self.setup_draft(root,pending)
+            with patch('cartoon_story.request',side_effect=[original[1],*remaining]) as writer:
+                result=plan(root,'test','topic')
+            self.assertEqual(writer.call_count,4)
+            self.assertEqual([s['text'] for s in result['scenes'][:4]],[s['text'] for s in original])
+            draft=json.loads((root/'cartoon-draft.json').read_text())
+            self.assertEqual(draft['batch_rejections'][0]['reason'],'word_count')
+            self.assertEqual(draft['batch_rejections'][0]['word_count'],2)
+            self.assertNotIn('pending_batch',draft)
+
+    def test_failed_repairs_remain_bounded_and_checkpoint_keeps_good_shots(self):
+        pending=[{k:s[k] for k in ('speaker','text','visual','action','emotion','sfx')} for s in fixture()['scenes'][:4]]
+        pending[2]['text']='Too short.'
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);self.setup_draft(root,pending)
+            with patch('cartoon_story.request',return_value=pending[2]) as writer:
+                with self.assertRaisesRegex(ValueError,'two targeted repairs'):plan(root,'test','topic')
+            self.assertEqual(writer.call_count,2)
+            draft=json.loads((root/'cartoon-draft.json').read_text())
+            self.assertEqual(draft['pending_batch'][0],pending[0])
+            self.assertEqual(draft['batch_rejections'][-1]['reason'],'word_count')
+
+    def test_named_slots_fix_voices_and_report_distinct_rejection_reasons(self):
+        from cartoon_story import BATCH,SLOTS,shot_issue
+        self.assertEqual(list(BATCH['properties']),[key for key,_ in SLOTS])
+        shot={k:v for k,v in fixture()['scenes'][0].items() if k in ('speaker','text','visual','action','emotion','sfx')}
+        self.assertEqual(shot_issue(shot,speaker='mira')['reason'],'speaker')
+        self.assertEqual(shot_issue(shot,[shot])['reason'],'duplicate_dialogue')
+        shot['action']='invented_action'
+        self.assertTrue(shot_issue(shot)['reason'].startswith('schema_'))

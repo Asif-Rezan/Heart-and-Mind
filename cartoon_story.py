@@ -3,7 +3,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from jsonschema import validate
+from jsonschema import ValidationError, validate
 
 VERSION = 'english-family-cartoon-v1'
 CAST = {
@@ -28,7 +28,10 @@ OUTLINE = obj(dict(title=text(8, 90), summary=text(100, 700), setting=text(30, 2
 SHOT = obj(dict(speaker={'enum': list(CAST)}, text=text(60, 240), visual=text(40, 350),
     action={'enum': ACTIONS}, emotion={'enum': ['curious', 'amused', 'worried', 'surprised', 'relieved', 'thoughtful']},
     sfx={'enum': ['none', 'footsteps', 'discovery']}))
-BATCH = obj(dict(shots={'type': 'array', 'minItems': 4, 'maxItems': 4, 'items': SHOT}))
+SLOTS = [('narration_open','narrator'),('mira_line','mira'),('theo_line','theo'),('narration_close','narrator')]
+SPOKEN_SHOT = obj({key: value for key, value in SHOT['properties'].items() if key != 'speaker'})
+SPOKEN_SHOT['properties']['text'] = text(1, 240)
+BATCH = obj({name:SPOKEN_SHOT for name,_ in SLOTS})
 
 
 def atomic(path, data):
@@ -48,6 +51,24 @@ def request(schema, prompt, seed):
             'json_schema': {'name': 'family_story', 'schema': schema}}))
     result = json.loads(response['choices'][0]['message']['content']); validate(result, schema)
     return result
+
+
+def shot_issue(shot, others=(), speaker=None):
+    spoken = shot.get('text')
+    if isinstance(spoken, str):
+        count = len(spoken.split())
+        if not 18 <= count <= 38:
+            return dict(reason='word_count', word_count=count, minimum=18, maximum=38)
+    try:
+        validate(shot,SHOT)
+    except ValidationError as error:
+        return dict(reason='schema_'+error.validator,field='.'.join(map(str,error.absolute_path)))
+    if speaker and shot['speaker']!=speaker:
+        return dict(reason='speaker',expected=speaker,actual=shot['speaker'])
+    key=' '.join(shot['text'].split()).casefold()
+    if any(' '.join(s['text'].split()).casefold()==key for s in others):
+        return dict(reason='duplicate_dialogue')
+    return None
 
 
 def validate_shots(shots):
@@ -99,23 +120,54 @@ def plan(root, run_id, topic='A funny everyday misunderstanding resolved through
         raise ValueError('Saved outline must have sixteen or twenty complete story beats')
     while len(draft['batches']) < len(outline['beats'])//4:
         batch = len(draft['batches']); prior = [s for b in draft['batches'] for s in b]
-        feedback = ''
-        for attempt in range(3):
-            result = request(BATCH, 'Outline: '+json.dumps(outline)+'. Write ONLY beats '+str(batch*4+1)+' to '+str(batch*4+4)+
-                '. Earlier accepted shots: '+json.dumps(prior)+'. Each shot has one speaker, 22-30 spoken English words '
-                '(hard limit 18-38); narrator carries action and characters speak naturally. No stage directions in spoken text. '
-                'Visual shows the same story event with Mira and Theo, preserving their clothes. Meaningful movement only: '
-                'approach_friend means Mira approaches waiting Theo, follow_friend means Mira follows leading Theo; '
-                'approach_ball only if this story event really involves a visible ball. Otherwise choose react/wait. '
-                'No obligatory dancing. Include narrator, Mira and Theo in every four-shot batch. '+feedback, seed+batch*10+attempt)
-            if (all(18 <= len(s['text'].split()) <= 38 for s in result['shots'])
-                    and {'narrator','mira','theo'}.issubset({s['speaker'] for s in result['shots']})
-                    and len({s['text'].lower() for s in prior+result['shots']}) == len(prior)+4):
-                break
-            feedback = 'Rewrite these four shots: use 22-30 words each, include all three speakers and never repeat accepted dialogue.'
-        else:
-            raise ValueError('Cartoon batch word count failed three attempts; accepted batches retained')
-        draft['batches'].append(result['shots']); atomic(draft_path, draft)
+        context = ('Outline: '+json.dumps(outline)+'. Write ONLY beats '+str(batch*4+1)+' to '+str(batch*4+4)+
+            '. Earlier accepted shots: '+json.dumps(prior)+'. Each shot has 22-30 spoken English words '
+            '(hard limit 18-38), no stage directions in spoken text. The four named fields are sequential shots: '
+            'narration_open is narrator, mira_line is Mira, theo_line is Theo, narration_close is narrator. '
+            'Visual shows the same event with Mira and Theo, preserving their clothes. '
+            'Use meaningful movement: approach_friend means Mira approaches waiting Theo, follow_friend means Mira '
+            'follows leading Theo, approach_ball requires a real visible ball in this story beat. Otherwise react/wait. '
+            'No obligatory dancing, no repeated dialogue.')
+        pending=draft.get('pending_batch')
+        if pending is None:
+            result=request(BATCH,context,seed+batch*100)
+            # Old saved/test array responses remain readable; new constrained
+            # generation uses named slots so voice coverage is guaranteed.
+            pending=(result['shots'] if 'shots' in result else
+                [dict(result[name],speaker=speaker) for name,speaker in SLOTS])
+            if len(pending)!=4: raise ValueError('Story batch must contain four complete shots')
+            draft['pending_batch']=pending
+            atomic(draft_path,draft)
+        for index in range(4):
+            others=prior+pending[:index]+pending[index+1:]
+            for attempt in range(3):
+                issue=shot_issue(pending[index],others,SLOTS[index][1])
+                if issue is None: break
+                rejection=dict(batch=batch,shot=index,attempt=attempt,**issue)
+                draft.setdefault('batch_rejections',[]).append(rejection)
+                atomic(draft_path,draft)
+                print(json.dumps(dict(phase='repair rejected cartoon shot',**rejection)),flush=True)
+                if attempt==2:
+                    raise ValueError(f'Cartoon batch {batch} shot {index} failed two targeted repairs: '+issue['reason']+
+                                     '; accepted shots and rejection diagnostics retained')
+                from lyrics_cpu import CARTOON_WORD_PATTERN
+                slot, speaker = SLOTS[index]
+                spec = obj({**SHOT['properties'], 'speaker': {'enum': [speaker]},
+                            'text': {**SHOT['properties']['text'], 'pattern': CARTOON_WORD_PATTERN}})
+                beat = outline['beats'][batch * 4 + index]
+                repaired = request(
+                    spec, f'Rewrite only {slot} as {speaker}. Story summary: {outline["summary"]}. '
+                    f'Exact story beat: {beat}. Rejected shot: {json.dumps(pending[index])}. '
+                    f'Exact rejection: {json.dumps(issue)}. Keep the same event with 22–30 spoken English words. '
+                    'Use plain ASCII punctuation and no stage directions. Preserve established story continuity. '
+                    f'Do not repeat these lines: {json.dumps([shot["text"] for shot in others])}',
+                    seed + batch * 100 + 10 + index * 3 + attempt)
+                pending[index]=repaired
+                atomic(draft_path,draft)
+        draft['batches'].append(pending)
+        draft.pop('pending_batch',None)
+        atomic(draft_path,draft)
+        print(json.dumps(dict(phase='cartoon batch accepted',batch=batch+1,shots=len(draft['batches'])*4)),flush=True)
     shots = [s for b in draft['batches'] for s in b]; validate_shots(shots)
     if any(h.get('title') == outline['title'] for h in history):
         raise ValueError('Story title already used; choose a new run ID/topic')

@@ -20,6 +20,7 @@ GGUF_SHA256 = '3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597'
 CONTEXT_TOKENS = 16384
 # A small, bounded word grammar is safe to retain; large prose bounds are not.
 LYRIC_WORD_PATTERN = r'^[A-Za-z]+( [A-Za-z]+){3,11}[.!?]?$'
+CARTOON_WORD_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9'.,!?-]*( [A-Za-z0-9][A-Za-z0-9'.,!?-]*){17,37}$"
 _model = None
 
 
@@ -148,7 +149,7 @@ def request_story(endpoint, payload):
         if isinstance(node, dict):
             node.pop('minLength', None)
             node.pop('maxLength', None)
-            if node.get('pattern') not in (LYRIC_WORD_PATTERN, HINDI_LYRIC_PATTERN, PUBLIC_PATTERN):
+            if node.get('pattern') not in (LYRIC_WORD_PATTERN, HINDI_LYRIC_PATTERN, PUBLIC_PATTERN, CARTOON_WORD_PATTERN):
                 node.pop('pattern', None)
             for value in node.values():
                 remove_string_bounds(value)
