@@ -75,7 +75,7 @@ class CacheContractTests(unittest.TestCase):
     def test_production_and_manual_shorts_restore_each_required_model(self):
         contracts = {
             'music.yml': {'story': ['lyrics']},
-            'cartoon-scene.yml': {'render': ['images','motion']},
+            'cartoon-scene.yml': {'render': []},
             'shorts.yml': {'short_music': ['music'], 'short_images': ['images', 'motion']},
         }
         for name, jobs in contracts.items():

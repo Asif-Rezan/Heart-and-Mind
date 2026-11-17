@@ -35,10 +35,18 @@ def prepare(run_id, stage, topic):
         prepare_audio(root); return
     song = validate_manifest(json.loads((root/'song.json').read_text()),timed=True)
     if stage == 'images':
-        from image_cpu import generate
-        from cartoon_render import render_shot
         shard, count = int(os.getenv('IMAGE_SHARD','0')), int(os.getenv('IMAGE_SHARDS','20'))
         if not 0 <= shard < count: raise ValueError('Invalid cartoon image shard')
+        if os.environ.get('HEART_BLENDER'):
+            from cartoon_blender import cover, render_shot
+            for scene in song['scenes']:
+                if scene['index'] % count == shard:
+                    render_shot(root,scene)
+            if shard == 0:
+                cover(root,song)
+            return
+        from image_cpu import generate
+        from cartoon_render import render_shot
         # Generate all shard illustrations, then release diffusion before segmentation.
         for scene in song['scenes']:
             if scene['index']%count != shard: continue

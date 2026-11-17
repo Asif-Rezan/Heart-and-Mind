@@ -236,3 +236,20 @@ class BatchRepairTests(unittest.TestCase):
         self.assertEqual(shot_issue(shot,[shot])['reason'],'duplicate_dialogue')
         shot['action']='invented_action'
         self.assertTrue(shot_issue(shot)['reason'].startswith('schema_'))
+
+class BlenderLayoutTests(unittest.TestCase):
+    def test_visual_actions_choose_a_set_prop_and_actor_without_using_dialogue(self):
+        from cartoon_blender import layout, hook
+
+        scene = dict(index=2, speaker='narrator', action='react', emotion='curious',
+                     visual='In the kitchen, Theo hands over a mug to Mira.',
+                     text='A different prop is mentioned in the dialogue.')
+        shot = layout(scene)
+        self.assertEqual((shot['place'],shot['prop'],shot['action'],shot['holder']),
+                         ('kitchen','cup','pass','theo'))
+        world = layout({**scene,'visual':'Mira walks across the garden. Theo watches.',
+                        'action':'approach_ball'})
+        self.assertEqual((world['place'],world['prop'],world['action']),('outdoors','ball','approach_ball'))
+        quiet = layout({**scene,'visual':'A covered box sits in the bedroom. They wait.','action':'wait'})
+        self.assertEqual((quiet['place'],quiet['prop'],quiet['action']),('bedroom','box','wait'))
+        self.assertEqual(hook('The Missing Mug | Heart and Mind'),['MISSING','MUG'])
