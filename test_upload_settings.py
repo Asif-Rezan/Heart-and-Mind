@@ -44,6 +44,43 @@ class UploadSettingsTests(unittest.TestCase):
             video['status']['containsSyntheticMedia']=False
             with self.assertRaises(RuntimeError): verified_phase(video,body,'right-channel')
 
+    def test_cartoon_publication_recovers_an_exhausted_empty_tag_readback(self):
+        from pathlib import Path
+        from pipeline import publish
+
+        with patch.dict(os.environ,{'UPLOAD_MODE':'public'},clear=True):
+            settings = load_settings()
+        tags = ['sock swap chaos','mira and theo socks','Heart and Mind']
+        body = upload_body({'title':'Sock Swap Chaos'},'Description',tags,settings)
+        state = {'video_id':'cartoon','upload_body':body,'upload_settings':settings,
+                 'thumbnail_uploaded':True,'tag_repair_attempts':2}
+        video = copy.deepcopy(body)
+        video['id'] = 'cartoon'
+        video['snippet']['channelId'] = 'channel'
+        video['snippet'].pop('tags')
+        video['status']['uploadStatus'] = 'processed'
+        video['processingDetails'] = {'processingStatus':'succeeded'}
+        video['contentDetails'] = {'definition':'hd'}
+        client, save = Mock(), Mock()
+        videos = client.videos.return_value
+        videos.list.return_value.execute.return_value = {'items':[video]}
+        videos.update.return_value.execute.return_value = {
+            'id':'cartoon','snippet':{'tags':list(reversed(tags))}}
+
+        with patch('pipeline.required',return_value='channel'), patch('pipeline.time.sleep') as wait:
+            publish(client,Path('/unused'),{},state,save)
+        self.assertEqual(state['phase'],'published')
+        self.assertEqual(state['tag_repair_attempts'],1)
+        wait.assert_called_once()
+        videos.insert.assert_not_called()
+        videos.update.assert_called_once()
+        receipt = state['tag_verification_receipt']
+        with self.assertRaisesRegex(RuntimeError,'tags mismatch'):
+            verified_phase(video,body,'channel',tag_receipt=dict(receipt,video_id='other'))
+        video['snippet']['tags'] = ['different tags']
+        with self.assertRaisesRegex(RuntimeError,'tags mismatch'):
+            verified_phase(video,body,'channel',tag_receipt=receipt)
+
     def test_scheduled_video_can_become_public(self):
         with patch.dict(os.environ,{'UPLOAD_MODE':'scheduled','PUBLISH_AT':'2030-01-01T12:00:00Z'},clear=True): settings=load_settings()
         body=upload_body({'title':'Dudi'},'Description',[],settings)

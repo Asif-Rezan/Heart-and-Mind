@@ -189,28 +189,57 @@ def normalized_tags(tags):
     return {' '.join(tag.split()).casefold() for tag in tags}
 
 
+def tags_verified(video, wanted, receipt=None):
+    actual = video.get('snippet', {}).get('tags', [])
+    if normalized_tags(actual) == normalized_tags(wanted):
+        return True
+    # Only an empty readback can use a previously observed, exact update response.
+    # Different nonempty tags still need repair. A request acknowledgment alone
+    # is insufficient: the returned video ID and returned tags must match.
+    return (not actual and isinstance(receipt, dict)
+        and receipt.get('video_id') == video.get('id') and receipt.get('accepted') is True
+        and normalized_tags(receipt.get('tags', [])) == normalized_tags(wanted))
+
+
 def ensure_uploaded_tags(client, video, state, save):
-    """Repair metadata on the existing ID, never upload a second video."""
+    """Repair the existing ID; preserve proof of exact tags returned by update."""
     wanted = state['upload_body']['snippet']
     actual = video.get('snippet', {}).get('tags', [])
-    if normalized_tags(actual) == normalized_tags(wanted['tags']):
-        return False
     if video.get('id') != state['video_id']:
         raise RuntimeError('Uploaded video unavailable')
-    # Tags are public metadata; log these alone, never API bodies or credentials.
+    if tags_verified(video, wanted['tags'], state.get('tag_verification_receipt')):
+        if normalized_tags(actual) != normalized_tags(wanted['tags']) and not state.get('tag_readback_warning'):
+            state['tag_readback_warning'] = 'List readback omitted tags; exact tags were verified in the update response.'
+            save()
+            print(json.dumps({'check':'tag update response verified','list_readback_empty':True}),flush=True)
+        return False
     print(json.dumps({'check':'reconcile uploaded tags',
         'expected_tags':wanted['tags'], 'actual_tags':actual}), flush=True)
+    # A one-time migration gives old exhausted checkpoints the new verification
+    # path; reruns of this version cannot reset the bounded update budget.
+    if state.get('tag_repair_version') != 2:
+        state.update(tag_repair_version=2, tag_repair_attempts=0)
     attempts = state.get('tag_repair_attempts', 0)
     if attempts >= 2:
-        raise RuntimeError('Uploaded tags mismatch')
+        raise RuntimeError('Uploaded tags mismatch after two updates; inspect the saved verification response')
     state['tag_repair_attempts'] = attempts + 1
+    state.pop('tag_verification_receipt', None)
     save()
-    client.videos().update(part='snippet',body={'id':state['video_id'],
+    response = client.videos().update(part='snippet',body={'id':state['video_id'],
         'snippet':wanted}).execute(num_retries=5)
+    if isinstance(response,dict):
+        returned = response.get('snippet', {}).get('tags', [])
+        accepted = (response.get('id') == state['video_id']
+                    and normalized_tags(returned) == normalized_tags(wanted['tags']))
+        state['tag_update_response'] = dict(video_id=response.get('id'),tags=returned,accepted=accepted)
+        if accepted:
+            state['tag_verification_receipt'] = dict(video_id=state['video_id'],tags=returned,
+                accepted=True,accepted_at=dt.datetime.now(dt.timezone.utc).isoformat())
+        save()
     return True
 
 
-def verified_phase(video, body, channel_id, disclosure_receipt=None):
+def verified_phase(video, body, channel_id, disclosure_receipt=None, *, tag_receipt=None):
     """Return a terminal phase only for matching remote metadata and processed HD."""
     snippet, status = video.get('snippet',{}), video.get('status',{})
     if snippet.get('channelId') != channel_id:
@@ -220,7 +249,7 @@ def verified_phase(video, body, channel_id, disclosure_receipt=None):
     for field in ('title','description','categoryId','defaultLanguage','defaultAudioLanguage'):
         if snippet.get(field) != body['snippet'][field]:
             raise RuntimeError('Uploaded metadata mismatch: ' + field)
-    if normalized_tags(snippet.get('tags',[])) != normalized_tags(body['snippet']['tags']):
+    if not tags_verified(video, body['snippet']['tags'], tag_receipt):
         raise RuntimeError('Uploaded tags mismatch')
     for field in ('selfDeclaredMadeForKids','containsSyntheticMedia','license','embeddable','publicStatsViewable'):
         if (field=='containsSyntheticMedia' and field not in status
