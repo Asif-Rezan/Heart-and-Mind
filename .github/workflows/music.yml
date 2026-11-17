@@ -7,8 +7,7 @@ on:
         required: true
         type: string
       topic:
-        description: Shared family story theme
-        default: A funny everyday misunderstanding resolved through cooperation
+        description: Optional story premise (default is an original What If adventure)
         type: string
       prepared_run:
         description: Optional previous cartoon workflow run with saved speech and story
@@ -45,7 +44,7 @@ jobs:
       run_id: ${{ steps.identity.outputs.run_id }}
     env:
       REQUESTED_RUN_ID: ${{ inputs.run_id }}
-      TOPIC: ${{ inputs.topic || 'A funny everyday misunderstanding resolved through cooperation' }}
+      TOPIC: ${{ inputs.topic }}
       LYRICS_MODEL: Qwen/Qwen3-4B-Instruct-2507
       OMP_NUM_THREADS: '3'
       DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}

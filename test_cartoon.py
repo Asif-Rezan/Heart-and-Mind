@@ -25,7 +25,7 @@ def fixture():
 
 class StoryTests(unittest.TestCase):
     def test_story_planning_resumes_accepted_batches_and_preserves_cast(self):
-        song=fixture();outline=dict(title=song['title'],summary=song['description'],setting='A sunny woodland with signposts and a small wooden bridge.',lesson='Checking assumptions together',beats=['Discover the next part of the woodland mystery.']*16)
+        song=fixture();outline=dict(title='What If Every Road Sign Pointed the Wrong Way?',summary=song['description'],setting='A sunny woodland with signposts and a small wooden bridge.',lesson='Checking assumptions together',beats=['Discover the next part of the woodland mystery.']*16)
         calls=[]
         def request(schema,prompt,seed):
             calls.append(prompt)
@@ -43,6 +43,8 @@ class StoryTests(unittest.TestCase):
                 completed=plan(root,'test')
                 self.assertEqual(model.call_count,3)
             self.assertEqual(completed['cast'],CAST)
+            self.assertEqual(completed['story_style'],'what-if')
+            self.assertTrue(completed['title'].startswith('What If '))
             self.assertNotIn('toddlers',completed['scenes'][0]['prompt'])
             with self.assertRaisesRegex(ValueError,'differs'):plan(root,'test','changed request')
 

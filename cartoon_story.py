@@ -6,6 +6,18 @@ from pathlib import Path
 from jsonschema import ValidationError, validate
 
 VERSION = 'english-family-cartoon-v1'
+DEFAULT_TOPIC = 'An original What If adventure where one impossible change disrupts Mira and Theo’s everyday world'
+WHAT_IF_RULE = (
+    'Open on one clear hypothetical change shown in action. Follow three distinct consequences that escalate '
+    'across daily life, then show how Mira and Theo respond and pay off the opening question. '
+    'Use a genuinely different premise from recent episodes. Keep it fictional and family-friendly. '
+    'Write the title as a specific question starting with What If and ending with a question mark.'
+)
+
+
+def is_what_if_title(title):
+    return bool(re.fullmatch(r'What If [^?]+\?', ' '.join(title.split()),flags=re.I))
+
 CAST = {
     'narrator': {'voice': 'af_heart', 'description': 'Warm natural adult narrator'},
     'mira': {'voice': 'af_bella', 'description': 'Mira, a curious young adult woman with a short dark bob, teal jacket and brown trousers'},
@@ -96,7 +108,7 @@ def image_prompt(outline, shot):
             '. Same faces and clothes, separate full bodies, visible feet, open ground, no text.')
 
 
-def plan(root, run_id, topic='A funny everyday misunderstanding resolved through cooperation', history=()):
+def plan(root, run_id, topic=DEFAULT_TOPIC, history=()):
     root = Path(root); root.mkdir(parents=True, exist_ok=True)
     identity = dict(version=VERSION, run_id=run_id, topic=topic, cast=CAST)
     draft_path = root/'cartoon-draft.json'
@@ -104,13 +116,26 @@ def plan(root, run_id, topic='A funny everyday misunderstanding resolved through
     if draft.get('identity') != identity:
         raise ValueError('Saved cartoon request differs; use a new run ID')
     seed = int(hashlib.sha256(run_id.encode()).hexdigest()[:7], 16)
+    what_if = topic == DEFAULT_TOPIC or bool(re.match(r'^what if\b',topic.strip(),re.I))
     if not draft.get('outline'):
-        draft['outline'] = request(OUTLINE, 'Plan a complete 2-3 minute adventure for Mira and Theo. Topic: '+topic+
+        prompt = ('Plan a complete 2-3 minute adventure for Mira and Theo. Topic: '+topic+
             '. Twenty sequential story beats: opening problem, discovery, believable mistake, funny complication, '
             'cooperation and earned resolution. One shared story for all ages, no separate adult/child versions. '
             'Use exactly these recurring characters: '+json.dumps(CAST)+'. Avoid these recent titles: '+
-            json.dumps([h.get('title') for h in history[-20:]]), seed)
-        atomic(draft_path, draft)
+            json.dumps([h.get('title') for h in history[-20:]]))
+        if what_if:
+            prompt += '. ' + WHAT_IF_RULE
+        for attempt in range(3):
+            outline = request(OUTLINE,prompt,seed+attempt*7)
+            if not what_if or is_what_if_title(outline['title']):
+                if what_if:
+                    outline['title'] = 'What If ' + ' '.join(outline['title'].split()[2:])
+                draft['outline'] = outline
+                atomic(draft_path,draft)
+                break
+            prompt += ' The previous title was rejected. Start it with What If and end it with a question mark.'
+        else:
+            raise ValueError('The model did not produce a valid What If outline title')
     outline = draft['outline']
     # Keep accepted sixteen-shot checkpoints resumable without rewriting their story.
     outline_schema = json.loads(json.dumps(OUTLINE))
@@ -118,6 +143,8 @@ def plan(root, run_id, topic='A funny everyday misunderstanding resolved through
     validate(outline, outline_schema)
     if len(outline['beats']) not in (16, 20):
         raise ValueError('Saved outline must have sixteen or twenty complete story beats')
+    if what_if and not is_what_if_title(outline['title']):
+        raise ValueError('Saved What If outline requires a question title')
     while len(draft['batches']) < len(outline['beats'])//4:
         batch = len(draft['batches']); prior = [s for b in draft['batches'] for s in b]
         context = ('Outline: '+json.dumps(outline)+'. Write ONLY beats '+str(batch*4+1)+' to '+str(batch*4+4)+
@@ -128,6 +155,8 @@ def plan(root, run_id, topic='A funny everyday misunderstanding resolved through
             'Use meaningful movement: approach_friend means Mira approaches waiting Theo, follow_friend means Mira '
             'follows leading Theo, approach_ball requires a real visible ball in this story beat. Otherwise react/wait. '
             'No obligatory dancing, no repeated dialogue.')
+        if what_if:
+            context += ' Keep the hypothetical change visible and show a new consequence or action in each shot.'
         pending=draft.get('pending_batch')
         if pending is None:
             result=request(BATCH,context,seed+batch*100)
@@ -177,6 +206,8 @@ def plan(root, run_id, topic='A funny everyday misunderstanding resolved through
         '\nAI-assisted illustrations, animation and synthetic character voices.',
         lyrics='\n'.join(s['text'] for s in shots), prompt=topic, story_summary=outline['summary'],
         cast=CAST, scenes=scenes, tags=['Heart and Mind', 'family cartoon', 'animated story', 'learning through stories'])
+    if what_if:
+        song['story_style'] = 'what-if'
     atomic(root/'song.json', song)
     return song
 

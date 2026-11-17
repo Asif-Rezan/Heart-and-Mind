@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
-from cartoon_story import plan, validate_manifest, atomic, VERSION
+from cartoon_story import DEFAULT_TOPIC, plan, validate_manifest, atomic, VERSION
 
 
 def prepare(run_id, stage, topic):
@@ -86,9 +86,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-id',required=True)
     parser.add_argument('--stage',choices=['story','speech','images','render','publish'],required=True)
-    parser.add_argument('--topic',default='A funny everyday misunderstanding resolved through cooperation')
+    parser.add_argument('--topic',default=DEFAULT_TOPIC)
     args = parser.parse_args()
-    try: prepare(args.run_id,args.stage,args.topic)
+    topic = args.topic or DEFAULT_TOPIC
+    if args.stage == 'story' and not args.topic and re.fullmatch(r'[A-Za-z0-9_-]{1,80}',args.run_id):
+        saved = Path('output')/args.run_id/'cartoon-draft.json'
+        if saved.exists():
+            topic = json.loads(saved.read_text())['identity']['topic']
+    try: prepare(args.run_id,args.stage,topic)
     except Exception as error:
         if re.fullmatch(r'[A-Za-z0-9_-]{1,80}',args.run_id):
             atomic(Path('output')/args.run_id/'cartoon-failure.json',dict(stage=args.stage,error_type=type(error).__name__,message=str(error)[:700]))

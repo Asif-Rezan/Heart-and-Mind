@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 from jsonschema import ValidationError, validate
-from cartoon_story import atomic, obj, text
+from cartoon_story import atomic, is_what_if_title, obj, text
 
 VERSION = 'cartoon-search-seo-v1'
 POWER_WORDS = ['UNEXPECTED','SURPRISING','SECRET','AMAZING','BRAVE','CLEVER','HIDDEN','INCREDIBLE']
@@ -70,6 +70,10 @@ def select_package(package, keywords, song, history):
     for candidate in package['candidates']:
         try:
             title = capitalize_title(candidate, keywords['primary'], evidence)
+            if song.get('story_style') == 'what-if':
+                if not is_what_if_title(title):
+                    raise ValueError('What If title must start with What If and end with a question mark')
+                title = 'What If ' + ' '.join(title.split()[2:])
         except ValueError as error:
             rejections.append(str(error))
             continue
@@ -124,10 +128,13 @@ def optimize(root,song,history=(),client=None,writer=None):
                 row['error_type']=type(error).__name__ # Never persist raw credential-bearing API errors.
         draft['research'].append(row);atomic(path,draft)
     if not draft.get('selected'):
+        title_style = ('Each title must start with What If and end with a question mark. '
+                       if song.get('story_style') == 'what-if' else '')
         feedback=''
         for attempt in range(3):
             try:
                 candidate=writer(PACKAGE,'Generate three distinct SEO title candidates and one natural English description for this story. '
+                    +title_style+
                     'Each title includes the primary keyword and 1-2 listed power words: '+json.dumps(POWER_WORDS)+'. '
                     'Use power words truthfully: SECRET/HIDDEN only for an actual hidden clue, BRAVE only for a courageous action. '
                     'Provide story_evidence copied verbatim from the summary or spoken text for each promise. '

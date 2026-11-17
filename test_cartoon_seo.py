@@ -93,6 +93,16 @@ class CartoonSEOTests(unittest.TestCase):
             self.assertEqual(writer.call_count,2)
             self.assertRegex(result['title'], r'SURPRISING|CLEVER')
 
+    def test_what_if_fallback_retains_the_question_when_seo_titles_omit_it(self):
+        song = story()
+        song['story_style'] = 'what-if'
+        song['title'] = 'What If Every Road Sign Pointed the Wrong Way?'
+        writer = Mock(side_effect=[keywords(),package(),package(),package()])
+        with tempfile.TemporaryDirectory() as tmp:
+            result = optimize(Path(tmp),song,writer=writer)
+        self.assertEqual(result['title'],'What If Every Road Sign Pointed the Wrong Way?')
+        self.assertIn('Each title must start with What If',writer.call_args_list[1].args[1])
+
     def test_exhausted_seo_attempts_resume_with_saved_story_metadata(self):
         bad = package()
         bad['description'] = 'An opening that misses the target keyword. ' * 5
