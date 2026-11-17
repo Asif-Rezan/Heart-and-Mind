@@ -348,7 +348,9 @@ wide = ((.18,-7.05,2.92),(0,.12,1.48),42)
 mira_view = ((-2.30,-5.42,2.62),(-.38,.08,1.83),44)
 theo_view = ((2.30,-5.42,2.62),(.38,.08,1.83),44)
 focus = {'mira':mira_view,'theo':theo_view}.get(shot['speaker'],wide)
-opening = wide if shot['cover'] or shot['action'] in ('approach_friend','follow_friend','approach_ball') else focus
+cover_view = ((-.48,-6.15,2.49),(-.07,.10,1.99),46)
+opening = cover_view if shot['cover'] else wide if shot['action'] in (
+    'approach_friend','follow_friend','approach_ball') else focus
 scene.camera=camera('Establish action',1,*opening)
 if not shot['cover'] and scene.frame_end >= 60:
     next_view = focus if opening==wide and focus!=wide else wide
@@ -360,14 +362,26 @@ scene.world=bpy.data.worlds.new('Storybook lighting world')
 scene.world.use_nodes=True
 scene.world.node_tree.nodes['Background'].inputs[0].default_value=(.14,.043,.24,1)
 scene.world.node_tree.nodes['Background'].inputs[1].default_value=.18
-for name,pos,energy,size,hue in (
+lights = (
     ('Warm key',(-3,-4,5),575,4,(1,.61,.32)),
     ('Soft fill',(3,-3,3),135,4,(.42,.56,1)),
     ('Window rim',(.2,2.9,4),1120,2.4,(1,.32,.085)),
     ('Cyan edge',(-3.3,1.05,2.9),560,2.5,(.075,.52,1)),
     ('Purple bounce',(0,1,3.6),100,4,(.40,.14,1)),
     ('Amber practical',(3.2,1.8,2.25),168,1.2,(1,.43,.14)),
-):
+)
+if shot['cover']:
+    lights = (
+        ('Warm key',(-2.5,-4.8,4.25),470,3.0,(1,.69,.40)),
+        ('Violet fill',(3.4,-3,3.6),95,3.0,(.43,.35,1)),
+        ('Golden rim',(1.25,1.50,3.4),1250,1.2,(1,.30,.055)),
+        ('Edge cyan',(-3.3,.30,2.8),615,1.85,(.055,.53,1)),
+        ('Purple backdrop',(2.5,1.35,3.20),236,2.5,(.44,.13,1)),
+    )
+    gradient.color_ramp.elements[0].color = (.98,.19,.024,1)
+    gradient.color_ramp.elements[-1].color = (.043,.011,.115,1)
+    glass_shader.inputs['Emission Strength'].default_value=.62
+for name,pos,energy,size,hue in lights:
     bpy.ops.object.light_add(type='AREA',location=pos)
     obj=bpy.context.object
     obj.name=name

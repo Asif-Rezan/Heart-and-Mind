@@ -14,8 +14,9 @@ from cartoon_render import FPS, valid_clip
 from cartoon_story import atomic
 
 SCRIPT = Path(__file__).with_name('cartoon_blender_scene.py')
-FONT = Path(__file__).parent/'assets/artwork/Oswald.ttf'
+FONT = Path(__file__).parent/'assets/artwork/LilitaOne-Regular.ttf'
 GRADE = 'eq=contrast=1.28:brightness=-0.009:saturation=1.35:gamma=1.04'
+COVER_GRADE = 'eq=contrast=1.23:brightness=-0.018:saturation=1.42:gamma=1.01'
 PLACES = {
     'kitchen': r'\b(kitchen|stove|cupboard|refrigerator|fridge|oven)\b',
     'bedroom': r'\b(bedroom|bedside|bunk|nightstand)\b',
@@ -123,22 +124,21 @@ def cover(root, song):
         source, graded = work/'cover.png',work/'graded.png'
         blender(shot,source,cover=True,frames=45)
         subprocess.run(['ffmpeg','-v','error','-y','-i',str(source),'-vf',
-                        f'scale=1920:1080:flags=lanczos,{GRADE}','-frames:v','1',str(graded)],
+                        f'scale=1920:1080:flags=lanczos,{COVER_GRADE}','-frames:v','1',str(graded)],
                        check=True,timeout=60)
         with Image.open(graded) as photo:
             image = photo.convert('RGB')
         draw = ImageDraw.Draw(image)
         words = hook(song['title'])
-        for size in range(155,49,-3):
+        for size in range(250,65,-3):
             font = ImageFont.truetype(str(FONT),size)
-            font.set_variation_by_axes([700])
-            measure = draw.textlength(' '.join(words),font=font)
-            if measure <= 1660:
+            if draw.textlength(' '.join(words),font=font) <= 1735:
                 break
-        x = round((image.width-measure)/2)
+        x = 77
         for i, word in enumerate(words):
-            draw.text((x,49),word,font=font,anchor='lt',stroke_width=12,stroke_fill='#120d1d',
-                      fill='#ff372f' if i==len(words)-1 else '#fff9ef')
+            draw.text((x+3,69),word,font=font,anchor='lt',stroke_width=23,stroke_fill='#160915',fill='#160915')
+            draw.text((x,49),word,font=font,anchor='lt',stroke_width=16,stroke_fill='#120c16',
+                      fill='#ff202c' if i==len(words)-1 else '#fff9f1')
             x += round(draw.textlength(word+' ',font=font))
         target = work/'thumbnail-source.png'
         image.save(target)
