@@ -10,7 +10,7 @@ permissions:
   contents: read
 concurrency:
   group: asmr-cutting-preview-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   render:
     name: Render 60-second ASMR preview without publishing
@@ -59,7 +59,9 @@ jobs:
           retention-days: 14
       - name: Record preview-only completion
         run: |
-          echo '## ASMR preview ready' >> "$GITHUB_STEP_SUMMARY"
-          echo '60 seconds · 1280×720 · 24 FPS · stereo synthesized cutting/crunching sound.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Five AI-generated keyframes, optical-flow interpolation, masking, localized deformation, particles and camera motion. Three 20-second passes reuse the five keyframes; this is stylized image animation, not a physical cutting simulation.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Preview artifact only. No YouTube/Facebook/Drive upload, no secrets and no changes to main.' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo '## ASMR preview ready'
+            echo '60 seconds · 1280×720 · 24 FPS · stereo synthesized cutting/crunching sound.'
+            echo 'Five AI-generated keyframes, optical-flow interpolation, masking, localized deformation, particles and camera motion. Three 20-second passes reuse the five keyframes; this is stylized image animation, not a physical cutting simulation.'
+            echo 'Preview artifact only. No YouTube/Facebook/Drive upload, no secrets and no changes to main.'
+          } >> "$GITHUB_STEP_SUMMARY"
