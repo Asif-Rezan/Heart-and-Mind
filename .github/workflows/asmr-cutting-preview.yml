@@ -1,4 +1,4 @@
-name: One-minute cutting ASMR preview
+name: One-minute procedural soap ASMR preview
 on:
   push:
     branches: [codex/asmr-cutting-preview-20261125]
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   render:
-    name: Render 60-second ASMR preview without publishing
+    name: Render 60-second procedural soap ASMR without publishing
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -32,36 +32,25 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           python -m pip install -r previews/asmr-cutting/requirements.txt
-      - name: Verify the five supplied AI-generated keyframes
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          from PIL import Image
-          root = Path('previews/asmr-cutting/images')
-          images = sorted(root.glob('keyframe-*.png'))
-          assert len(images) == 5
-          for image in images:
-              with Image.open(image) as frame:
-                  frame.verify()
-          print('Five consistent AI keyframes ready; no live image API call or credentials needed.')
-          PY
-      - name: Animate cuts and grains, synthesize stereo ASMR and encode MP4
-        run: python -u previews/asmr-cutting/render_preview.py
+      - name: Verify cutting contact, detachment, landing and deterministic geometry
+        run: python -m unittest discover -s previews/asmr-cutting -p test_soap_cutting.py -v
+      - name: Render geometric blade and slices with synchronized synthesized sound
+        run: python -u previews/asmr-cutting/soap_cutting.py
       - name: Save video, sound and media validation for review
         uses: actions/upload-artifact@v4
         with:
-          name: cutting-asmr-preview-60s-${{ github.run_number }}
+          name: soap-cutting-asmr-preview-60s-${{ github.run_number }}
           path: |
-            previews/asmr-cutting/output/kinetic-sand-cutting-asmr-preview.mp4
-            previews/asmr-cutting/output/cutting-sound-design.wav
-            previews/asmr-cutting/output/media-probe.json
+            previews/asmr-cutting/output/soap-cutting-asmr-preview.mp4
+            previews/asmr-cutting/output/soap-cutting-sound-design.wav
+            previews/asmr-cutting/output/soap-media-probe.json
           if-no-files-found: error
           retention-days: 14
       - name: Record preview-only completion
         run: |
           {
             echo '## ASMR preview ready'
-            echo '60 seconds · 1280×720 · 24 FPS · stereo synthesized cutting/crunching sound.'
-            echo 'Five AI-generated keyframes, optical-flow interpolation, masking, localized deformation, particles and camera motion. Three 20-second passes reuse the five keyframes; this is stylized image animation, not a physical cutting simulation.'
+            echo '60 seconds · 720×1280 portrait · 30 FPS · stereo event-synchronized soap-cutting sound.'
+            echo 'Pillow-generated low-poly geometry adapted from the supplied make_asmr.py: moving blade, detachable slices, rotation, landing shadows and ballistic crumbs. Six ten-second color variations, thirty cuts; no AI still-image morphing.'
             echo 'Preview artifact only. No YouTube/Facebook/Drive upload, no secrets and no changes to main.'
           } >> "$GITHUB_STEP_SUMMARY"
