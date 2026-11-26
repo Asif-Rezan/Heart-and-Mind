@@ -74,7 +74,7 @@ class CacheContractTests(unittest.TestCase):
 
     def test_production_and_manual_shorts_restore_each_required_model(self):
         contracts = {
-            'music.yml': {'story': ['lyrics']},
+            'music.yml': {'lyrics': ['lyrics'], 'image_models': ['images'], 'images': ['images']},
             'cartoon-scene.yml': {'render': []},
             'shorts.yml': {'short_music': ['music'], 'short_images': ['images', 'motion']},
         }
@@ -87,7 +87,7 @@ class CacheContractTests(unittest.TestCase):
                 if any('--no-cache-dir' in s.get('run', '') for s in steps):
                     self.assertFalse(any(s.get('with', {}).get('cache') == 'pip' for s in steps))
         workflow = yaml.safe_load(Path('.github/workflows/music.yml').read_text())
-        self.assertTrue(any('kokoro' in s.get('with',{}).get('key','') for s in workflow['jobs']['story']['steps']))
+        self.assertTrue(any(s.get('with',{}).get('repository')=='ace-step/ACE-Step-1.5' for s in workflow['jobs']['music']['steps']))
 
     def test_image_prefetch_excludes_unused_weight_variants(self):
         with patch('huggingface_hub.snapshot_download') as download:

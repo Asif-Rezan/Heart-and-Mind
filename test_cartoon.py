@@ -164,9 +164,9 @@ class RenderIntegrationTests(unittest.TestCase):
 
 
 class ParallelWorkflowTests(unittest.TestCase):
-    def test_twenty_workers_then_verified_publication_and_cleanup(self):
+    def test_archived_twenty_worker_cartoon_remains_recoverable(self):
         import yaml
-        workflow=yaml.safe_load(Path('.github/workflows/music.yml').read_text())
+        workflow=yaml.safe_load(Path('docs/archive/before-english-songs-2026-11-26-music.yml.txt').read_text())
         jobs=workflow['jobs']
         workers={key:job for key,job in jobs.items() if key.startswith('scene_')}
         self.assertEqual(len(workers),20)

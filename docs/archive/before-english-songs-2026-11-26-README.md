@@ -1,0 +1,109 @@
+# Idea-driven ASMR production — testing with publication OFF
+
+The latest preview uses actual **Wan 2.1 T2V 1.3B Q4 GGUF** video diffusion in six
+parallel clips for a thirty-second Short. [Wan preview settings and speed limits](docs/wan-short-preview.md).
+Publishing remains off; this preview is separate from the procedural renderer below.
+
+The new isolated ASMR pipeline uses local AI to generate fresh ideas, executable
+scene recipes, and separate title/description/tags for a 4–5 minute full video and
+an exact 30-second Short. Full video is 1280×720 landscape; Short is independently
+composed at 720×1280 portrait. AI chooses among eight implemented ASMR activity
+families, including pouring, tapping, paper crinkling, brushing, raking, pressing,
+water ripples and cutting, each with distinct animation and synchronized sound.
+Episodes require at least three activity types and limit cutting to three scenes.
+
+[ASMR production, test controls, publishing, Drive cleanup and recovery](docs/asmr-production.md).
+Implementation: `asmr/`; workflow: `.github/workflows/asmr-production.yml`.
+It is currently on `codex/asmr-production`; main and the existing cartoon pipeline
+remain unchanged. All ASMR publishing/cleanup gates default OFF, and the initial
+cloud run is an artifact-only full-duration test.
+
+---
+
+# Heart and Mind — English family story cartoons
+
+The active `music.yml` workflow now creates one shared English educational adventure cartoon for children and adults. It replaces the Hindi nursery-rhyme generation path. Narration, natural dialogue, humor, a believable mistake and its consequences carry the lesson; there are no separate child/adult cuts or obligatory dance choruses.
+
+## Version log and rollback
+
+- **Before this migration:** Hindi rhyme production commit `56aa49c`, preserved as tag `before-english-family-cartoon-2026-11-10`. Backup documentation commit `ea190ac` was pushed before implementation.
+- [Complete pre-cartoon README](docs/archive/before-english-family-cartoon-2026-11-10-README.md)
+- [Pre-cartoon production workflow](docs/archive/before-english-family-cartoon-music.yml.txt)
+- The earlier Hindi album baseline remains `e6bf309529968fc834df14e7414d11061e3b3313`, tag `before-hindi-kids-reference-2026-11-09`.
+
+To restore the previous Hindi rhyme implementation without rewriting Git history:
+
+```sh
+git switch -c codex/restore-hindi-rhymes
+git restore --source before-english-family-cartoon-2026-11-10 -- .
+git commit -m "Restore pre-cartoon Hindi rhyme production"
+git push origin codex/restore-hindi-rhymes
+```
+
+Merge that restoration branch to activate it. Git restores tracked source, not credentials, repository variables, deleted cloud media or published videos.
+
+## Current generation flow
+
+1. The pinned Qwen CPU model writes an original English outline and twenty sequential shots, in five checkpointed batches. Each shot contains one speaker, complete spoken text, a matching illustration, emotion and a grounded action. Accepted batches survive interruptions. Duplicate dialogue, missing cast, invalid word counts and mismatched resumed requests stop clearly.
+2. Kokoro 82M synthesizes three stable American English voices on CPU: narrator `af_heart`, Mira `af_bella`, Theo `am_michael`. These are natural adult synthetic voices. Model revision `f3ff3571791e39611d31c381e3a41a3af07b4987` and library `0.9.4` are pinned. Weights and voice packs use that exact revision, with a shared GitHub Actions cache.
+3. Speech is measured before illustration/animation. Every scene gets its own frame-aligned duration and short reaction space. Complete narration is retained; speech is never forced into the old five-second rhyme slots. The writing target is 2–3 minutes; accepted complete media must be 2–5 minutes and each shot at most 25 seconds. Out-of-range/silent speech is rejected rather than clipped or silently replaced.
+4. An original, evolving synthesized instrumental score sits quietly beneath the voices, with optional gentle discovery/footstep cues. This score uses local synthesis, not ACE-Step singing or downloaded stock songs. Spoken pauses are intentional and do not use the old music-only silence rejection rule.
+5. Twenty parallel CPU illustration/motion shards create the story's settings and fixed recurring cast: Mira in a teal jacket and Theo in an amber vest. Approaching a waiting friend, following a leader and approaching a visible ball are explicit actions. Other shots use restrained reaction/idle movement. Cast geometry and available space bound travel; characters do not drift simply because a shot needs motion.
+6. Cutout acting runs once over the actual spoken shot duration, with gentle camera movement and conservative blinks. Assembly blends a held outgoing frame into each incoming shot over 160 ms, preserving all dialogue timing. Output is 1920×1080 with AAC speech/music. Thumbnail uses the actual opening scene.
+7. Existing Heart and Mind account verification, Drive backup, resumable YouTube upload and verified publication receipts are reused. Metadata/audio language are English; category is Film & Animation. New uploads publish publicly as soon as processing completes; audience/disclosure settings remain in place. Scheduling requires an explicit scheduled-mode request. Rhyme Shorts are not automatically generated from cartoon dialogue.
+
+This is narrated cutout animation, not full 3D acting or phoneme lip-sync. Expressions largely come from scene illustrations; uncertain face rigs are left untouched. A scene with an unusable segmentation mask falls back to camera motion and records that fallback. Prompted clothes/faces improve continuity but do not guarantee identical generated characters. Left/right cutout geometry grounds interactions; the engine does not recognize character names from pixels or synthesize physical handovers/pickups.
+
+## Run or resume
+
+GitHub Actions → **Heart and Mind English family cartoon** → **Run workflow**:
+
+- `run_id`: a fresh identity such as `cartoon-map-20261110-01`.
+- `topic`: the shared story theme; default is a funny misunderstanding resolved through cooperation.
+- `upload_mode` / `publish_at`: existing scheduled/public controls.
+- `prepared_run`: optional numeric ID of a previous **cartoon** run. Reuse the same `run_id` and topic; expired/mismatched artifacts fail clearly. The story/speech checkpoint and available matching image shards are restored; matching audio/clip hashes avoid repeated inference. Hindi rhyme checkpoints belong to the archived generation path.
+
+Partial story, speech, image/motion and publication diagnostics are uploaded even when a stage fails, retained for seven days. Kokoro candidates are validated before becoming reusable speech checkpoints. Encoder output is committed only after duration/frame checks. Failed YouTube uploads retain the existing ambiguous-upload guard, so retries cannot blindly duplicate a video.
+
+For local development use Python 3.12, FFmpeg/ffprobe, espeak-ng, the base requirements and the stage-specific requirements. `requirements-cartoon.txt` pins Kokoro and explicitly installs its English pronunciation model. The workflow installs CPU PyTorch separately and verifies regression tests before model generation. Run `python -m unittest -v` and actionlint before pushing.
+
+## Accounts, caches and legacy tools
+
+Repository and destination remain `Asif-Rezan/Heart-and-Mind`; no other channel's credentials or Page token are copied. Existing `PUBLISH_ENABLED`, `AUTOMATION_ENABLED`, Google secrets and channel verification still apply. Facebook remains optional and requires this project's Page ID/access-token configuration. Changing the cartoon format does not configure that missing account connection.
+
+The existing lyrics/image/motion model caches are retained, with a small additional Kokoro cache. Repository cache quota stays at the owner-approved 10 GB; eviction can cause a future download. No ACE-Step model is needed by the active cartoon workflow. Manual Hindi/Shorts/recovery tools remain for old content; they do not define the new daily cartoon format. Use the active workflow with `prepared_run` for cartoon generation recovery.
+
+## Validation for the migration
+
+Real Kokoro synthesis was exercised for all three selected voices. Regression coverage includes checkpointed story resumption, English/cast guards, corrupted speech recovery without regenerating accepted shots, silence rejection, sample/frame-aligned audio mixing, grounded action selection, variable-length actor rendering, and real FFmpeg assembly/decode of a complete 140.8-second test timeline with transitions. A generated episode still needs a finished-video viewing/listening check for creative quality and factual accuracy.
+
+
+### 2026-11-10 — English outline punctuation regression
+
+First cartoon run `42793148672` stopped during outline creation: `summary` failed an ASCII-only pattern three times. That pattern also rejected English paragraphs and typographic quotes/dashes. English story fields now accept whitespace, Latin characters and common Unicode punctuation, while retaining string/word-count bounds and excluding other writing systems/control bytes. The saved schema validator remains active; no story is substituted or truncated. A regression exercises multi-paragraph English with curly quotes, an apostrophe and an em dash through the real request/validation path without model retries, and rejects Hindi, Chinese and NUL input.
+
+
+### 2026-11-10 — restore twenty parallel workers and post-publication cleanup
+
+New episodes have twenty story shots and a twenty-worker image/motion matrix with `max-parallel: 20`. Each worker generates and animates one shot. Existing accepted sixteen-shot checkpoints remain compatible. YouTube publication waits for every image worker; the original guarded Drive cleanup sweep runs after successful publication and shares the existing cleanup lock. Scheduled/private/not-yet-HD videos remain in Drive until the hourly verified-public sweep makes them eligible. Actual simultaneous execution still depends on GitHub's account-wide runner capacity. Already running workflows retain their original commit and worker count.
+
+
+### Workflow graph visibility
+
+Twenty scene workers are individual named reusable-workflow jobs (`Cartoon scene 01` through `Cartoon scene 20`), so GitHub displays separate branches rather than a collapsed matrix. Each depends on the completed story/voice stage. Assembly/YouTube publication depends on all twenty, followed by the optional Facebook branch and the verified Drive cleanup branch. Existing in-progress runs keep their original workflow graph.
+
+
+### 2026-11-10 — direct public publication
+
+New full cartoons and manual Shorts default to public visibility; no automatic 72-hour delay or scheduled timestamp is applied. The default upload settings and production/recovery workflow fallbacks are public. Facebook feed/Reels also support direct publication from a verified public YouTube checkpoint, retaining Heart and Mind Page identity validation. Facebook requires published-state evidence, not merely ready processing. Existing saved upload IDs preserve their checkpointed visibility/schedule when resumed. Verified public-HD Drive cleanup remains enabled.
+
+
+### 2026-11-10 — researched SEO metadata and capitalized power words
+
+Fresh cartoon episodes now generate a story-specific keyword plan, research up to two English/US YouTube search queries using the existing OAuth credentials, then generate three title candidates and a natural description. The selected title includes its primary keyword and 1–2 explicitly CAPITALIZED power words (for example UNEXPECTED, BRAVE or CLEVER). A verbatim story excerpt must support every candidate's promise; prompts prohibit unrelated trends, competitor-title copying and unsupported SECRET/HIDDEN claims. Title selection uses readability/relevance heuristics, not invented ranking metrics.
+
+`seo-draft.json` preserves candidate titles, keyword plan, dated query/source/results and the chosen metadata. Search results are topic signals, not exact search volume or competition scores. Network/quota errors safely fall back to story-derived keywords and record only error types; the story/audio job continues. External result text is explicitly treated as untrusted data. Each search uses bounded HTTP timeouts and one transport retry. Accepted research/metadata are reused on resume. This integration uses YouTube Data API search results, not Google Trends or channel Analytics; those would require separate integrations.
+
+Description openings include the primary phrase naturally, followed by a truthful plot summary, AI disclosure, 2–3 relevant hashtags and four chapters calculated from real speech-derived scene timestamps. Tags use relevant primary/supporting phrases. Existing prepared episodes keep their saved metadata; the feature applies to new story identities, or resumes a new story's interrupted SEO stage without rewriting accepted dialogue. Publication visibility, twenty scene branches and verified Drive cleanup are unchanged.
+
+References: [YouTube description guidance](https://support.google.com/youtube/answer/12948449), [official search.list API](https://developers.google.com/youtube/v3/docs/search/list).

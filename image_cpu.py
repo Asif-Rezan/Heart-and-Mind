@@ -14,7 +14,7 @@ class ImageSafetyBlocked(RuntimeError):
     """The model's safety checker rejected a generated image."""
 
 
-def safer_prompt(prompt):
+def safer_prompt(prompt, cinematic=False):
     """Keep the scene's setting and props while removing graphic/sexual details."""
     replacements = [
         (r'\b(?:bloodied|bloody|gory|gore|bleeding|bloodstains?)\b', 'dramatic'),
@@ -28,7 +28,7 @@ def safer_prompt(prompt):
     for pattern, replacement in replacements:
         prompt = re.sub(pattern, replacement, prompt, flags=re.I)
     # Preserve the scene's visual anchor before the encoders' token limit.
-    return prompt + ' Gentle child-friendly storybook scene, no violence.'
+    return prompt + (' Cinematic scenic artwork, no graphic violence.' if cinematic else ' Gentle child-friendly storybook scene, no violence.')
 
 def recovery_prompt(prompt):
     """Keep the musical mood with a restrained fully clothed composition."""
@@ -53,7 +53,9 @@ def negative_prompt():
 
 _pipeline = None
 
-def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_image=None, strength=None):
+def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_image=None, strength=None, style='storybook'):
+    if style not in ('storybook','cinematic'):
+        raise ValueError('Unknown image style')
     if allow_text:
         raise ValueError('Dudi Dam TV artwork must be text-free')
     if reference_image is None and strength is not None:
@@ -99,14 +101,17 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
         reference_options=dict(image=initial_image,strength=float(strength))
     start = time.monotonic()
     image = None
-    initial_prompt = safer_prompt(prompt)
-    rewritten = recovery_prompt(prompt)
+    initial_prompt = safer_prompt(prompt) if style=='storybook' else safer_prompt(prompt,cinematic=True)+' Cinematic music artwork, coherent natural light, no writing or logos.'
+    rewritten = recovery_prompt(prompt) if style=='storybook' else safer_prompt(prompt,cinematic=True)+' Quiet scenic composition, environment and objects only, no people, no writing or logos.'
+    negative = negative_prompt() if style=='storybook' else (
+        'text, letters, title, typography, watermark, logo, cartoon, anime, nursery illustration, '
+        'plastic CGI, oversaturated, blurry, low detail, deformed anatomy, extra limbs, collage, borders')
     for attempt in range(10):
         # Five seeds per composition; keep input sanitization and output checks.
         candidate = initial_prompt if attempt < 5 else rewritten
         if attempt == 5:
             print('Five safety rejections; retrying a restrained music portrait.', flush=True)
-        result = pipeline(prompt=candidate, negative_prompt=negative_prompt(), width=width, height=height,
+        result = pipeline(prompt=candidate, negative_prompt=negative, width=width, height=height,
             num_inference_steps=steps, guidance_scale=GUIDANCE_SCALE,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007),**reference_options)
         if any(getattr(result, 'nsfw_content_detected', None) or []):
