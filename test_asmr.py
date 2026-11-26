@@ -28,6 +28,31 @@ def plan():return finish(payload(),'asmr-unit',270,42)
 
 
 class PlanningTests(unittest.TestCase):
+ def test_overlong_idea_and_mismatched_short_repair_without_regenerating_scenes(self):
+  source=payload();source['idea']='A calming journey through colorful material cutting. '*12
+  source['short_scenes']=[0,1,2]
+  source['shorts']['title']='Soft Slime Cutting ASMR in Three Colorful Scenes'
+  source['shorts']['description']='Watch the first 10 seconds of slime cutting in this colorful ASMR animation. Each slice lands softly alongside crisp cutting sounds and gentle textures.'
+  corrected=dict(title='Soap, Sand and Clay Cutting ASMR | Crisp Meets Soft',
+   description='Enjoy soap, sand and clay sliced into neat pieces in this animated ASMR Short. Three selected scenes bring colorful slices and soft layered textures with cutting sounds.',
+   tags=['cutting asmr','soap cutting','sand cutting','clay cutting','satisfying animation'])
+  with tempfile.TemporaryDirectory() as d:
+   ask=Mock(side_effect=[source,corrected])
+   result=generate(d,'asmr-editorial-repair',270,[],ask)
+   self.assertLessEqual(len(result['idea']),350)
+   self.assertEqual(result['shorts'],corrected)
+   self.assertEqual(result['short_scenes'],source['short_scenes'])
+   self.assertEqual([{k:s[k] for k in source['scenes'][0]} for s in result['scenes']],source['scenes'])
+   self.assertEqual(json.loads((Path(d)/'draft.json').read_text()),source)
+   self.assertEqual(ask.call_count,2)
+   self.assertEqual(set(ask.call_args.args[1]['properties']),{'title','description','tags'})
+ def test_validation_retry_names_constraint_without_echoing_long_candidate(self):
+  source=payload();source['scenes'][0]['label']='unusable scene label '*10
+  with tempfile.TemporaryDirectory() as d:
+   ask=Mock(side_effect=[source,payload()]);generate(d,'asmr-field-retry',270,[],ask)
+   correction=ask.call_args.args[0].split('Correct the previous candidate:')[-1]
+   self.assertIn('scenes.0.label violates maxLength=65',correction)
+   self.assertNotIn('unusable scene label',correction)
  def test_model_uses_explicit_grammar_and_rejects_incomplete_output(self):
   from asmr.model import ask
   backend=Mock();backend.tokenize.return_value=[1]

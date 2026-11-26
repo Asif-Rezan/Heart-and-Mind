@@ -19,6 +19,12 @@ The ASMR planner passes an explicit decoding grammar for all twelve complete sce
 objects and metadata fields; it does not rely on the chat adapter's generic JSON
 fallback. Semantic and length validation still run after decoding, with bounded
 retries and saved candidate artifacts for diagnosis.
+An overlong idea summary is shortened at a sentence/word boundary without changing
+any scene controls. The raw AI draft remains available. If Short packaging names
+an absent material or promises an incorrect duration, only its metadata is
+regenerated against the three selected scene recipes; scene selection stays fixed.
+Retry feedback identifies the exact schema field and bound rather than copying
+an overlong response back into the prompt.
 
 History reserves the exact title and structural render fingerprint before the
 expensive scene jobs start. Different random seeds alone do not make an identical

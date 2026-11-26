@@ -3,12 +3,12 @@ import json
 from .plan import MATERIALS, PALETTES, SHAPES, PATTERNS
 
 
-def grammar_text():
+def grammar_text(metadata_only=False):
  def enum(values):
   return ' | '.join(json.dumps(json.dumps(v)) for v in values)
  scenes=' ws "," ws '.join(['scene']*12)
  tags=' ws "," ws '.join(['string']*5)+' (ws "," ws string){0,7}'
- return '\n'.join([
+ rules=[
   'root ::= "{" ws "\\\"idea\\\"" ws ":" ws string ws "," ws "\\\"video\\\"" ws ":" ws metadata ws "," ws "\\\"shorts\\\"" ws ":" ws metadata ws "," ws "\\\"scenes\\\"" ws ":" ws "[" ws '+scenes+' ws "]" ws "," ws "\\\"short_scenes\\\"" ws ":" ws "[" ws index ws "," ws index ws "," ws index ws "]" ws "}" ws',
   'metadata ::= "{" ws "\\\"title\\\"" ws ":" ws string ws "," ws "\\\"description\\\"" ws ":" ws string ws "," ws "\\\"tags\\\"" ws ":" ws "[" ws '+tags+' ws "]" ws "}"',
   'scene ::= "{" ws "\\\"label\\\"" ws ":" ws string ws "," ws "\\\"material\\\"" ws ":" ws material ws "," ws "\\\"palette\\\"" ws ":" ws palette ws "," ws "\\\"shape\\\"" ws ":" ws shape ws "," ws "\\\"pattern\\\"" ws ":" ws pattern ws "," ws "\\\"cuts\\\"" ws ":" ws cuts ws "}"',
@@ -19,7 +19,9 @@ def grammar_text():
   r'string ::= "\"" char* "\""',
   r'char ::= [^"\\\x00-\x1F] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F]{4})',
   r'ws ::= [ \t\n\r]{0,4}',
- ])
+ ]
+ if metadata_only:rules[0]='root ::= metadata ws'
+ return '\n'.join(rules)
 
 
 def ask(prompt,spec,seed):
@@ -31,7 +33,7 @@ def ask(prompt,spec,seed):
  tokens=sum(len(model.tokenize(m['content'].encode(),add_bos=False))+16 for m in messages)+32
  if tokens+4800>CONTEXT_TOKENS:raise ValueError('ASMR model context exceeded')
  # Passing grammar directly avoids the chat adapter's schema-to-JSON fallback.
- grammar=LlamaGrammar.from_string(grammar_text(),verbose=False)
+ grammar=LlamaGrammar.from_string(grammar_text(metadata_only=set(spec.get('properties',{}))=={'title','description','tags'}),verbose=False)
  print(json.dumps(dict(check='ASMR strict grammar inference',prompt_tokens=tokens)),flush=True)
  with inference_progress():
   response=model.create_chat_completion(messages=messages,grammar=grammar,max_tokens=4800,

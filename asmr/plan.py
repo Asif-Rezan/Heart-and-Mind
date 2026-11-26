@@ -51,6 +51,51 @@ def schema():
   scenes=dict(type='array',minItems=12,maxItems=12,items=scene),
   short_scenes=dict(type='array',minItems=3,maxItems=3,uniqueItems=True,items=dict(type='integer',minimum=0,maximum=11))))
 
+def short_issue(payload):
+ meta=payload['shorts']
+ words=set(re.findall(r'[a-z]+',(meta['title']+' '+meta['description']).lower()))
+ available={payload['scenes'][i]['material'] for i in payload['short_scenes']}
+ if any(material in words and material not in available for material in MATERIALS):return 'Short metadata promises a material absent from its selected scenes'
+ for duration in re.findall(r'\b(\d+)\s*[- ]?\s*(?:seconds?|secs?)\b',meta['title']+' '+meta['description']+' '+' '.join(meta['tags']),re.I):
+  if int(duration)!=30:return 'The Short lasts 30 seconds; do not promise another duration'
+ return None
+
+def normalize_idea(payload):
+ """Bound only editorial summary prose; never alter executable scene recipes."""
+ payload=copy.deepcopy(payload)
+ idea=payload.get('idea')
+ if isinstance(idea,str):
+  idea=' '.join(idea.split())
+  if len(idea)>350:
+   prefix=idea[:349]
+   stops=list(re.finditer(r'[.!?](?=\s|$)',prefix))
+   idea=prefix[:stops[-1].end()] if stops and stops[-1].end()>=40 else prefix.rsplit(' ',1)[0].rstrip(' ,;:.')+'.'
+  payload['idea']=idea
+ return payload
+
+def repair_short(payload,ask,seed):
+ """Keep the AI's scene selection; rewrite only conflicting Short packaging."""
+ issue=short_issue(payload)
+ if not issue:return payload
+ selected=[scene_identity(payload['scenes'][i]) for i in payload['short_scenes']]
+ prompt=('Write English title, description and 5-12 relevant tags for this exact 30-second animated cutting ASMR Short. '
+  'It contains ten seconds from EACH of these three scene recipes: '+json.dumps(selected)+'. '
+  'Describe only these materials, palettes, shapes and patterns. Title contains ASMR. '
+  'Use a title of 35-75 characters and description of 150-350 characters. '
+  'No health promises, real-footage claims, numeric counts, or duration references other than 30 seconds. '
+  'Return only title, description and tags as JSON. Fix: '+issue)
+ for attempt in range(3):
+  candidate=ask(prompt,metadata_schema(),seed+attempt)
+  try:
+   validate(candidate,metadata_schema())
+   payload=copy.deepcopy(payload);payload['shorts']=candidate
+   issue=short_issue(payload)
+   if not issue:return payload
+   prompt+='\nCorrect: '+issue
+  except ValidationError as error:
+   prompt+='\nCorrect field '+'.'.join(map(str,error.absolute_path))+'; constraint '+error.validator+'='+str(error.validator_value)[:80]
+ raise ValueError('Short metadata repair exhausted')
+
 def validate_plan(plan):
  payload={k:plan[k] for k in ('idea','video','shorts','scenes','short_scenes')}
  scenes=copy.deepcopy(payload['scenes'])
@@ -58,6 +103,7 @@ def validate_plan(plan):
   for k in ('index','seconds','start','seed'):scene.pop(k,None)
  payload['scenes']=scenes
  validate(payload,schema())
+ if short_issue(payload):raise ValueError(short_issue(payload))
  if plan.get('version')!=VERSION or plan.get('seconds') not in (240,270,300):raise ValueError('Invalid ASMR version or duration')
  if not re.fullmatch(r'asmr-[A-Za-z0-9_-]{1,70}',plan.get('run_id','')):raise ValueError('Invalid ASMR identity')
  if len({digest(scene_identity(s)) for s in plan['scenes']})!=12:raise ValueError('Every scene must have a distinct rendered configuration')
@@ -130,6 +176,11 @@ Return only the requested JSON; labels and colors must match the selected render
   try:
    payload=ask(prompt,schema(),seed+attempt)
    atomic(root/'draft.json',payload)
+   payload=normalize_idea(payload)
+   # Validate structural data before indexing it for targeted metadata repair.
+   validate(payload,schema())
+   payload=repair_short(payload,ask,seed+100+attempt*3)
+   atomic(root/'candidate.json',payload)
    plan=finish(payload,run_id,seconds,seed)
    if any(h.get('fingerprint')==plan['fingerprint'] or h.get('title','').casefold()==plan['video']['title'].casefold() for h in history if h.get('run_id')!=run_id):raise ValueError('Duplicate ASMR title or render plan')
    diversity=[len({s[k] for s in plan['scenes']}) for k in ('material','shape','pattern','palette')]
@@ -138,6 +189,6 @@ Return only the requested JSON; labels and colors must match the selected render
   except (ValueError,ValidationError) as e:
    print(json.dumps(dict(check='ASMR plan validation',attempt=attempt+1,error_type=type(e).__name__,field=list(e.absolute_path) if isinstance(e,ValidationError) else [])),flush=True)
    if attempt==2:raise
-   reason=e.message if isinstance(e,ValidationError) else str(e)
+   reason=('field '+'.'.join(map(str,e.absolute_path))+' violates '+e.validator+'='+str(e.validator_value)[:100]) if isinstance(e,ValidationError) else str(e)
    prompt+='\nCorrect the previous candidate: '+reason[:400]+'. Return a complete new candidate.'
  raise RuntimeError('ASMR idea generation exhausted')
