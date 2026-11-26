@@ -1,0 +1,139 @@
+name: Wan 2.1 Q4 realistic ASMR Short preview
+on:
+  push:
+    branches: [codex/asmr-production]
+    paths: [.generation/wan-short-request.json]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wan-short-preview-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  HF_HUB_DISABLE_XET: '1'
+  HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+  OMP_NUM_THREADS: '4'
+  OPENBLAS_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '4'
+jobs:
+  plan:
+    name: AI idea and six coherent Wan shot prompts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python install_lyrics_dependencies.py
+      - uses: ./.github/actions/model-cache
+        with: {family: lyrics}
+      - run: python -u wan_preview.py plan
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: 'wan-plan-${{ github.run_id }}', path: output/wan-short/, retention-days: 7}
+  assets:
+    name: Verify and cache Q4 weights and native runtime
+    runs-on: ubuntu-24.04
+    container: ubuntu:26.04
+    timeout-minutes: 30
+    defaults:
+      run: {shell: bash}
+    steps:
+      - name: Install runtime dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y git ca-certificates python3-venv zstd libgomp1 libopenblas0
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - run: |
+          python3 -m venv /opt/wan-env
+          /opt/wan-env/bin/pip install 'huggingface-hub>=0.34,<2' 'jsonschema>=4.23,<5'
+      - uses: actions/cache/restore@v4
+        with:
+          path: .wan-cache
+          key: wan21-q4-linux26-52491bd-82788a4a-v1
+      - name: Verify exact model, text encoder, VAE and official engine checksums
+        run: /opt/wan-env/bin/python -u wan_preview.py assets
+      - uses: actions/cache/save@v4
+        with:
+          path: .wan-cache
+          key: wan21-q4-linux26-52491bd-82788a4a-v1
+  clips:
+    name: Wan diffusion clip ${{ matrix.index }}
+    needs: [plan, assets]
+    runs-on: ubuntu-24.04
+    container: ubuntu:26.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        index: [0, 1, 2, 3, 4, 5]
+    defaults:
+      run: {shell: bash}
+    steps:
+      - name: Install native inference and video dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y git ca-certificates python3-venv ffmpeg zstd libgomp1 libopenblas0
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - run: |
+          python3 -m venv /opt/wan-env
+          /opt/wan-env/bin/pip install 'Pillow>=11,<13' 'jsonschema>=4.23,<5'
+      - uses: actions/cache/restore@v4
+        with:
+          path: .wan-cache
+          key: wan21-q4-linux26-52491bd-82788a4a-v1
+          fail-on-cache-miss: true
+      - uses: actions/download-artifact@v4
+        with: {name: 'wan-plan-${{ github.run_id }}', path: output/wan-short/}
+      - name: Generate 41 actual video frames with Wan Q4; interpolate a five-second portrait clip
+        env: {SHOT_INDEX: '${{ matrix.index }}'}
+        run: /opt/wan-env/bin/python -u wan_preview.py render --index "$SHOT_INDEX"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wan-clip-${{ github.run_id }}-${{ matrix.index }}
+          path: output/wan-short/
+          retention-days: 7
+  assemble:
+    name: Verify six model clips and export exact 30-second Short
+    needs: [clips]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with: {pattern: 'wan-clip-${{ github.run_id }}-*', merge-multiple: true, path: output/wan-short/}
+      - run: python -u wan_preview.py assemble
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wan-short-30s-${{ github.run_id }}
+          path: |
+            output/wan-short/video.mp4
+            output/wan-short/metadata.json
+            output/wan-short/media.json
+            output/wan-short/plan.json
+            output/wan-short/profile.json
+            output/wan-short/sound-design.wav
+          if-no-files-found: error
+          retention-days: 14
+      - run: |
+          {
+            echo '## Wan 2.1 T2V 1.3B Q4 ASMR Short'
+            echo 'Six independently generated five-second shots; exact 30-second 720x1280 / 24 FPS export.'
+            echo 'Speed draft: 288x512, 41 generated frames per shot, 8 FPS playback, 20 steps, CFG 6, six parallel CPU workers.'
+            echo 'Optical-flow interpolation and upscaling are post-processing, not native HD generation.'
+            echo 'Separate synthesized sound design; Wan does not generate the soundtrack. Contact-level synchronization is not claimed.'
+            echo 'No publishing, Drive access, cleanup, paid GPU provisioning or changes to main.'
+          } >> "$GITHUB_STEP_SUMMARY"

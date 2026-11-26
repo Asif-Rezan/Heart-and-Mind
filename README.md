@@ -1,5 +1,9 @@
 # Idea-driven ASMR production — testing with publication OFF
 
+The latest preview uses actual **Wan 2.1 T2V 1.3B Q4 GGUF** video diffusion in six
+parallel clips for a thirty-second Short. [Wan preview settings and speed limits](docs/wan-short-preview.md).
+Publishing remains off; this preview is separate from the procedural renderer below.
+
 The new isolated ASMR pipeline uses local AI to generate fresh ideas, executable
 scene recipes, and separate title/description/tags for a 4–5 minute full video and
 an exact 30-second Short. Full video is 1280×720 landscape; Short is independently
