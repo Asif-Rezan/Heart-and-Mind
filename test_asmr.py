@@ -14,10 +14,11 @@ from asmr import publication as pub
 
 def payload():
  scenes=[]
+ pairs=[('cutting','soap'),('pressing','slime'),('pouring','beads'),('tapping','wood'),('brushing','sand'),('crinkling','paper'),('raking','sand'),('ripples','water'),('cutting','clay'),('pressing','clay'),('pouring','water'),('tapping','glass')]
  for i in range(12):
-  scenes.append(dict(label=f'Satisfying cutting variation {i+1}',material=['soap','sand','clay','slime'][i%4],
+  scenes.append(dict(label=f'Satisfying activity variation {i+1}',activity=pairs[i][0],material=pairs[i][1],
    palette=['candy','ocean','sunset','jewel'][i%4],shape=['bar','tapered','stepped'][i%3],
-   pattern=['rainbow','solid','layered','striped'][i%4],cuts=8+i%3))
+   pattern=['rainbow','solid','layered','striped'][i%4],cycles=8+i%3))
  meta=dict(title='Colorful Material Cutting ASMR for Quiet Moments',
   description='Watch colorful animated materials sliced into neat pieces, with crisp cuts and soft squishes across a changing palette.',
   tags=['cutting asmr','soap cutting','sand cutting','satisfying animation','no talking'])
@@ -28,13 +29,25 @@ def plan():return finish(payload(),'asmr-unit',270,42)
 
 
 class PlanningTests(unittest.TestCase):
+ def test_cutting_only_episode_and_incompatible_activity_material_are_rejected(self):
+  p=plan()
+  for s in p['scenes']:s.update(activity='cutting',material='soap')
+  p['fingerprint']=fingerprint(p)
+  with self.assertRaises(ValueError):validate_plan(p)
+  p=plan();p['scenes'][1]['material']='glass';p['fingerprint']=fingerprint(p)
+  with self.assertRaisesRegex(ValueError,'incompatible'):validate_plan(p)
+ def test_packaging_cannot_call_noncutting_scenes_cutting(self):
+  from asmr.plan import short_issue
+  p=payload();p['short_scenes']=[3,5,7]
+  p['shorts']['title']='Gentle Cutting ASMR for Quiet Moments'
+  self.assertIn('activity absent',short_issue(p))
  def test_overlong_idea_and_mismatched_short_repair_without_regenerating_scenes(self):
   source=payload();source['idea']='A calming journey through colorful material cutting. '*12
-  source['short_scenes']=[0,1,2]
+  source['short_scenes']=[0,4,8]
   source['shorts']['title']='Soft Slime Cutting ASMR in Three Colorful Scenes'
   source['shorts']['description']='Watch the first 10 seconds of slime cutting in this colorful ASMR animation. Each slice lands softly alongside crisp cutting sounds and gentle textures.'
-  corrected=dict(title='Soap, Sand and Clay Cutting ASMR | Crisp Meets Soft',
-   description='Enjoy soap, sand and clay sliced into neat pieces in this animated ASMR Short. Three selected scenes bring colorful slices and soft layered textures with cutting sounds.',
+  corrected=dict(title='Soap, Sand and Clay ASMR | Crisp Meets Soft',
+   description='Enjoy soap and clay cutting alongside gentle sand brushing in this animated ASMR Short. Three selected scenes contrast delicate slices with soft brush strokes and their matching sounds.',
    tags=['cutting asmr','soap cutting','sand cutting','clay cutting','satisfying animation'])
   with tempfile.TemporaryDirectory() as d:
    ask=Mock(side_effect=[source,corrected])
@@ -66,12 +79,12 @@ class PlanningTests(unittest.TestCase):
    backend.create_chat_completion.return_value['choices'][0]['finish_reason']='length'
    with self.assertRaisesRegex(ValueError,'incomplete'):ask('Make an episode',{},42)
  def test_invalid_model_candidate_is_saved_and_retried_with_specific_field(self):
-  bad=payload();bad['scenes'][0].pop('cuts')
+  bad=payload();bad['scenes'][0].pop('cycles')
   with tempfile.TemporaryDirectory() as d:
    ask=Mock(side_effect=[bad,payload()])
    p=generate(d,'asmr-retry',270,[],ask)
    self.assertEqual(p['run_id'],'asmr-retry')
-   self.assertIn('cuts',ask.call_args.args[0])
+   self.assertIn('cycles',ask.call_args.args[0])
    self.assertEqual(ask.call_count,2)
  def test_full_and_short_have_accurate_separate_chapters(self):
   p=plan()
@@ -106,11 +119,31 @@ class PlanningTests(unittest.TestCase):
    ask.assert_not_called()
 
 class GeometryTests(unittest.TestCase):
+ def test_native_landscape_and_portrait_actions_move_and_sound_differently(self):
+  from asmr.activities import Scene,ACTIVITIES
+  from scipy.io import wavfile
+  images=[];sounds=[]
+  with tempfile.TemporaryDirectory() as d:
+   for i,(activity,materials) in enumerate(ACTIVITIES.items()):
+    recipe=dict(plan()['scenes'][0],activity=activity,material=materials[0],seed=50+i)
+    scene=Scene(recipe)
+    a=np.asarray(scene.render(.5+scene.cycle*.2));b=np.asarray(scene.render(.5+scene.cycle*.5))
+    self.assertEqual(a.shape,(720,1280,3))
+    self.assertGreater(np.mean(np.abs(a.astype(float)-b.astype(float))),.1)
+    self.assertEqual(Scene(recipe,'portrait').render(2).size,(720,1280))
+    self.assertTrue(all(.5<x<recipe['seconds'] for x in scene.event_times()))
+    path=Path(d)/f'{activity}.wav';scene.build_audio(path);rate,pcm=wavfile.read(path)
+    self.assertEqual((rate,pcm.shape),(48000,(round(recipe['seconds']*48000),2)))
+    self.assertLessEqual(np.max(np.abs(pcm.astype(float))),32767)
+    self.assertGreater(np.sqrt(np.mean(pcm.astype(float)**2)),20)
+    images.append(b);sounds.append(pcm)
+   self.assertTrue(all(not np.array_equal(images[0],x) for x in images[1:]))
+   self.assertTrue(all(not np.array_equal(sounds[0],x) for x in sounds[1:]))
  def test_all_materials_render_distinct_pixels_and_valid_cut_clock(self):
   from asmr import geometry as g
   images=[]
   for i,scene in enumerate(plan()['scenes'][:4]):
-   g.configure(scene,supersample=1)
+   g.configure(dict(scene,material=['soap','sand','clay','slime'][i],cuts=scene['cycles']),supersample=1)
    for k in range(g.CUTS):
     self.assertAlmostEqual(g.knife_state(g.t_bottom(k))[1],g.YBOT)
     self.assertIsNone(g.slice_state(k,g.t_detach(k)-.001))
@@ -123,7 +156,7 @@ class GeometryTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    sounds=[]
    for i,s in enumerate(plan()['scenes'][:4]):
-    g.configure(s,supersample=1);p=Path(d)/f'{i}.wav';g.build_audio(p)
+    g.configure(dict(s,material=['soap','sand','clay','slime'][i],cuts=s['cycles']),supersample=1);p=Path(d)/f'{i}.wav';g.build_audio(p)
     rate,pcm=wavfile.read(p)
     self.assertEqual((rate,pcm.shape[1]),(44100,2))
     self.assertLessEqual(np.max(np.abs(pcm.astype(float))),32767)

@@ -1,26 +1,29 @@
 """Explicit ASMR decoding grammar; never silently fall back to generic JSON."""
 import json
-from .plan import MATERIALS, PALETTES, SHAPES, PATTERNS
+from .plan import ACTIVITIES, PALETTES, SHAPES, PATTERNS
 
 
-def grammar_text(metadata_only=False):
- def enum(values):
-  return ' | '.join(json.dumps(json.dumps(v)) for v in values)
- scenes=' ws "," ws '.join(['scene']*12)
- tags=' ws "," ws '.join(['string']*5)+' (ws "," ws string){0,7}'
+def grammar_text(metadata_only=False,activities=None):
+ def literal(value):return json.dumps(json.dumps(value))
+ def enum(values):return ' | '.join(literal(v) for v in values)
+ def object_rule(fields):
+  return '\"{\" ws '+' ws \",\" ws '.join(literal(key)+' ws \":\" ws '+value for key,value in fields)+' ws \"}\"'
+ scenes=' ws \",\" ws '.join(['scene']*12)
+ tags=' ws \",\" ws '.join(['string']*5)+' (ws \",\" ws string){0,7}'
  rules=[
-  'root ::= "{" ws "\\\"idea\\\"" ws ":" ws string ws "," ws "\\\"video\\\"" ws ":" ws metadata ws "," ws "\\\"shorts\\\"" ws ":" ws metadata ws "," ws "\\\"scenes\\\"" ws ":" ws "[" ws '+scenes+' ws "]" ws "," ws "\\\"short_scenes\\\"" ws ":" ws "[" ws index ws "," ws index ws "," ws index ws "]" ws "}" ws',
-  'metadata ::= "{" ws "\\\"title\\\"" ws ":" ws string ws "," ws "\\\"description\\\"" ws ":" ws string ws "," ws "\\\"tags\\\"" ws ":" ws "[" ws '+tags+' ws "]" ws "}"',
-  'scene ::= "{" ws "\\\"label\\\"" ws ":" ws string ws "," ws "\\\"material\\\"" ws ":" ws material ws "," ws "\\\"palette\\\"" ws ":" ws palette ws "," ws "\\\"shape\\\"" ws ":" ws shape ws "," ws "\\\"pattern\\\"" ws ":" ws pattern ws "," ws "\\\"cuts\\\"" ws ":" ws cuts ws "}"',
-  'material ::= '+enum(MATERIALS), 'palette ::= '+enum(PALETTES),
-  'shape ::= '+enum(SHAPES),'pattern ::= '+enum(PATTERNS),
-  'cuts ::= "8" | "9" | "10"',
-  'index ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11"',
+  'root ::= '+('metadata ws' if metadata_only else object_rule([('idea','string'),('video','metadata'),('shorts','metadata'),('scenes','\"[\" ws '+scenes+' ws \"]\"'),('short_scenes','\"[\" ws index ws \",\" ws index ws \",\" ws index ws \"]\"')])+' ws'),
+  'metadata ::= '+object_rule([('title','string'),('description','string'),('tags','\"[\" ws '+tags+' ws \"]\"')]),
+  'scene ::= '+' | '.join(a+'-scene' for a in (activities or ACTIVITIES)),
+  'palette ::= '+enum(PALETTES),'shape ::= '+enum(SHAPES),'pattern ::= '+enum(PATTERNS),
+  'cycles ::= \"8\" | \"9\" | \"10\"',
+  'index ::= '+' | '.join(json.dumps(str(i)) for i in range(12)),
   r'string ::= "\"" char* "\""',
   r'char ::= [^"\\\x00-\x1F] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F]{4})',
   r'ws ::= [ \t\n\r]{0,4}',
  ]
- if metadata_only:rules[0]='root ::= metadata ws'
+ for activity in (activities or ACTIVITIES):
+  rules.append(activity+'-material ::= '+enum(ACTIVITIES[activity]))
+  rules.append(activity+'-scene ::= '+object_rule([('label','string'),('activity',literal(activity)),('material',activity+'-material'),('palette','palette'),('shape','shape'),('pattern','pattern'),('cycles','cycles')]))
  return '\n'.join(rules)
 
 
@@ -33,7 +36,7 @@ def ask(prompt,spec,seed):
  tokens=sum(len(model.tokenize(m['content'].encode(),add_bos=False))+16 for m in messages)+32
  if tokens+4800>CONTEXT_TOKENS:raise ValueError('ASMR model context exceeded')
  # Passing grammar directly avoids the chat adapter's schema-to-JSON fallback.
- grammar=LlamaGrammar.from_string(grammar_text(metadata_only=set(spec.get('properties',{}))=={'title','description','tags'}),verbose=False)
+ grammar=LlamaGrammar.from_string(grammar_text(metadata_only=set(spec.get('properties',{}))=={'title','description','tags'},activities=spec.get('properties',{}).get('scenes',{}).get('items',{}).get('properties',{}).get('activity',{}).get('enum')),verbose=False)
  print(json.dumps(dict(check='ASMR strict grammar inference',prompt_tokens=tokens)),flush=True)
  with inference_progress():
   response=model.create_chat_completion(messages=messages,grammar=grammar,max_tokens=4800,

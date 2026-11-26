@@ -2,8 +2,11 @@
 
 The new isolated ASMR pipeline uses local AI to generate fresh ideas, executable
 scene recipes, and separate title/description/tags for a 4–5 minute full video and
-an exact 30-second Short. It follows the approved procedural soap-cutting approach,
-with actual blade/slice motion and synchronized material-specific sound.
+an exact 30-second Short. Full video is 1280×720 landscape; Short is independently
+composed at 720×1280 portrait. AI chooses among eight implemented ASMR activity
+families, including pouring, tapping, paper crinkling, brushing, raking, pressing,
+water ripples and cutting, each with distinct animation and synchronized sound.
+Episodes require at least three activity types and limit cutting to three scenes.
 
 [ASMR production, test controls, publishing, Drive cleanup and recovery](docs/asmr-production.md).
 Implementation: `asmr/`; workflow: `.github/workflows/asmr-production.yml`.

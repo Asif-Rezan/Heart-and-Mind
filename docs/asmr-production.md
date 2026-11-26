@@ -2,17 +2,26 @@
 
 This implementation lives on `codex/asmr-production`; main and the existing
 cartoon publishing workflows have not been changed. The earlier approved
-`make_asmr.py` geometry/audio design is the renderer foundation. The preview
-workflow remains available separately.
+`make_asmr.py` preview is preserved separately. Production v2 uses distinct
+activity renderers instead of applying a cutting template to every idea.
 
 ## What each new run does
 
 The existing pinned local Qwen3-4B model writes an original episode idea, twelve
 scene recipes, and separate English title/description/tags for the full video and
-Short. It chooses actual renderer controls: soap/sand/clay/slime, eight palettes,
-three slab shapes, four color patterns and 8–10 cuts per scene. Every scene must
-have a distinct configuration; at least two visual controls must vary across the
-episode. Titles cannot promise an absent material, real footage, medical effects
+Short. A run-seeded sampler chooses four activity families from an eight-family
+library and avoids repeating the previous episode's exact activity set. The AI
+invents a coherent idea using that menu and writes the executed scene recipes.
+Supported families are blade cutting, soft-material pressing, bead/water pouring,
+wood/glass tapping, sand brushing, paper crinkling, sand raking and water ripples.
+These are a finite implemented animation library, not arbitrary photorealistic
+video generation. Each action has its own moving objects, contact events and sound.
+The decoding grammar constrains each activity to compatible materials. Twelve
+scenes must contain at least three different activities, with at most three cutting
+scenes. Eight palettes, color patterns, shape controls and 8–10 action cycles per
+scene provide variation within those families. Every scene must have a distinct
+configuration; at least two visual controls must vary across the episode.
+Titles cannot promise an absent material, real footage, medical effects
 or invented numeric event counts. Invalid AI output is retried within a bound;
 there is no canned-episode fallback and no model-generated Python is executed.
 The ASMR planner passes an explicit decoding grammar for all twelve complete scene
@@ -20,8 +29,8 @@ objects and metadata fields; it does not rely on the chat adapter's generic JSON
 fallback. Semantic and length validation still run after decoding, with bounded
 retries and saved candidate artifacts for diagnosis.
 An overlong idea summary is shortened at a sentence/word boundary without changing
-any scene controls. The raw AI draft remains available. If Short packaging names
-an absent material or promises an incorrect duration, only its metadata is
+any scene controls. The raw AI draft remains available. If packaging names
+an absent material/activity or the Short promises an incorrect duration, only its metadata is
 regenerated against the three selected scene recipes; scene selection stays fixed.
 Retry feedback identifies the exact schema field and bound rather than copying
 an overlong response back into the prompt.
@@ -33,17 +42,19 @@ preview history. Production uses durable private Drive history and keeps all
 reservations, including incomplete episodes. History comparison is a practical
 repeat guard, not a guarantee of originality across all possible content.
 
-Twelve scene jobs render moving blade strokes, contact seams, separate falling
-slices, shadows, material-specific crumbs/facet density and elastic slime
-stretch. Actual geometry and audio share the same cut event clock. Soap emphasizes
-crisp crunches, sand finer grains, clay softer chunks and slime wet squishes.
-These are stylized low-poly illustrations and synthesized sound, not real cutting
-footage or a full physical simulation. Camera and lighting are consistent; the
-idea changes the executed material/pattern/shape/palette/cut configuration.
+Twelve scene jobs render distinct action geometry: separated slices, a descending
+press and deforming slab, streams and filling containers, bouncing mallets,
+bristles clearing grains, a folding/crumpling sheet, combed sand grooves, or
+falling droplets and expanding rings. Sound is synthesized on each activity's event
+clock: crisp cutting, low squishes, granular/water streams, wood knocks/glass tones,
+brush swishes, paper crackles, dry rake friction and drips. These are stylized
+illustrations with synthesized audio, not recorded footage or physical simulation.
 
-The full portrait video is 720×1280 / 30 FPS, with a choice of exactly 240, 270 or
-300 seconds. The separate Short is exactly thirty seconds: ten seconds from each
-of three AI-selected scene indices. Its metadata describes those selected scenes.
+The full video is native **1280×720 landscape (16:9)** / 30 FPS, lasting exactly
+240, 270 or 300 seconds. The separate Short is native **720×1280 portrait (9:16)**,
+exactly thirty seconds: ten seconds from each of three AI-selected scene recipes.
+The Short is rendered with its own portrait composition, not stretched or cropped
+from the landscape video. Its metadata describes only those selected scenes.
 Descriptions add real timeline chapter markers and an animation/synthetic-sound
 disclosure. Both products and thumbnails use the actual generated scene frames.
 
@@ -141,3 +152,11 @@ Live publishing is intentionally not exercised while testing is off; successful
 preview generation cannot prove current OAuth/Page-token validity, API quotas or
 future platform acceptance. The cloud preview must complete before claiming an
 end-to-end AI-generated episode has been validated.
+
+## v2 compatibility
+
+The v2 schema adds `activity` and replaces `cuts` with `cycles`. Renderer receipts
+include the activity implementation and format code. Old cutting-only portrait
+plans and media are deliberately not reused as v2 output. To recover an old v1
+publication, check out its original revision; never migrate an existing uploaded
+video ID to a new source recipe or orientation.

@@ -115,7 +115,7 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
   scenes:
-    name: Procedural cutting scene ${{ matrix.index }}
+    name: Procedural ASMR activity scene ${{ matrix.index }}
     needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -144,7 +144,7 @@ jobs:
           run-id: ${{ inputs.prepared_run }}
           github-token: ${{ github.token }}
           path: output/
-      - name: Render actual blade, material-specific slices and synchronized sound
+      - name: Render native landscape activity with synchronized sound
         env:
           RUN_ID: ${{ needs.plan.outputs.run_id }}
           SCENE_INDEX: ${{ matrix.index }}
@@ -207,7 +207,7 @@ jobs:
         run: |
           {
             echo "## ASMR outputs: $RUN_ID"
-            echo 'Full episode: video.mp4 (240-300 seconds); Short: short/video.mp4 (30 seconds).'
+            echo 'Full episode: video.mp4 (1280x720 landscape, 240-300 seconds); Short: short/video.mp4 (720x1280 portrait, 30 seconds).'
             echo "YouTube enabled: $ASMR_PUBLISH_ENABLED; Facebook enabled: $ASMR_FACEBOOK_ENABLED; cleanup enabled: $ASMR_CLEANUP_ENABLED."
             echo 'Publishing requires the manual publish input and the ASMR repository flags; ordinary test pushes never publish.'
           } >> "$GITHUB_STEP_SUMMARY"

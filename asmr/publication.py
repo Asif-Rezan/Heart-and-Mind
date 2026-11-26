@@ -37,7 +37,7 @@ def reserve(plan):
    return
   if item.get('fingerprint')==plan['fingerprint'] or item.get('title','').casefold()==plan['video']['title'].casefold():raise ValueError('ASMR idea was already reserved')
  history.append(dict(run_id=plan['run_id'],title=plan['video']['title'],idea=plan['idea'],fingerprint=plan['fingerprint'],
-  recipes=[{k:s[k] for k in ('material','shape','pattern','palette','cuts')} for s in plan['scenes']]))
+  recipes=[{k:s[k] for k in ('activity','material','shape','pattern','palette','cycles')} for s in plan['scenes']]))
  atomic('output/asmr-history.json',history[-100:])
  if backup_enabled():
   store=ASMRStore();store.save('history.json',history)
