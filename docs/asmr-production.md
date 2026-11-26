@@ -39,7 +39,9 @@ disclosure. Both products and thumbnails use the actual generated scene frames.
 
 ## Test mode: publishing is OFF
 
-`AI ASMR long video and Short` runs on a push to the production test branch, with
+`AI ASMR long video and Short` was started by the initial test-branch push. Further
+branch tests are requested by changing `.generation/asmr-request.json` (for example
+`{"request":"new-preview-20261126"}`), with
 all publication and cleanup gates false. No YouTube or Facebook API writes occur,
 no Drive files are deleted, and no Drive client is created by default. Old global
 `PUBLISH_ENABLED=true` / `FACEBOOK_PUBLISH_ENABLED=true` variables cannot enable this
@@ -62,7 +64,8 @@ recipe or renderer hash invalidates that scene's cached render.
 
 Merge the reviewed branch when ready to activate its workflow on the default
 branch. GitHub manual dispatch/recovery requires the workflow on the default
-branch; branch push tests work without a merge. No automatic ASMR schedule has
+branch; request-file branch push tests work without a merge. Ordinary code pushes do
+not start another expensive AI/video generation. No automatic ASMR schedule has
 been enabled by this implementation.
 
 To publish, BOTH the workflow dispatch input `publish=true` AND repository variable

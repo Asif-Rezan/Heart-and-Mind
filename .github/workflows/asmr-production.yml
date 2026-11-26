@@ -2,7 +2,7 @@ name: AI ASMR long video and Short
 on:
   push:
     branches: [codex/asmr-production]
-    paths: [asmr/**, test_asmr.py, .github/workflows/asmr-production.yml]
+    paths: [.generation/asmr-request.json]
   workflow_dispatch:
     inputs:
       run_id:

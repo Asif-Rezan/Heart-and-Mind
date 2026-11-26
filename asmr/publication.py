@@ -58,20 +58,24 @@ def backup(root,plan,store=None):
  if not state:state=dict(identity=identity,run_id=plan['run_id'],plan=plan,media=[],youtube={},facebook={},deleted=[],facebook_required=enabled('ASMR_FACEBOOK_ENABLED'))
  if state.get('facebook_required',False)!=enabled('ASMR_FACEBOOK_ENABLED'):raise ValueError('ASMR Facebook policy differs from its saved publication checkpoint')
  if state.get('backup_complete'):
+  for entry in state['media']:
+   if not store.verified(entry['id'],entry['key'],entry['size'],entry['md5']):raise ValueError('Completed ASMR backup changed or disappeared; reconcile before publishing')
   save_state(root,store,key,state);return state
  media=[root/'video.mp4',root/'thumbnail.jpg',root/'short'/'video.mp4',root/'short'/'thumbnail.jpg']
  media+=sorted((root/'scenes').glob('scene-*.mp4'))+sorted((root/'scenes').glob('scene-*.jpg'))
  for path in media:
   name=path.relative_to(root).as_posix();remote_key=prefix+'/'+name
-  if any(entry['name']==name and entry['sha256']==file_hash(path) for entry in state['media']):continue
+  saved=next((entry for entry in state['media'] if entry['name']==name),None)
+  if saved and saved['sha256']==file_hash(path) and store.verified(saved['id'],saved['key'],saved['size'],saved['md5']):continue
   result=store.upload(path,remote_key)
   with path.open('rb') as f:md5=hashlib.file_digest(f,'md5').hexdigest()
+  state['media']=[entry for entry in state['media'] if entry['name']!=name]
   state['media'].append(dict(id=result['id'],key=remote_key,name=name,sha256=file_hash(path),md5=md5,size=path.stat().st_size))
   save_state(root,store,key,state)
- state['backup_complete']=True
- save_state(root,store,key,state)
  store.save(prefix+'/plan.json',plan)
  store.save(prefix+'/media.json',json.loads((root/'media.json').read_text()))
+ state['backup_complete']=True
+ save_state(root,store,key,state)
  return state
 
 def production_settings():
@@ -98,7 +102,7 @@ def publish_youtube(root,plan):
 
 def publish_facebook(root,plan):
  if not publish_enabled() or not enabled('ASMR_FACEBOOK_ENABLED'):return {'disabled':True}
- preflight();root=Path(root);store=ASMRStore();key=f"episodes/{plan['run_id']}/publication.json"
+ preflight();validate_plan(plan);root=Path(root);store=ASMRStore();key=f"episodes/{plan['run_id']}/publication.json"
  state=store.load(key,{})
  if state.get('identity')!=product_identity(plan):raise ValueError('ASMR Facebook source identity mismatch')
  import facebook_publish as fb
@@ -111,7 +115,7 @@ def publish_facebook(root,plan):
 
 def cleanup(root,plan):
  if not publish_enabled() or not enabled('ASMR_CLEANUP_ENABLED'):return {'disabled':True}
- preflight();root=Path(root);store=ASMRStore();key=f"episodes/{plan['run_id']}/publication.json"
+ preflight();validate_plan(plan);root=Path(root);store=ASMRStore();key=f"episodes/{plan['run_id']}/publication.json"
  state=store.load(key,{})
  if state.get('identity')!=product_identity(plan) or not state.get('backup_complete'):raise ValueError('ASMR cleanup checkpoint identity mismatch')
  from pipeline import youtube_client

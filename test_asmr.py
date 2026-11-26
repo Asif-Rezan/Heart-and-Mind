@@ -105,7 +105,7 @@ class DurablePublicationTests(unittest.TestCase):
    for name in ('video.mp4','thumbnail.jpg','short/video.mp4','short/thumbnail.jpg'):(root/name).write_bytes(name.encode())
    atomic(root/'media.json',{})
    state=dict(identity=product_identity(p),run_id=p['run_id'],plan=p,youtube={},facebook={},deleted=[],facebook_required=False,
-    media=[dict(name='video.mp4',sha256=file_hash(root/'video.mp4'),id='already')])
+    media=[dict(name='video.mp4',sha256=file_hash(root/'video.mp4'),id='already',key='old',size=9,md5='existing')])
    store.load.return_value=state;store.upload.return_value={'id':'next'}
    with patch.dict(os.environ,{'ASMR_DRIVE_BACKUP':'true','ASMR_PUBLISH_ENABLED':'false','ASMR_FACEBOOK_ENABLED':'false'}),patch.object(pub,'validate_products'):
     result=pub.backup(root,p,store)
@@ -135,6 +135,25 @@ class DurablePublicationTests(unittest.TestCase):
    patch('upload_settings.verified_phase',return_value='published'):
    with self.assertRaisesRegex(ValueError,'Unsafe'):pub.cleanup('/unused',p)
   store.client.files().delete.assert_not_called()
+ def test_successful_cleanup_checks_exact_file_then_checkpoints_idempotently(self):
+  from asmr.render import product_identity
+  import hashlib
+  p=plan();store=Mock();store.folder='asmr-owned'
+  yt={k:dict(phase='published',video_id=k,upload_body={}) for k in ('video','shorts')}
+  key=f"episodes/{p['run_id']}/video.mp4"
+  entry=dict(id='media-id',name='video.mp4',key=key,size=42,md5='expected')
+  state=dict(identity=product_identity(p),backup_complete=True,youtube=yt,facebook_required=False,deleted=[],media=[entry])
+  store.load.return_value=state
+  store.client.files().get().execute.return_value=dict(id='media-id',name=key.replace('/','__'),parents=['asmr-owned'],
+   appProperties={'workflow_key':hashlib.sha256(key.encode()).hexdigest()},size='42',md5Checksum='expected',mimeType='video/mp4')
+  client=Mock();client.videos().list().execute.side_effect=[{'items':[{'id':k}]} for k in ('video','shorts','video','shorts')]
+  with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,{'ASMR_PUBLISH_ENABLED':'true','ASMR_CLEANUP_ENABLED':'true','ASMR_FACEBOOK_ENABLED':'false','EXPECTED_CHANNEL_ID':'channel'}),\
+   patch.object(pub,'preflight'),patch.object(pub,'ASMRStore',return_value=store),patch('pipeline.youtube_client',return_value=client),\
+   patch('upload_settings.verified_phase',return_value='published'):
+   pub.cleanup(d,p);pub.cleanup(d,p)
+  store.client.files().delete.assert_called_once_with(fileId='media-id')
+  self.assertEqual(state['deleted'],['media-id']);self.assertTrue(state['cleanup_complete'])
+
  def test_preview_history_reserves_identity_without_drive(self):
   with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,{'ASMR_PUBLISH_ENABLED':'false','ASMR_DRIVE_BACKUP':'false'}):
    previous=os.getcwd();os.chdir(d)
