@@ -1,0 +1,326 @@
+name: AI ASMR long video and Short
+on:
+  push:
+    branches: [codex/asmr-production]
+    paths: [asmr/**, test_asmr.py, .github/workflows/asmr-production.yml]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Optional stable identity for recovery; must start with asmr-
+        type: string
+      seconds:
+        description: Full episode duration; Short is always 30 seconds
+        type: choice
+        options: ['240', '270', '300']
+        default: '270'
+      publish:
+        description: Publish only if repository ASMR_PUBLISH_ENABLED is also true
+        type: boolean
+        default: false
+      backup_to_drive:
+        description: Optional private ASMR Drive backup during testing
+        type: boolean
+        default: false
+      operation:
+        description: Generate a fresh episode or recover existing publication without AI regeneration
+        type: choice
+        options: [generate, recover, cleanup]
+        default: generate
+      prepared_run:
+        description: Optional original GitHub run number for resuming saved plan and scene artifacts
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: heart-and-mind-asmr-production
+  cancel-in-progress: false
+env:
+  ASMR_PUBLISH_ENABLED: ${{ inputs.publish && vars.ASMR_PUBLISH_ENABLED == 'true' && 'true' || 'false' }}
+  ASMR_FACEBOOK_ENABLED: ${{ inputs.publish && vars.ASMR_PUBLISH_ENABLED == 'true' && vars.ASMR_FACEBOOK_ENABLED == 'true' && 'true' || 'false' }}
+  ASMR_CLEANUP_ENABLED: ${{ inputs.publish && vars.ASMR_PUBLISH_ENABLED == 'true' && vars.ASMR_CLEANUP_ENABLED == 'true' && 'true' || 'false' }}
+  ASMR_DRIVE_BACKUP: ${{ (inputs.backup_to_drive || (inputs.publish && vars.ASMR_PUBLISH_ENABLED == 'true')) && 'true' || 'false' }}
+  OMP_NUM_THREADS: '2'
+  OPENBLAS_NUM_THREADS: '2'
+  MKL_NUM_THREADS: '2'
+  HF_HUB_DISABLE_XET: '1'
+  HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+jobs:
+  plan:
+    if: inputs.operation == '' || inputs.operation == 'generate'
+    name: AI idea, scene recipe, title, description and tags
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    outputs:
+      run_id: ${{ steps.identity.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - id: identity
+        env:
+          REQUESTED: ${{ inputs.run_id }}
+          PREPARED: ${{ inputs.prepared_run }}
+        run: |
+          run_id="${REQUESTED:-asmr-$GITHUB_RUN_ID}"
+          [[ "$run_id" =~ ^asmr-[A-Za-z0-9_-]{1,70}$ ]]
+          if [[ -n "$PREPARED" ]]; then
+            [[ "$PREPARED" =~ ^[0-9]+$ && -n "$REQUESTED" ]]
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+      - name: Install local AI and base dependencies
+        run: python install_lyrics_dependencies.py
+      - name: Install rendering dependencies and run ASMR regression tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m unittest -v test_asmr
+      - uses: actions/cache/restore@v4
+        with:
+          path: output/asmr-history.json
+          key: asmr-history-v1-${{ github.run_id }}
+          restore-keys: asmr-history-v1-
+      - uses: ./.github/actions/model-cache
+        with: {family: lyrics}
+      - name: Restore the original plan on an explicit resume
+        if: inputs.prepared_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: asmr-plan-${{ inputs.prepared_run }}
+          run-id: ${{ inputs.prepared_run }}
+          github-token: ${{ github.token }}
+          path: output/
+      - name: Generate or resume a unique constrained AI plan and metadata
+        env:
+          RUN_ID: ${{ steps.identity.outputs.run_id }}
+          SECONDS_REQUESTED: ${{ inputs.seconds || '270' }}
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          FACEBOOK_PAGE_ID: ${{ vars.FACEBOOK_PAGE_ID }}
+        run: python -u -m asmr --stage plan --run-id "$RUN_ID" --seconds "$SECONDS_REQUESTED"
+      - uses: actions/cache/save@v4
+        if: always() && hashFiles('output/asmr-history.json') != ''
+        with:
+          path: output/asmr-history.json
+          key: asmr-history-v1-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asmr-plan-${{ github.run_id }}
+          path: output/
+          retention-days: 14
+          if-no-files-found: warn
+  scenes:
+    name: Procedural cutting scene ${{ matrix.index }}
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: asmr-plan-${{ github.run_id }}
+          path: output/
+      - uses: actions/download-artifact@v4
+        if: inputs.prepared_run != ''
+        with:
+          name: asmr-scene-${{ inputs.prepared_run }}-${{ matrix.index }}
+          run-id: ${{ inputs.prepared_run }}
+          github-token: ${{ github.token }}
+          path: output/
+      - name: Render actual blade, material-specific slices and synchronized sound
+        env:
+          RUN_ID: ${{ needs.plan.outputs.run_id }}
+          SCENE_INDEX: ${{ matrix.index }}
+          ASMR_PUBLISH_ENABLED: 'false'
+          ASMR_DRIVE_BACKUP: 'false'
+        run: python -u -m asmr --stage scene --run-id "$RUN_ID" --index "$SCENE_INDEX"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asmr-scene-${{ github.run_id }}-${{ matrix.index }}
+          path: output/
+          retention-days: 14
+          if-no-files-found: warn
+  assemble:
+    name: Assemble 4-5 minute episode and exact 30-second Short
+    needs: [plan, scenes]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: asmr-scene-${{ github.run_id }}-*
+          merge-multiple: true
+          path: output/
+      - name: Verify scenes, assemble both products and decode outputs
+        env:
+          RUN_ID: ${{ needs.plan.outputs.run_id }}
+          ASMR_PUBLISH_ENABLED: 'false'
+          ASMR_DRIVE_BACKUP: 'false'
+        run: python -u -m asmr --stage assemble --run-id "$RUN_ID"
+      - name: Optional private Drive backup; preview media is never deleted
+        if: env.ASMR_DRIVE_BACKUP == 'true'
+        env:
+          RUN_ID: ${{ needs.plan.outputs.run_id }}
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          FACEBOOK_PAGE_ID: ${{ vars.FACEBOOK_PAGE_ID }}
+        run: python -u -m asmr --stage backup --run-id "$RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asmr-finished-${{ github.run_id }}
+          path: output/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Record test/production status without credentials
+        env:
+          RUN_ID: ${{ needs.plan.outputs.run_id }}
+        run: |
+          {
+            echo "## ASMR outputs: $RUN_ID"
+            echo 'Full episode: video.mp4 (240-300 seconds); Short: short/video.mp4 (30 seconds).'
+            echo "YouTube enabled: $ASMR_PUBLISH_ENABLED; Facebook enabled: $ASMR_FACEBOOK_ENABLED; cleanup enabled: $ASMR_CLEANUP_ENABLED."
+            echo 'Publishing requires the manual publish input and the ASMR repository flags; ordinary test pushes never publish.'
+          } >> "$GITHUB_STEP_SUMMARY"
+  youtube:
+    name: Publish and verify YouTube long video and Short
+    needs: [plan, assemble]
+    if: inputs.publish && vars.ASMR_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+      FACEBOOK_PAGE_ID: ${{ vars.FACEBOOK_PAGE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with: {name: 'asmr-finished-${{ github.run_id }}', path: output/}
+      - name: Resume durable uploads without inserting duplicates
+        env: {RUN_ID: '${{ needs.plan.outputs.run_id }}'}
+        run: python -u -m asmr --stage youtube --run-id "$RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: 'asmr-publication-${{ github.run_id }}', path: 'output/*/publication.json', retention-days: 14}
+  facebook:
+    name: Publish and verify Facebook feed video and Reel
+    needs: [plan, youtube]
+    if: inputs.publish && vars.ASMR_PUBLISH_ENABLED == 'true' && vars.ASMR_FACEBOOK_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+      FACEBOOK_PAGE_ID: ${{ vars.FACEBOOK_PAGE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with: {name: 'asmr-finished-${{ github.run_id }}', path: output/}
+      - env: {RUN_ID: '${{ needs.plan.outputs.run_id }}'}
+        run: python -u -m asmr --stage facebook --run-id "$RUN_ID"
+  cleanup:
+    name: Fresh publication checks and exact-ID Drive cleanup
+    needs: [plan, youtube, facebook]
+    if: >-
+      always() && !cancelled() && needs.youtube.result == 'success' &&
+      (needs.facebook.result == 'success' || needs.facebook.result == 'skipped') &&
+      inputs.publish && vars.ASMR_PUBLISH_ENABLED == 'true' && vars.ASMR_CLEANUP_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+      FACEBOOK_PAGE_ID: ${{ vars.FACEBOOK_PAGE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with: {name: 'asmr-finished-${{ github.run_id }}', path: output/}
+      - env: {RUN_ID: '${{ needs.plan.outputs.run_id }}'}
+        run: python -u -m asmr --stage cleanup --run-id "$RUN_ID"
+  recovery:
+    name: Recover existing publication or cleanup without regeneration
+    if: inputs.operation == 'recover' || inputs.operation == 'cleanup'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 200
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+      FACEBOOK_PAGE_ID: ${{ vars.FACEBOOK_PAGE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt
+      - env:
+          RUN_ID: ${{ inputs.run_id }}
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$ASMR_PUBLISH_ENABLED" = true
+          if [[ "$OPERATION" == cleanup ]]; then
+            python -u -m asmr --stage restore --metadata-only --run-id "$RUN_ID"
+          else
+            python -u -m asmr --stage restore --run-id "$RUN_ID"
+            python -u -m asmr --stage youtube --run-id "$RUN_ID"
+            python -u -m asmr --stage facebook --run-id "$RUN_ID"
+          fi
+          python -u -m asmr --stage cleanup --run-id "$RUN_ID"

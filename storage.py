@@ -30,6 +30,9 @@ def drive_retry(call):
 
 class Store:
     """Private Google Drive storage; never purchases additional quota."""
+    CHILD_MARKER = 'heart_and_mind_hindi_kids_root'
+    CHILD_LABEL = 'Kids Rhymes - Heart and Mind'
+
     def __init__(self):
         from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build
@@ -46,7 +49,7 @@ class Store:
         # Isolate kids checkpoints from the archived pipeline's history and runs.
         query = (f"'{root}' in parents and trashed=false and "
                  "mimeType='application/vnd.google-apps.folder' and "
-                 "appProperties has { key='heart_and_mind_hindi_kids_root' and value='v1' }")
+                 f"appProperties has {{ key='{self.CHILD_MARKER}' and value='v1' }}")
         result = drive_retry(lambda: self.client.files().list(
             q=query, fields='nextPageToken,files(id)', pageSize=100).execute())
         folders = result.get('files', [])
@@ -56,9 +59,9 @@ class Store:
             self.folder = folders[0]['id']
         else:
             self.folder = self.client.files().create(body={
-                'name': 'Kids Rhymes - Heart and Mind', 'parents': [root],
+                'name': self.CHILD_LABEL, 'parents': [root],
                 'mimeType': 'application/vnd.google-apps.folder',
-                'appProperties': {'heart_and_mind_hindi_kids_root': 'v1'}}, fields='id').execute()['id']
+                'appProperties': {self.CHILD_MARKER: 'v1'}}, fields='id').execute()['id']
         self.check_owned_folder(self.folder, user['emailAddress'])
 
     def check_owned_folder(self, folder, email):

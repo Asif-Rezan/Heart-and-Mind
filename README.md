@@ -1,3 +1,18 @@
+# Idea-driven ASMR production — testing with publication OFF
+
+The new isolated ASMR pipeline uses local AI to generate fresh ideas, executable
+scene recipes, and separate title/description/tags for a 4–5 minute full video and
+an exact 30-second Short. It follows the approved procedural soap-cutting approach,
+with actual blade/slice motion and synchronized material-specific sound.
+
+[ASMR production, test controls, publishing, Drive cleanup and recovery](docs/asmr-production.md).
+Implementation: `asmr/`; workflow: `.github/workflows/asmr-production.yml`.
+It is currently on `codex/asmr-production`; main and the existing cartoon pipeline
+remain unchanged. All ASMR publishing/cleanup gates default OFF, and the initial
+cloud run is an artifact-only full-duration test.
+
+---
+
 # Heart and Mind — English family story cartoons
 
 The active `music.yml` workflow now creates one shared English educational adventure cartoon for children and adults. It replaces the Hindi nursery-rhyme generation path. Narration, natural dialogue, humor, a believable mistake and its consequences carry the lesson; there are no separate child/adult cuts or obligatory dance choruses.

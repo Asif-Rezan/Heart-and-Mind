@@ -1,0 +1,130 @@
+# Idea-driven procedural ASMR production
+
+This implementation lives on `codex/asmr-production`; main and the existing
+cartoon publishing workflows have not been changed. The earlier approved
+`make_asmr.py` geometry/audio design is the renderer foundation. The preview
+workflow remains available separately.
+
+## What each new run does
+
+The existing pinned local Qwen3-4B model writes an original episode idea, twelve
+scene recipes, and separate English title/description/tags for the full video and
+Short. It chooses actual renderer controls: soap/sand/clay/slime, eight palettes,
+three slab shapes, four color patterns and 8–10 cuts per scene. Every scene must
+have a distinct configuration; at least two visual controls must vary across the
+episode. Titles cannot promise an absent material, real footage, medical effects
+or invented numeric event counts. Invalid AI output is retried within a bound;
+there is no canned-episode fallback and no model-generated Python is executed.
+
+History reserves the exact title and structural render fingerprint before the
+expensive scene jobs start. Different random seeds alone do not make an identical
+recipe new. Preview history persists in an Actions cache; cache eviction can limit
+preview history. Production uses durable private Drive history and keeps all
+reservations, including incomplete episodes. History comparison is a practical
+repeat guard, not a guarantee of originality across all possible content.
+
+Twelve scene jobs render moving blade strokes, contact seams, separate falling
+slices, shadows, material-specific crumbs/facet density and elastic slime
+stretch. Actual geometry and audio share the same cut event clock. Soap emphasizes
+crisp crunches, sand finer grains, clay softer chunks and slime wet squishes.
+These are stylized low-poly illustrations and synthesized sound, not real cutting
+footage or a full physical simulation. Camera and lighting are consistent; the
+idea changes the executed material/pattern/shape/palette/cut configuration.
+
+The full portrait video is 720×1280 / 30 FPS, with a choice of exactly 240, 270 or
+300 seconds. The separate Short is exactly thirty seconds: ten seconds from each
+of three AI-selected scene indices. Its metadata describes those selected scenes.
+Descriptions add real timeline chapter markers and an animation/synthetic-sound
+disclosure. Both products and thumbnails use the actual generated scene frames.
+
+## Test mode: publishing is OFF
+
+`AI ASMR long video and Short` runs on a push to the production test branch, with
+all publication and cleanup gates false. No YouTube or Facebook API writes occur,
+no Drive files are deleted, and no Drive client is created by default. Old global
+`PUBLISH_ENABLED=true` / `FACEBOOK_PUBLISH_ENABLED=true` variables cannot enable this
+new workflow. An optional `backup_to_drive` input permits private test backup;
+preview media remains until explicitly handled later and is never auto-deleted.
+
+Normal tests upload these artifacts for fourteen days:
+
+- `asmr-plan-RUN`: original idea, renderer recipes, generated metadata and draft.
+- `asmr-scene-RUN-INDEX`: per-scene video, actual frame, source identity and hashes.
+- `asmr-finished-RUN`: full `video.mp4`, `short/video.mp4`, both thumbnails,
+  `video-metadata.json`, `short-metadata.json`, `plan.json` and `media.json`.
+
+`media.json` records actual durations, dimensions, FPS, stereo audio and SHA-256.
+Every output is fully decoded with FFmpeg before it is accepted. Encodes are
+written to temporary files and only committed after validation. A changed scene
+recipe or renderer hash invalidates that scene's cached render.
+
+## Production activation after test review
+
+Merge the reviewed branch when ready to activate its workflow on the default
+branch. GitHub manual dispatch/recovery requires the workflow on the default
+branch; branch push tests work without a merge. No automatic ASMR schedule has
+been enabled by this implementation.
+
+To publish, BOTH the workflow dispatch input `publish=true` AND repository variable
+`ASMR_PUBLISH_ENABLED=true` are required. Set `ASMR_FACEBOOK_ENABLED=true` for both
+the Facebook feed video and Reel, and `ASMR_CLEANUP_ENABLED=true` for post-publication
+Drive cleanup. All three variables are independently false unless explicitly set.
+The full episode and Short use public visibility after platform processing, English
+metadata/audio, Entertainment category, not-made-for-kids audience and AI disclosure.
+
+Reuse the repository's existing `YOUTUBE_TOKEN_JSON`, `EXPECTED_CHANNEL_ID`,
+`DRIVE_TOKEN_JSON` and `DRIVE_FOLDER_ID`. Facebook additionally requires this
+project's `FACEBOOK_PAGE_ID` variable and `FACEBOOK_PAGE_ACCESS_TOKEN` secret.
+No channel/Page IDs or credentials are copied from another project. Preflight
+checks required names only when publishing is enabled; missing Facebook setup is
+a production configuration blocker, not evidence of a connected Page.
+
+The existing uploader checks the exact YouTube channel, durable video ID,
+metadata/settings, synthetic disclosure and public HD processing. Lost/ambiguous
+insert responses stop for reconciliation rather than inserting duplicate videos.
+Long video and Short have separate publication checkpoints. Facebook reuses the
+existing resumable Page-video/Reel uploader and requires verified YouTube success
+for the matching product. Facebook failure retains media for independent recovery.
+
+## Private backup, cleanup and recovery
+
+ASMR uses a separate owner-only child folder under the configured project root,
+marked `heart_and_mind_asmr_root=v1`; it never uses the cartoon/kids history folder.
+Storage retains the existing account/owner/root/privacy/quota guards. Media is
+backed up and verified before the first publication request. Plan, history,
+publication checkpoint and media report are retained as essential records.
+
+Cleanup requires fresh remote proof that BOTH YouTube products are public HD with
+matching identities and metadata; when Facebook was required in the original
+checkpoint, BOTH Facebook products must also be confirmed. Changing an enable flag
+later cannot bypass a saved Facebook requirement. The entire deletion manifest is
+validated before the first deletion. Each item must have the exact episode key,
+file ID, private parent, workflow-key tag, size and MD5. Only those named disposable
+media files are removed, with each deletion checkpointed; no account-wide trash
+emptying, folder deletion, broad sweep or unrelated data removal is performed.
+Scheduled/private/failed/ambiguous publications never qualify for cleanup.
+
+For render recovery use the same `run_id`, original code revision and
+`prepared_run` number. Matching scene artifacts are reused; missing artifacts fail
+explicitly and can be regenerated by running the affected scene stage from the
+saved plan. Artifacts expire after fourteen days. A production publication can
+instead use `operation=recover` with publishing enabled: it restores the original
+verified Drive media and resumes saved YouTube/Facebook IDs without AI regeneration.
+`operation=cleanup` restores only essential metadata and retries cleanup. Use the
+original renderer revision; source/hash or publication-policy changes fail closed.
+
+Local examples:
+
+```sh
+python -m unittest -v test_asmr
+python -m asmr --stage plan --run-id asmr-example --seconds 270
+python -m asmr --stage scene --run-id asmr-example --index 0
+# Render indices 0-11, then:
+python -m asmr --stage assemble --run-id asmr-example
+```
+
+Rendering and mock publication/cleanup regressions verify implementation behavior.
+Live publishing is intentionally not exercised while testing is off; successful
+preview generation cannot prove current OAuth/Page-token validity, API quotas or
+future platform acceptance. The cloud preview must complete before claiming an
+end-to-end AI-generated episode has been validated.
