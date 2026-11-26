@@ -15,6 +15,10 @@ have a distinct configuration; at least two visual controls must vary across the
 episode. Titles cannot promise an absent material, real footage, medical effects
 or invented numeric event counts. Invalid AI output is retried within a bound;
 there is no canned-episode fallback and no model-generated Python is executed.
+The ASMR planner passes an explicit decoding grammar for all twelve complete scene
+objects and metadata fields; it does not rely on the chat adapter's generic JSON
+fallback. Semantic and length validation still run after decoding, with bounded
+retries and saved candidate artifacts for diagnosis.
 
 History reserves the exact title and structural render fingerprint before the
 expensive scene jobs start. Different random seeds alone do not make an identical

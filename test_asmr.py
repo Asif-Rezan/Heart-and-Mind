@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import types
 from unittest.mock import Mock,patch
 import numpy as np
 from asmr.plan import finish,validate_plan,generate,metadata,fingerprint,atomic
@@ -27,6 +28,26 @@ def plan():return finish(payload(),'asmr-unit',270,42)
 
 
 class PlanningTests(unittest.TestCase):
+ def test_model_uses_explicit_grammar_and_rejects_incomplete_output(self):
+  from asmr.model import ask
+  backend=Mock();backend.tokenize.return_value=[1]
+  backend.create_chat_completion.return_value={'choices':[{'finish_reason':'stop','message':{'content':json.dumps(payload())}}]}
+  grammar=Mock();module=types.SimpleNamespace(LlamaGrammar=grammar)
+  with patch.dict('sys.modules',{'llama_cpp':module}),patch('lyrics_cpu.load_model',return_value=backend):
+   self.assertEqual(ask('Make an episode',{},42),payload())
+   call=backend.create_chat_completion.call_args.kwargs
+   self.assertIs(call['grammar'],grammar.from_string.return_value)
+   self.assertNotIn('response_format',call)
+   backend.create_chat_completion.return_value['choices'][0]['finish_reason']='length'
+   with self.assertRaisesRegex(ValueError,'incomplete'):ask('Make an episode',{},42)
+ def test_invalid_model_candidate_is_saved_and_retried_with_specific_field(self):
+  bad=payload();bad['scenes'][0].pop('cuts')
+  with tempfile.TemporaryDirectory() as d:
+   ask=Mock(side_effect=[bad,payload()])
+   p=generate(d,'asmr-retry',270,[],ask)
+   self.assertEqual(p['run_id'],'asmr-retry')
+   self.assertIn('cuts',ask.call_args.args[0])
+   self.assertEqual(ask.call_count,2)
  def test_full_and_short_have_accurate_separate_chapters(self):
   p=plan()
   self.assertEqual(p['seconds'],270)

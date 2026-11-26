@@ -123,23 +123,20 @@ of those three scenes, for exactly 30 seconds. Short metadata describes ONLY tho
 Labels are short, readable chapter names. No timestamps in descriptions; real ones are added later.
 Avoid the recent ideas/titles/render configurations: {json.dumps(recent)}.
 Return only the requested JSON; labels and colors must match the selected renderer controls.'''
+ prompt+='\nKeep idea to 120-220 CHARACTERS, titles to 35-75 CHARACTERS, descriptions to 150-350 CHARACTERS, labels to 15-45 CHARACTERS. Each scene MUST include label, material, palette, shape, pattern and cuts. Include all twelve complete scenes.'
  if ask is None:
-  def ask(prompt,spec,seed):
-   from lyrics_cpu import request_story,MODEL_ID
-   response=request_story('chat/completions',dict(model=MODEL_ID,seed=seed,max_completion_tokens=4800,
-    messages=[dict(role='system',content='You design original procedural ASMR episodes. Respect the renderer controls and return valid JSON only.'),dict(role='user',content=prompt)],
-    response_format=dict(type='json_schema',json_schema=dict(name='asmr_episode',schema=spec))))
-   return json.loads(response['choices'][0]['message']['content'])
+  from .model import ask
  for attempt in range(3):
-  payload=ask(prompt,schema(),seed+attempt)
-  atomic(root/'draft.json',payload)
   try:
+   payload=ask(prompt,schema(),seed+attempt)
+   atomic(root/'draft.json',payload)
    plan=finish(payload,run_id,seconds,seed)
    if any(h.get('fingerprint')==plan['fingerprint'] or h.get('title','').casefold()==plan['video']['title'].casefold() for h in history if h.get('run_id')!=run_id):raise ValueError('Duplicate ASMR title or render plan')
    diversity=[len({s[k] for s in plan['scenes']}) for k in ('material','shape','pattern','palette')]
    if sum(n>1 for n in diversity)<2:raise ValueError('Episode needs variation in two visual controls')
    atomic(path,plan);return plan
   except (ValueError,ValidationError) as e:
+   print(json.dumps(dict(check='ASMR plan validation',attempt=attempt+1,error_type=type(e).__name__,field=list(e.absolute_path) if isinstance(e,ValidationError) else [])),flush=True)
    if attempt==2:raise
    reason=e.message if isinstance(e,ValidationError) else str(e)
    prompt+='\nCorrect the previous candidate: '+reason[:400]+'. Return a complete new candidate.'
