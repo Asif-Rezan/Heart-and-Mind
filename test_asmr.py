@@ -118,6 +118,28 @@ class DisabledPublicationTests(unittest.TestCase):
    self.assertFalse(pub.publish_enabled())
 
 class DurablePublicationTests(unittest.TestCase):
+ def test_missing_remote_completed_backup_stops_reuse(self):
+  from asmr.render import product_identity
+  p=plan();store=Mock();store.verified.return_value=False
+  store.load.return_value=dict(identity=product_identity(p),facebook_required=False,backup_complete=True,
+   media=[dict(id='missing',key='episode/video',size=4,md5='checksum')])
+  with patch.dict(os.environ,{'ASMR_DRIVE_BACKUP':'true','ASMR_FACEBOOK_ENABLED':'false'}),patch.object(pub,'validate_products'):
+   with self.assertRaisesRegex(ValueError,'changed or disappeared'):pub.backup('/unused',p,store)
+  store.upload.assert_not_called()
+ def test_backup_not_complete_until_recovery_metadata_is_saved(self):
+  from asmr.render import product_identity
+  p=plan();store=Mock();state=dict(identity=product_identity(p),facebook_required=False,media=[])
+  store.load.return_value=state;store.upload.return_value={'id':'media'}
+  def save(key,value):
+   if key.endswith('/media.json'):raise RuntimeError('Simulated essential metadata failure')
+  store.save.side_effect=save
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d);(root/'short').mkdir()
+   for name in ('video.mp4','thumbnail.jpg','short/video.mp4','short/thumbnail.jpg'):(root/name).write_bytes(b'fake')
+   atomic(root/'media.json',{})
+   with patch.dict(os.environ,{'ASMR_DRIVE_BACKUP':'true','ASMR_FACEBOOK_ENABLED':'false'}),patch.object(pub,'validate_products'):
+    with self.assertRaisesRegex(RuntimeError,'essential'):pub.backup(root,p,store)
+   self.assertFalse(state.get('backup_complete'))
  def test_partial_backup_resumes_remaining_files(self):
   p=plan();store=Mock()
   from asmr.render import product_identity,file_hash
