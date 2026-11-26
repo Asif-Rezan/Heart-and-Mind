@@ -42,7 +42,29 @@ class EnglishWritingTests(unittest.TestCase):
   self.assertEqual(set(jobs['render']['needs']),{'lyrics','music','images'})
   self.assertIn('requirements-song-video.txt','\n'.join(s.get('run','') for s in jobs['render']['steps']))
   self.assertIn('vars.ENGLISH_SONG_PUBLISH_ENABLED',jobs['publication']['if'])
+  self.assertEqual(jobs['drive_cleanup']['needs'],['lyrics','publication'])
+  self.assertIn("needs.publication.result == 'success'",jobs['drive_cleanup']['if'])
+  self.assertIn('--metadata-only','\n'.join(s.get('run','') for s in jobs['drive_cleanup']['steps']))
+  self.assertNotIn('--stage cleanup','\n'.join(s.get('run','') for s in jobs['publication']['steps']))
   self.assertNotIn('vars.PUBLISH_ENABLED',str(workflow));self.assertNotIn('Kokoro',str(workflow))
+ def test_search_packaging_is_truthful_complete_and_bounded(self):
+  from english_song.packaging import metadata
+  p=song();result=metadata(p,['00:00 Opening','00:35 Second scene','01:10 Third scene'])
+  self.assertTrue(result['title'].startswith(p['title']));self.assertLessEqual(len(result['title']),100)
+  self.assertIn(p['lyrics'],result['description']);self.assertIn('00:35 Second scene',result['description'])
+  self.assertIn('AI-generated',result['description']);self.assertLessEqual(len(result['description']),5000)
+  self.assertEqual(len(result['tags']),len(set(result['tags'])))
+ def test_bright_thumbnail_is_uploadable_and_has_title(self):
+  from english_song.packaging import thumbnail
+  with tempfile.TemporaryDirectory() as d:
+   source=Path(d)/'scene.png';target=Path(d)/'thumbnail.jpg'
+   Image.new('RGB',(1024,576),(40,70,90)).save(source)
+   thumbnail(source,target,'The Light You Left Behind')
+   with Image.open(target) as cover:
+    self.assertEqual(cover.size,(1920,1080))
+    self.assertGreater(cover.getpixel((1000,900))[0],40)
+    self.assertGreater(max(cover.convert('L').crop((100,60,1800,400)).getdata()),200)
+   self.assertLess(target.stat().st_size,2*1024*1024)
  def test_critic_grammar_has_valid_identifiers_and_optional_issue_array(self):
   import re
   grammar=w.grammar(w.review_schema())
@@ -123,6 +145,8 @@ class EnglishPublicationTests(unittest.TestCase):
   client=Mock();client.videos().list().execute.return_value={'items':[{'id':'published-id'}]}
   with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,{'ENGLISH_SONG_PUBLISH_ENABLED':'true','ENGLISH_SONG_CLEANUP_ENABLED':'true','EXPECTED_CHANNEL_ID':'channel'}),patch.object(pub,'preflight'),patch.object(pub,'SongStore',return_value=store),patch('pipeline.youtube_client',return_value=client),patch('upload_settings.verified_phase',return_value='published'):
    pub.cleanup(d,p);pub.cleanup(d,p)
+   report=json.loads((Path(d)/'cleanup-report.json').read_text())
+   self.assertEqual(report['reclaimed_bytes'],100);self.assertEqual(report['deleted_files'],1)
   store.client.files().delete.assert_called_once_with(fileId='owned-audio');store.check_private.assert_called_once_with('owned-audio')
   self.assertTrue(state['cleanup_complete']);self.assertEqual(state['deleted'],['owned-audio'])
  def test_saved_facebook_requirement_cannot_be_disabled_to_bypass_cleanup(self):

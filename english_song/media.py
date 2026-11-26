@@ -10,7 +10,7 @@ from .writer import validate_song
 from . import VERSION
 
 def identity(song):
- return digest(dict(song=song,version=VERSION,renderer=file_hash(__file__)))
+ return digest(dict(song=song,version=VERSION,renderer=file_hash(__file__),packaging=file_hash(Path(__file__).with_name('packaging.py'))))
 
 def probe(path):
  return json.loads(subprocess.check_output(['ffprobe','-v','error','-show_format','-show_streams','-of','json',str(path)]))
@@ -139,11 +139,11 @@ def assemble(root,song):
   final.close();audio.close()
   for clip in clips:clip.close()
  subprocess.run(['ffmpeg','-v','error','-i',str(temp),'-f','null','-'],check=True);temp.replace(root/'video.mp4')
- with Image.open(paths[0]) as im:ImageOps.fit(im.convert('RGB'),(1920,1080),method=Image.Resampling.LANCZOS).save(root/'thumbnail.jpg',quality=94)
+ from .packaging import thumbnail,metadata
+ thumbnail(paths[0],root/'thumbnail.jpg',song['title'])
  starts=[]
  for i,start in enumerate(scene_starts):
   t=int(start);starts.append(f'{t//60:02}:{t%60:02} '+song['visuals'][i]['label'])
- description=song['description']+'\n\nOriginal English song created with AI-generated lyrics, singing/music and artwork.\n\nVisual chapters\n'+'\n'.join(starts)
- atomic(root/'metadata.json',dict(title=song['title'],description=description,tags=song['tags']))
+ atomic(root/'metadata.json',metadata(song,starts))
  atomic(root/'media.json',dict(identity=identity(song),seconds=seconds,language='en',lyrics_sha256=song['lyrics_sha256'],renderer='MoviePy 2.2.1',scene_starts=scene_starts,files={name:file_hash(root/name) for name in ('song.wav','video.mp4','thumbnail.jpg','metadata.json')}))
  return verify_products(root,song)

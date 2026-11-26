@@ -113,7 +113,13 @@ def cleanup(root,song):
   except Exception as error:
    if getattr(getattr(error,'resp',None),'status',None)!=404:raise
   state['deleted'].append(item['id']);save(root,store,song,state)
- state['cleanup_complete']=True;save(root,store,song,state);return state
+ state['cleanup_complete']=True;save(root,store,song,state)
+ report=dict(run_id=song['run_id'],cleanup_complete=True,deleted_files=len(state['deleted']),reclaimed_bytes=sum(int(m['size']) for m in state['media'] if m['id'] in state['deleted']),retained=essentials()+['history.json','publication.json'],platforms_verified=True)
+ atomic(root/'cleanup-report.json',report)
+ summary=os.getenv('GITHUB_STEP_SUMMARY')
+ if summary:
+  with open(summary,'a') as f:f.write('## Verified Drive cleanup\nDeleted '+str(report['deleted_files'])+' generated media files ('+str(report['reclaimed_bytes'])+' bytes). Essential metadata and history retained.\n')
+ return state
 
 def restore(root,run_id,media=True):
  if not backup_enabled():raise ValueError('Explicit English backup/publication required for Drive restore')

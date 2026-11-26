@@ -67,7 +67,9 @@ Publishing requires BOTH dispatch `publish=true` and repository variable
 `ENGLISH_SONG_PUBLISH_ENABLED=true`. Optional Facebook also requires
 `ENGLISH_SONG_FACEBOOK_ENABLED=true`, this project's `FACEBOOK_PAGE_ID` and
 `FACEBOOK_PAGE_ACCESS_TOKEN`. Cleanup requires
-`ENGLISH_SONG_CLEANUP_ENABLED=true`. Keep these disabled while reviewing previews.
+`ENGLISH_SONG_CLEANUP_ENABLED` defaults to on for verified published songs; set it
+to `false` to retain all media. Publishing remains disabled during previews, so
+preview media is never automatically deleted.
 
 Use the existing Heart and Mind `YOUTUBE_TOKEN_JSON`, `EXPECTED_CHANNEL_ID`,
 `DRIVE_TOKEN_JSON` and `DRIVE_FOLDER_ID`. No account credentials or destination IDs
@@ -78,6 +80,11 @@ quota guards remain. English songs use their own child marker
 Backup verifies exact file identity/checksums and saves essential song, metadata,
 audio and media receipts before marking completion. Upload uses the existing
 ambiguous-insert and saved-video-ID guards; reruns do not blindly duplicate songs.
+The Actions graph shows publication → **Verify published platforms and clean Drive media**
+as separate jobs. The cleanup job restores only small receipts, writes an audit
+artifact and reports reclaimed bytes in the run summary. It remains skipped in
+preview mode or after publication failure.
+
 Cleanup freshly verifies the correct YouTube video/channel, metadata, AI/audience
 settings and public HD processing. If Facebook was required in the original
 checkpoint, it must also be confirmed even if its enable flag changes later.
@@ -93,10 +100,9 @@ For generation recovery, use the same run ID, topic, duration and voice plus the
 original `prepared_run`; missing/expired artifacts fail clearly. Saved singing
 cannot be reused under changed lyrics.
 
-Daily 03:00 Asia/Dhaka automation is available ONLY with
-`ENGLISH_SONG_AUTOMATION_ENABLED=true` after merge. Scheduled publishing additionally
-requires the English publish flag. No automation or publish flag is enabled by
-this implementation. The old cartoon workflow is replaced in this branch and
+Daily generation runs at **03:00 Asia/Dhaka** from the default branch. Set
+`ENGLISH_SONG_AUTOMATION_ENABLED=false` to pause it. Scheduled publishing additionally
+requires `ENGLISH_SONG_PUBLISH_ENABLED=true`; testing keeps this off. The old cartoon workflow is replaced in this branch and
 archived for rollback, rather than running a second format from the same trigger.
 
 ## Models and local checks
@@ -127,3 +133,9 @@ another download.
 Sources: [ACE-Step English vocal language and parameter documentation](https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/API.md),
 [SSD-1B model and limitations](https://huggingface.co/segmind/SSD-1B),
 [MoviePy v2 composition and transitions](https://zulko.github.io/moviepy/user_guide/compositing.html).
+
+Search packaging uses the actual song title with an English emotional-pop qualifier,
+relevant deduplicated tags, story, complete lyrics, AI disclosure and measured visual
+chapters. Thumbnails use the actual opening artwork with bright tonal separation,
+strong warm/cool composition and a bold readable song title. No invented artist
+credits, popularity claims or promised CTR gains are added.

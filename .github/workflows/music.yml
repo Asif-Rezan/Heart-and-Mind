@@ -49,7 +49,7 @@ concurrency:
 env:
   ENGLISH_SONG_PUBLISH_ENABLED: ${{ (inputs.publish || github.event_name == 'schedule') && vars.ENGLISH_SONG_PUBLISH_ENABLED == 'true' && 'true' || 'false' }}
   ENGLISH_SONG_FACEBOOK_ENABLED: ${{ (inputs.publish || github.event_name == 'schedule') && vars.ENGLISH_SONG_PUBLISH_ENABLED == 'true' && vars.ENGLISH_SONG_FACEBOOK_ENABLED == 'true' && 'true' || 'false' }}
-  ENGLISH_SONG_CLEANUP_ENABLED: ${{ (inputs.publish || github.event_name == 'schedule') && vars.ENGLISH_SONG_PUBLISH_ENABLED == 'true' && vars.ENGLISH_SONG_CLEANUP_ENABLED == 'true' && 'true' || 'false' }}
+  ENGLISH_SONG_CLEANUP_ENABLED: ${{ (inputs.publish || github.event_name == 'schedule') && vars.ENGLISH_SONG_PUBLISH_ENABLED == 'true' && vars.ENGLISH_SONG_CLEANUP_ENABLED != 'false' && 'true' || 'false' }}
   ENGLISH_SONG_DRIVE_BACKUP: ${{ (inputs.backup_to_drive || ((inputs.publish || github.event_name == 'schedule') && vars.ENGLISH_SONG_PUBLISH_ENABLED == 'true')) && 'true' || 'false' }}
   HF_HUB_DISABLE_XET: '1'
   HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
@@ -62,7 +62,7 @@ jobs:
   lyrics:
     name: Original English lyrics and independent editorial critique
     if: >-
-      (github.event_name != 'schedule' || vars.ENGLISH_SONG_AUTOMATION_ENABLED == 'true') &&
+      (github.event_name != 'schedule' || vars.ENGLISH_SONG_AUTOMATION_ENABLED != 'false') &&
       (inputs.operation == '' || inputs.operation == 'generate')
     runs-on: ubuntu-24.04
     timeout-minutes: 100
@@ -124,7 +124,7 @@ jobs:
   image_models:
     name: Prepare pinned image-model cache
     if: >-
-      (github.event_name != 'schedule' || vars.ENGLISH_SONG_AUTOMATION_ENABLED == 'true') &&
+      (github.event_name != 'schedule' || vars.ENGLISH_SONG_AUTOMATION_ENABLED != 'false') &&
       (inputs.operation == '' || inputs.operation == 'generate')
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -285,7 +285,7 @@ jobs:
             echo 'Preview artifacts require listening/viewing review; AI editorial scores do not verify the unheard performance.'
           } >> "$GITHUB_STEP_SUMMARY"
   publication:
-    name: Guarded YouTube/Facebook publication then verified Drive cleanup
+    name: Guarded YouTube/Facebook publication
     needs: [lyrics, render]
     if: >-
       (inputs.publish || github.event_name == 'schedule') && vars.ENGLISH_SONG_PUBLISH_ENABLED == 'true'
@@ -311,10 +311,46 @@ jobs:
       - env: {RUN_ID: '${{ needs.lyrics.outputs.run_id }}'}
         run: |
           python -u -m english_song --stage publish --run-id "$RUN_ID"
-          python -u -m english_song --stage cleanup --run-id "$RUN_ID"
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: 'english-song-publication-${{ github.run_id }}', path: 'output/*/publication.json', retention-days: 14}
+  drive_cleanup:
+    name: Verify published platforms and clean Drive media
+    needs: [lyrics, publication]
+    if: >-
+      needs.publication.result == 'success' && vars.ENGLISH_SONG_CLEANUP_ENABLED != 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+      EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID }}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+      FACEBOOK_PAGE_ID: ${{ vars.FACEBOOK_PAGE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r requirements.txt
+      - name: Restore receipts without downloading large media
+        env: {RUN_ID: '${{ needs.lyrics.outputs.run_id }}'}
+        run: python -u -m english_song --stage restore --metadata-only --run-id "$RUN_ID"
+      - name: Verify public uploads and delete only exact backed-up files
+        env: {RUN_ID: '${{ needs.lyrics.outputs.run_id }}'}
+        run: python -u -m english_song --stage cleanup --run-id "$RUN_ID"
+      - name: Save cleanup audit even after partial failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: english-song-cleanup-${{ github.run_id }}
+          path: |
+            output/*/publication.json
+            output/*/cleanup-report.json
+            output/*/failure.json
+          retention-days: 14
+          if-no-files-found: warn
   recovery:
     name: Recover original English publication or cleanup without regeneration
     if: inputs.operation == 'recover' || inputs.operation == 'cleanup'

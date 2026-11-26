@@ -111,10 +111,10 @@ def write(root,run_id,seconds=210,voice='female',history=(),request='Original em
   'Verse 1 sets a real scene; verse 2 advances events, bridge changes perspective; outro resolves the central image. '
   'Each lyric line is 4-12 words, ideally 6-9, with comfortable two-bar phrasing. Use natural near-rhyme and varied line openings. '
   'Return sections verse1=4 lines, prechorus=2, chorus=4, verse2=4, bridge=4, outro=2. Do not repeat choruses yourself; software repeats the EXACT chorus. '
-  'Title 20-65 characters, English description 150-600 characters, story 100-450 characters, 5-10 relevant music tags, bpm 78-104, key one of '+str(KEYS)+'. '
+  'Title 20-65 characters: a specific memorable phrase grounded in the chorus, emotionally intriguing but accurate, no clickbait claims or artist names. English description 150-600 characters: name the central relationship moment and emotional payoff in the first two sentences, natural English, no keyword stuffing. Story 100-450 characters, 5-10 relevant music/mood tags, bpm 78-104, key one of '+str(KEYS)+'. '
   'Production caption 80-240 characters describing instruments and arrangement, no artist names. Target '+str(seconds)+' seconds, mature '+voice+' lead, clear English singing. '
   'Six cinematic landscape background prompts, each 120-350 characters with a short label. Depict six different moments/places/objects from this lyric story. '
-  'Repeat one coherent color palette/time of day; prefer landscapes and meaningful objects over faces/hands. No nursery cartoons, lettering, split screens or cloned compositions. '
+  'Repeat one coherent complementary warm amber/cool teal color palette/time of day. Bright luminous focal subject, rich saturated color, clear tonal separation, readable at mobile size; avoid muddy underexposed scenes. Opening composition doubles as thumbnail: one large story-related focal object off-center, clean upper quarter for title overlay. Prefer landscapes and meaningful objects over faces/hands. No nursery cartoons, lettering, split screens or cloned compositions. '
   'Avoid recent titles and chorus wording: '+json.dumps(recent)+'. Return only the structured song JSON.')
  for attempt in range(3):
   try:
